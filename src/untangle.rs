@@ -10,21 +10,18 @@ mod history;
 mod python;
 
 use std::collections::{BTreeSet, HashMap, HashSet};
-use std::ffi::OsStr;
 use std::fmt::Write as _;
 use std::fs;
-use std::hash::{DefaultHasher, Hash, Hasher};
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
-use anyhow::{Context, Result};
-use ast_grep_core::Language;
+use anyhow::Result;
 use ast_grep_language::SupportLang;
 use clap::ValueEnum;
 use rayon::prelude::*;
 use serde::Serialize;
 
-use crate::git;
+use crate::ledger::{self, Ledger, Listed, Place, Tree};
 use crate::output::Format;
 use crate::source;
 use crate::style::Style;
@@ -33,41 +30,17 @@ use crate::workspace::Workspace;
 
 use history::History;
 
-/// How many places of a finding the text shows. The JSON holds every place.
-const PLACES_SHOWN: usize = 3;
+type Finding = ledger::Finding<Kind>;
+type Entry = ledger::Entry<Kind>;
 
 /// The three ways to get the question wrong, and the code that stands outside the design.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize)]
 #[serde(rename_all = "kebab-case")]
-enum Group {
+pub(crate) enum Group {
     HiddenLink,
     NeedlessLink,
     Surplus,
     SpecialCase,
-}
-
-impl Group {
-    const ALL: [Self; 4] = [
-        Self::HiddenLink,
-        Self::NeedlessLink,
-        Self::Surplus,
-        Self::SpecialCase,
-    ];
-
-    fn heading(self) -> &'static str {
-        match self {
-            Self::HiddenLink => {
-                "Hidden links: pieces that must change together, where the code does not show it"
-            }
-            Self::NeedlessLink => {
-                "Needless links: pieces tied together that change for different reasons"
-            }
-            Self::Surplus => "Surplus: pieces with no reason of their own to change",
-            Self::SpecialCase => {
-                "Special cases: code for one situation, which the design did not account for"
-            }
-        }
-    }
 }
 
 /// What a finding is.
@@ -106,7 +79,16 @@ pub(crate) enum Kind {
     DisabledTest,
 }
 
-impl Kind {
+impl ledger::Kind for Kind {
+    type Group = Group;
+
+    const GROUPS: &'static [Group] = &[
+        Group::HiddenLink,
+        Group::NeedlessLink,
+        Group::Surplus,
+        Group::SpecialCase,
+    ];
+
     fn group(self) -> Group {
         match self {
             Self::Copy | Self::ChangesTogether | Self::SharedState => Group::HiddenLink,
@@ -122,13 +104,23 @@ impl Kind {
         }
     }
 
-    fn name(self) -> String {
-        self.to_possible_value()
-            .expect("no kind is skipped")
-            .get_name()
-            .to_owned()
+    fn heading(group: Group) -> &'static str {
+        match group {
+            Group::HiddenLink => {
+                "Hidden links: pieces that must change together, where the code does not show it"
+            }
+            Group::NeedlessLink => {
+                "Needless links: pieces tied together that change for different reasons"
+            }
+            Group::Surplus => "Surplus: pieces with no reason of their own to change",
+            Group::SpecialCase => {
+                "Special cases: code for one situation, which the design did not account for"
+            }
+        }
     }
+}
 
+impl Kind {
     /// The kind that a rule of the Python pack reports, for the rules that the ledger takes
     /// over from `xpd check`.
     fn of_rule(rule: &str) -> Option<Self> {
@@ -142,110 +134,6 @@ impl Kind {
     }
 }
 
-/// One place of a finding. Lines count from 1.
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize)]
-struct Place {
-    path: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    line: Option<usize>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    end_line: Option<usize>,
-}
-
-impl Place {
-    fn file(path: &str) -> Self {
-        Self {
-            path: path.to_owned(),
-            line: None,
-            end_line: None,
-        }
-    }
-
-    fn line(path: &str, line: usize) -> Self {
-        Self {
-            line: Some(line),
-            ..Self::file(path)
-        }
-    }
-
-    fn text(&self) -> String {
-        match (self.line, self.end_line) {
-            (Some(line), Some(end)) => format!("{}:{line}-{end}", self.path),
-            (Some(line), None) => format!("{}:{line}", self.path),
-            _ => self.path.clone(),
-        }
-    }
-}
-
-/// One entry of the ledger.
-#[derive(Debug, Clone, Serialize)]
-struct Finding {
-    kind: Kind,
-    /// What the finding is about, without a line or a count, so that the same finding has the
-    /// same key at another commit.
-    #[serde(skip)]
-    key: String,
-    places: Vec<Place>,
-    /// What was measured, as one sentence.
-    evidence: String,
-    /// How strong the evidence is among findings of the same kind. The strongest come first.
-    #[serde(skip)]
-    weight: usize,
-}
-
-/// A finding as the ledger lists it.
-#[derive(Debug, Clone, Serialize)]
-struct Entry {
-    /// The name of the finding, which it keeps at another commit as long as its files keep
-    /// their paths. Of two findings that are alike in one file, the first in the file has the
-    /// first id.
-    id: String,
-    /// With `--since`: whether the commit had no finding of this id.
-    #[serde(rename = "new", skip_serializing_if = "Option::is_none")]
-    fresh: Option<bool>,
-    #[serde(flatten)]
-    finding: Finding,
-}
-
-/// The findings with their ids, in the same order.
-fn named(findings: Vec<Finding>) -> Vec<Entry> {
-    let mut alike: HashMap<(Kind, String), usize> = HashMap::new();
-    (findings.into_iter())
-        .map(|finding| {
-            let nth = alike
-                .entry((finding.kind, finding.key.clone()))
-                .or_default();
-            *nth += 1;
-            let mut hasher = DefaultHasher::new();
-            (finding.kind.name(), &finding.key, *nth).hash(&mut hasher);
-            Entry {
-                id: format!("{:08x}", hasher.finish() & 0xffff_ffff),
-                fresh: None,
-                finding,
-            }
-        })
-        .collect()
-}
-
-/// How many findings of one kind there are.
-#[derive(Debug, Serialize)]
-struct KindCount {
-    kind: Kind,
-    count: usize,
-    /// The count at the commit of `--since`.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    was: Option<usize>,
-}
-
-#[derive(Debug, Serialize)]
-struct GroupCount {
-    group: Group,
-    count: usize,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    was: Option<usize>,
-    kinds: Vec<KindCount>,
-}
-
 /// What a run read.
 #[derive(Debug, Clone, Copy, Serialize)]
 struct Read {
@@ -255,35 +143,6 @@ struct Read {
     python: usize,
     /// The commits of the history. 0 outside a git repository.
     commits: usize,
-}
-
-#[derive(Debug, Serialize)]
-struct Summary {
-    count: usize,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    was: Option<usize>,
-    /// With `--since`: the findings of today that the commit did not have.
-    #[serde(rename = "new", skip_serializing_if = "Option::is_none")]
-    fresh: Option<usize>,
-    /// With `--since`: the findings of the commit that are gone today.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    fixed: Option<usize>,
-    groups: Vec<GroupCount>,
-}
-
-/// What `xpd untangle` prints.
-#[derive(Debug, Serialize)]
-struct Ledger {
-    read: Read,
-    /// The commit that `was` counts.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    since: Option<String>,
-    summary: Summary,
-    /// The strongest findings of each kind, up to the limit.
-    findings: Vec<Entry>,
-    /// With `--since`: the findings of the commit that are gone today, up to the limit.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    fixed: Option<Vec<Entry>>,
 }
 
 /// List the places where the code gets wrong which pieces change together.
@@ -319,7 +178,7 @@ pub(crate) struct UntangleArgs {
 
 impl UntangleArgs {
     pub(crate) fn run(self, default: Format) -> Result<ExitCode> {
-        let top = repository(&self.paths[0]);
+        let top = ledger::repository(&self.paths[0]);
         let history =
             (top.as_deref()).map_or_else(History::default, |top| History::read(top, "HEAD"));
         let files = Tree {
@@ -329,307 +188,44 @@ impl UntangleArgs {
         let (read, findings) = survey(&self.paths, files, &history)?;
         let before = match &self.since {
             Some(commit) => {
-                let top = top.as_deref().with_context(|| {
-                    format!(
-                        "{} is in no git repository, which --since needs",
-                        self.paths[0].display()
-                    )
+                let top = ledger::repository_for_since(top.as_deref(), &self.paths[0])?;
+                let then = ledger::at_commit(&self.paths, top, commit, |then, files, resolved| {
+                    Ok(survey(then, files, &History::read(top, resolved))?.1)
                 })?;
-                Some(survey_commit(&self.paths, top, commit)?)
+                Some((commit.clone(), then.unwrap_or_default()))
             }
             None => None,
         };
-        let mut findings = findings;
-        let mut fixed = None;
-        if let Some(before) = &before {
-            let had: HashSet<&str> = before.iter().map(|entry| entry.id.as_str()).collect();
-            for entry in &mut findings {
-                entry.fresh = Some(!had.contains(entry.id.as_str()));
-            }
-            let has: HashSet<&str> = findings.iter().map(|entry| entry.id.as_str()).collect();
-            fixed = Some(
-                (before.iter())
-                    .filter(|entry| !has.contains(entry.id.as_str()))
-                    .cloned()
-                    .collect::<Vec<_>>(),
-            );
-        }
-        let mut summary = summary(&findings, before.as_deref());
-        summary.fresh = (before.is_some()).then(|| {
-            findings
-                .iter()
-                .filter(|entry| entry.fresh == Some(true))
-                .count()
-        });
-        summary.fixed = fixed.as_ref().map(Vec::len);
-        let ledger = Ledger {
-            read,
-            since: self.since.clone(),
-            summary,
-            findings: self.listed(findings),
-            fixed: fixed.map(|fixed| self.listed(fixed)),
+        let listed = Listed {
+            kinds: &self.kind,
+            limit: self.limit,
         };
+        let ledger = Ledger::new(read, findings, before, listed);
         match self.format.unwrap_or(default) {
             Format::Json => println!("{}", serde_json::to_string(&ledger)?),
-            Format::Text => print!("{}", self.text(&ledger)),
+            Format::Text => print!("{}", ledger.text(&header(&ledger), listed)),
         }
         Ok(ExitCode::SUCCESS)
     }
-
-    /// The findings of the kinds that were asked for, up to the limit of each kind.
-    fn listed(&self, findings: Vec<Entry>) -> Vec<Entry> {
-        let mut listed: HashMap<Kind, usize> = HashMap::new();
-        (findings.into_iter())
-            .filter(|entry| self.kind.is_empty() || self.kind.contains(&entry.finding.kind))
-            .filter(|entry| {
-                let count = listed.entry(entry.finding.kind).or_default();
-                *count += 1;
-                self.limit == 0 || *count <= self.limit
-            })
-            .collect()
-    }
-
-    fn text(&self, ledger: &Ledger) -> String {
-        let mut text = String::new();
-        let was = |was: Option<usize>| was.map_or_else(String::new, |was| format!(" (was {was})"));
-        let Read {
-            files,
-            python,
-            commits,
-        } = ledger.read;
-        let since = match (
-            ledger.summary.was,
-            ledger.summary.fixed,
-            ledger.summary.fresh,
-        ) {
-            (Some(was), Some(fixed), Some(fresh)) => {
-                format!(" (was {was}, {fixed} fixed, {fresh} new)")
-            }
-            _ => String::new(),
-        };
-        let _ = writeln!(
-            text,
-            "xpd untangle: {} findings{since} in {files} files, {python} of them Python, with {commits} commits of history",
-            ledger.summary.count,
-        );
-        if commits == 0 {
-            text.push_str(
-                "No git history was read, so no finding rests on how the files changed.\n",
-            );
-        }
-        for group in &ledger.summary.groups {
-            let _ = writeln!(
-                text,
-                "\n{}: {}{}",
-                group.group.heading(),
-                group.count,
-                was(group.was)
-            );
-            for kind in &group.kinds {
-                if kind.count == 0 && kind.was.unwrap_or(0) == 0 {
-                    continue;
-                }
-                let _ = writeln!(
-                    text,
-                    "  {}: {}{}",
-                    kind.kind.name(),
-                    kind.count,
-                    was(kind.was)
-                );
-                let listed: Vec<_> = (ledger.findings.iter())
-                    .filter(|entry| entry.finding.kind == kind.kind)
-                    .collect();
-                for entry in &listed {
-                    let _ = writeln!(text, "    {}", entry.text());
-                }
-                let selected = self.kind.is_empty() || self.kind.contains(&kind.kind);
-                if selected && listed.len() < kind.count {
-                    let _ = writeln!(
-                        text,
-                        "    and {} more with --kind {} --limit 0",
-                        kind.count - listed.len(),
-                        kind.kind.name()
-                    );
-                }
-            }
-        }
-        if let (Some(fixed), Some(commit)) = (&ledger.fixed, &ledger.since) {
-            let _ = writeln!(
-                text,
-                "\nFixed since {commit}: {}",
-                ledger.summary.fixed.unwrap_or(0)
-            );
-            for entry in fixed {
-                let _ = writeln!(text, "  {}  {}", entry.finding.kind.name(), entry.text());
-            }
-        }
-        text
-    }
 }
 
-impl Entry {
-    /// The finding on one line: its id, `new` when the commit of `--since` did not have it,
-    /// its first places and its evidence.
-    fn text(&self) -> String {
-        let finding = &self.finding;
-        let mut places: Vec<_> =
-            (finding.places.iter().take(PLACES_SHOWN).map(Place::text)).collect();
-        if finding.places.len() > PLACES_SHOWN {
-            places.push(format!("{} more", finding.places.len() - PLACES_SHOWN));
-        }
-        let fresh = if self.fresh == Some(true) { " new" } else { "" };
-        format!(
-            "{}{fresh}  {}  {}",
-            self.id,
-            places.join(", "),
-            finding.evidence
-        )
+/// The first lines of the text: the count, and what the run read.
+fn header(ledger: &Ledger<Kind, Read>) -> String {
+    let Read {
+        files,
+        python,
+        commits,
+    } = ledger.read;
+    let mut text = String::new();
+    let _ = writeln!(
+        text,
+        "xpd untangle: {} in {files} files, {python} of them Python, with {commits} commits of history",
+        ledger.count(),
+    );
+    if commits == 0 {
+        text.push_str("No git history was read, so no finding rests on how the files changed.\n");
     }
-}
-
-/// The count of each kind and group, with the counts of `before` beside them.
-fn summary(findings: &[Entry], before: Option<&[Entry]>) -> Summary {
-    let count = |findings: &[Entry], kind: Kind| {
-        findings
-            .iter()
-            .filter(|entry| entry.finding.kind == kind)
-            .count()
-    };
-    let groups: Vec<GroupCount> = (Group::ALL.into_iter())
-        .map(|group| {
-            let kinds: Vec<KindCount> = (Kind::value_variants().iter())
-                .filter(|kind| kind.group() == group)
-                .map(|&kind| KindCount {
-                    kind,
-                    count: count(findings, kind),
-                    was: before.map(|before| count(before, kind)),
-                })
-                .collect();
-            GroupCount {
-                group,
-                count: kinds.iter().map(|kind| kind.count).sum(),
-                was: before.map(|_| kinds.iter().filter_map(|kind| kind.was).sum()),
-                kinds,
-            }
-        })
-        .collect();
-    Summary {
-        count: findings.len(),
-        was: before.map(<[Entry]>::len),
-        fresh: None,
-        fixed: None,
-        groups,
-    }
-}
-
-/// The top folder of the git repository that holds `path`. `None` outside a repository.
-fn repository(path: &Path) -> Option<PathBuf> {
-    let folder = if path.is_dir() {
-        path
-    } else {
-        path.parent()
-            .filter(|folder| !folder.as_os_str().is_empty())?
-    };
-    let top = git::output(folder, &["rev-parse", "--show-toplevel"]).ok()?;
-    fs::canonicalize(top.trim_end_matches(['\r', '\n'])).ok()
-}
-
-/// A folder that is removed when the value is dropped.
-struct Scratch(PathBuf);
-
-impl Drop for Scratch {
-    fn drop(&mut self) {
-        let _ = fs::remove_dir_all(&self.0);
-    }
-}
-
-/// The findings of the files under `paths` as they were at `commit`. The files of the commit
-/// are written to a folder of their own through an index of their own, so the working tree and
-/// the index of the repository stay as they are.
-fn survey_commit(paths: &[PathBuf], top: &Path, commit: &str) -> Result<Vec<Entry>> {
-    let resolved = git::output(
-        top,
-        &["rev-parse", "--verify", &format!("{commit}^{{commit}}")],
-    )
-    .with_context(|| format!("{commit} names no commit"))?;
-    let resolved = resolved.trim();
-    let scratch =
-        Scratch(std::env::temp_dir().join(format!("xpd-untangle-{}", std::process::id())));
-    let tree = scratch.0.join("tree");
-    fs::create_dir_all(&tree).with_context(|| format!("cannot create {}", tree.display()))?;
-    let index = scratch.0.join("index");
-    let env: [(&str, &OsStr); 1] = [("GIT_INDEX_FILE", index.as_os_str())];
-    git::output_with(top, &["read-tree", resolved], &env)?;
-    let prefix = format!("--prefix={}/", tree.display());
-    git::output_with(top, &["checkout-index", "--all", &prefix], &env)?;
-    let then: Vec<PathBuf> = (paths.iter())
-        .filter_map(|path| {
-            let below = fs::canonicalize(path).ok()?;
-            Some(tree.join(below.strip_prefix(top).ok()?))
-        })
-        .filter(|path| path.exists())
-        .collect();
-    if then.is_empty() {
-        return Ok(Vec::new());
-    }
-    let history = History::read(top, resolved);
-    let here = std::env::current_dir().and_then(fs::canonicalize).ok();
-    let shown_from = (here.as_deref())
-        .and_then(|here| here.strip_prefix(top).ok())
-        .map_or_else(|| tree.clone(), |below| tree.join(below));
-    let files = Tree {
-        top: Some(&tree),
-        shown_from: Some(&shown_from),
-    };
-    Ok(survey(&then, files, &history)?.1)
-}
-
-/// A language whose files hold code. A data or markup file repeats its structure by nature, so
-/// its copies and its changes say nothing about the design.
-fn code(path: &Path) -> Option<SupportLang> {
-    SupportLang::from_path(path).filter(|language| {
-        !matches!(
-            language,
-            SupportLang::Json
-                | SupportLang::Yaml
-                | SupportLang::Html
-                | SupportLang::Css
-                | SupportLang::Markdown
-        )
-    })
-}
-
-/// The files of code under `paths`, in path order. A folder that cannot be read is named on
-/// stderr, and the rest of the project is still read.
-fn files(paths: &[PathBuf]) -> Vec<(PathBuf, SupportLang)> {
-    let (first, rest) = paths.split_first().expect("clap gives a default path");
-    let mut walk = ignore::WalkBuilder::new(first);
-    for path in rest {
-        walk.add(path);
-    }
-    let mut files = Vec::new();
-    for entry in walk.build() {
-        let entry = match entry {
-            Ok(entry) => entry,
-            Err(error) => {
-                eprintln!("xpd: {error}");
-                continue;
-            }
-        };
-        if entry.file_type().is_some_and(|kind| kind.is_file())
-            && let Some(language) = code(entry.path())
-        {
-            files.push((entry.into_path(), language));
-        }
-    }
-    files.sort_by(|a, b| a.0.cmp(&b.0));
-    files.dedup_by(|a, b| a.0 == b.0);
-    files
-}
-
-/// The path as the ledger prints it, without the `./` of a walk that starts in this folder.
-fn shown(path: &Path) -> String {
-    path.strip_prefix(".").unwrap_or(path).display().to_string()
+    text
 }
 
 /// What one file gives the ledger.
@@ -642,16 +238,6 @@ struct Surveyed {
     ruled: Vec<python::Local>,
 }
 
-/// The folders that the files of a survey are in.
-#[derive(Clone, Copy)]
-struct Tree<'p> {
-    /// The folder that the paths of the history start from. `None` outside a repository.
-    top: Option<&'p Path>,
-    /// The folder that the printed paths start from, for the copy of a commit, whose files are
-    /// in a temporary folder. `None` prints each path as it was given.
-    shown_from: Option<&'p Path>,
-}
-
 /// One file as the ledger needs it. `None` for a file that cannot be read.
 fn read(
     path: &Path,
@@ -659,12 +245,9 @@ fn read(
     tree: Tree<'_>,
     workspace: Option<&Workspace>,
 ) -> Option<Surveyed> {
-    let top = tree.top;
     let text = fs::read_to_string(path).ok()?;
     let absolute = fs::canonicalize(path).ok()?;
-    let tracked = top
-        .and_then(|top| absolute.strip_prefix(top).ok())
-        .map(|below| below.to_string_lossy().replace('\\', "/"));
+    let tracked = tree.tracked(&absolute);
     let root = syntax::parse_as(&text, language);
     let mut ruled = Vec::new();
     let python = workspace.map(|workspace| {
@@ -679,11 +262,8 @@ fn read(
         let facts = python::facts(&absolute, &root);
         (absolute, facts)
     });
-    let below = tree
-        .shown_from
-        .and_then(|from| path.strip_prefix(from).ok());
     Some(Surveyed {
-        shown: shown(below.unwrap_or(path)),
+        shown: tree.shown(path),
         tracked,
         blocks: copies::blocks(&root.root()),
         python,
@@ -704,11 +284,7 @@ fn copied(surveyed: &[Surveyed]) -> Vec<Finding> {
                 kind: Kind::Copy,
                 key: format!("{:016x}", block.hash),
                 places: (group.iter())
-                    .map(|(file, block)| Place {
-                        path: (*file).to_owned(),
-                        line: Some(block.lines.0),
-                        end_line: Some(block.lines.1),
-                    })
+                    .map(|(file, block)| Place::lines(file, block.lines))
                     .collect(),
                 evidence: format!(
                     "The same {lines} lines of code are written in {} places.",
@@ -789,7 +365,7 @@ fn changed_together(
 /// The rules of `xpd check` take a
 /// moment to compile, so they are loaded only when a Python file is read.
 fn survey(paths: &[PathBuf], tree: Tree<'_>, history: &History) -> Result<(Read, Vec<Entry>)> {
-    let files = files(paths);
+    let files = ledger::files(paths);
     let workspace = (files
         .iter()
         .any(|(_, language)| *language == SupportLang::Python))
@@ -830,19 +406,5 @@ fn survey(paths: &[PathBuf], tree: Tree<'_>, history: &History) -> Result<(Read,
         &shown_as,
         &python::imports(&modules),
     ));
-    findings.sort_by(|a, b| {
-        (
-            a.kind.group(),
-            a.kind,
-            std::cmp::Reverse(a.weight),
-            &a.places,
-        )
-            .cmp(&(
-                b.kind.group(),
-                b.kind,
-                std::cmp::Reverse(b.weight),
-                &b.places,
-            ))
-    });
-    Ok((read, named(findings)))
+    Ok((read, ledger::named(findings)))
 }

@@ -22,6 +22,7 @@ mod hook;
 mod impact;
 mod imports;
 mod index;
+mod ledger;
 mod lsp;
 mod mcp;
 mod migration;
