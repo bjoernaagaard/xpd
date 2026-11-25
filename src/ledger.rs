@@ -17,6 +17,8 @@ use clap::ValueEnum;
 use serde::Serialize;
 
 use crate::git;
+
+mod run;
 use crate::output::Format;
 
 /// How many places of a finding the text shows. The JSON holds every place.
@@ -30,6 +32,9 @@ pub(crate) trait Kind:
     type Group: Copy + Ord + std::fmt::Debug + Serialize + Send + Sync;
 
     const GROUPS: &'static [Self::Group];
+
+    /// The name of the command that lists findings of this kind, such as `untangle`.
+    const COMMAND: &'static str;
 
     fn group(self) -> Self::Group;
 
@@ -270,7 +275,11 @@ impl<K: Kind> Listed<'_, K> {
 
 /// The arguments of a command of the ledger.
 #[derive(Debug, clap::Args)]
+#[command(args_conflicts_with_subcommands = true)]
 pub(crate) struct Select<K: Kind> {
+    /// A stage of a refactor run, which xpd records in the git folder of the repository.
+    #[command(subcommand)]
+    action: Option<run::Action>,
     /// Files or directories (directories respect .gitignore).
     #[arg(default_value = ".")]
     paths: Vec<PathBuf>,
@@ -284,21 +293,24 @@ pub(crate) struct Select<K: Kind> {
     #[arg(long, value_name = "COMMIT")]
     since: Option<String>,
     /// Output format. Default: text on a terminal, json otherwise.
-    #[arg(long, value_enum)]
+    #[arg(long, value_enum, global = true)]
     format: Option<Format>,
 }
 
 impl<K: Kind> Select<K> {
-    /// Prints the ledger of the paths. `survey` reads the files under the paths it gets, which
+    /// Prints the ledger of the paths, or runs a stage of a refactor run. `survey` reads the files under the paths it gets, which
     /// are in the folders of the tree, and returns what it read and the findings. It also gets
     /// the top of the repository and the commit that the files are from, which is `HEAD` for
     /// the files of today. `header` writes the first lines of the text.
     pub(crate) fn print<R: Serialize>(
-        &self,
+        self,
         default: Format,
         survey: impl Fn(&[PathBuf], Tree<'_>, Option<&Path>, &str) -> Result<(R, Vec<Entry<K>>)>,
         header: impl FnOnce(&Ledger<K, R>) -> String,
     ) -> Result<ExitCode> {
+        if let Some(action) = self.action {
+            return run::act(action, self.format.unwrap_or(default), survey);
+        }
         let top = repository(&self.paths[0]);
         let files = Tree {
             top: top.as_deref(),

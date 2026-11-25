@@ -138,9 +138,17 @@ as they are. An id is made from the kind and from what the finding is about, suc
 function and the call, and not from a line, so it stays the same when code moves within a file. It
 changes when the file is renamed. Outside a git repository `--since` fails.
 
+## A recorded run
+
+`xpd optimize start`, `plan`, `approve`, `gate`, `drop`, `status` and `finish` record a run of
+changes the way [`xpd untangle`](../untangle/#a-recorded-run) does, in `.git/xpd-optimize.json`.
+A gate keeps a change when each check passes as it did at the start, at least one finding of the
+change is gone, and the count of findings is not higher.
+
 ## Exit status
 
 | Exit code | Meaning |
 | --- | --- |
-| 0 | It printed the ledger, with or without findings |
+| 0 | It printed the ledger, with or without findings, or the stage of a run was done |
+| 1 | A gate did not keep its change, or `finish` did not end the run |
 | 2 | It could not run, as when `--since` names no commit |

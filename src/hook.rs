@@ -484,7 +484,9 @@ fn user_prompt(cwd: &Path, prompt: &str) -> Result<ExitCode> {
              together: copies, files that change in the same commits, import cycles, unused \
              definitions and special cases, each with its evidence. The count of each kind \
              measures the refactor, and `xpd untangle --since <commit>` prints the count at \
-             that commit beside the count of today. The `xpd-untangle` skill holds the steps."
+             that commit beside the count of today. `xpd untangle start` begins a run that xpd \
+             records, with a plan, a gate for each fix and `xpd untangle status` for the stage \
+             that comes next. The `xpd-untangle` skill holds the steps."
                 .to_owned(),
         );
     }

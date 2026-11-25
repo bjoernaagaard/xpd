@@ -130,3 +130,13 @@ Run the loop again on the changed code, and stop when a round keeps no change.
 Give the line count, the counts of `xpd optimize` and the measured times before and after, each
 change with its kind and the proof you ran for it, and the findings you left as they are with the
 reason.
+
+## A recorded run
+
+`xpd optimize start <paths> --check "<command>"` begins a run that xpd records in the git
+folder of the repository, so it survives the end of a session. `xpd optimize plan <file>` takes
+the changes in order, each with the ids of the findings it removes, and the accepted findings
+with their reasons. After each commit, `xpd optimize gate <change>` runs the checks and
+compares the findings, and exits 1 when the change is not kept. `xpd optimize status` prints
+the stage that comes next, and `xpd optimize finish` ends the run. The `xpd-untangle` skill
+describes each stage.

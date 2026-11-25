@@ -66,6 +66,8 @@ pub(crate) enum Kind {
 impl ledger::Kind for Kind {
     type Group = Group;
 
+    const COMMAND: &'static str = "optimize";
+
     const GROUPS: &'static [Group] = &[
         Group::WrittenTwice,
         Group::DoneAgain,

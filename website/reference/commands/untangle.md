@@ -12,8 +12,7 @@ reads the files and the git history, and it runs no code.
 `copy` and `changes-together` are found in every programming language that ast-grep parses. The
 other kinds are read from Python. A finding is evidence, so judge it against the code before you
 change anything. The `xpd-untangle` skill, which [`xpd skill --json`](../skill/) prints, holds the
-steps of a refactor that the counts measure, and `untangle.workflow.ts`, which runs those steps as a
-durable workflow of T3 Code with a separate agent for each stage.
+steps of a refactor that the counts measure.
 
 ## Examples
 
@@ -158,9 +157,54 @@ changes when the file is renamed. Of two findings that are alike in one file, th
 file has the first id. Without git, `changes-together` and `volatile-import` report nothing, and
 `--since` fails.
 
+## A recorded run
+
+`xpd untangle start` begins a refactor run, which xpd records in the git folder of the
+repository as `.git/xpd-untangle.json`. The run belongs to no session and to no agent tool. An
+agent judges, designs and edits, and xpd records what was decided, says which stage comes next,
+and gates each fix itself.
+
+| Stage | Command | What xpd does |
+| --- | --- | --- |
+| Start | [`xpd untangle start <paths> --check "<command>"`](./start/) | Records the commit, the paths and the checks |
+| Plan | [`xpd untangle plan <file>`](./plan/) | Checks the fixes and the accepted findings against the ids of the ledger |
+| Ask | [`xpd untangle approve <fix>`](./approve/) | Records the user's yes to a fix that changes what callers or users see |
+| Gate | [`xpd untangle gate <fix>`](./gate/) | Runs the checks, compares the findings, and keeps the fix or exits 1 |
+| Give up | [`xpd untangle drop <fix> --reason "<why>"`](./drop/) | Records the reason, and the run goes on |
+| Resume | [`xpd untangle status`](./status/) | Prints the run and the stage that comes next |
+| End | [`xpd untangle finish`](./finish/) | Compares with the commit of the start |
+
+```console
+$ git init -q && git add -A && git -c user.name=xpd -c user.email=xpd@example.com commit -qm start
+$ xpd untangle start shop --check "python3 -c 'import shop.orders'" --format json | jq -c '{findings: .run.was, checks: [.run.checks[].passed], next: .next.stage}'
+{"findings":7,"checks":[true],"next":"plan"}
+```
+
+A plan names the fixes in order and the findings that are right as they are.
+
+```json title="plan.json"
+{
+  "fixes": [{"id": "no-fixed-wait", "title": "Remove the fixed wait in summarize", "findings": ["SLEEP"]}],
+  "accepted": []
+}
+```
+
+```console
+$ sed -i "s/SLEEP/$(xpd untangle shop --kind sleep-or-retry --format json | jq -r '.findings[0].id')/" plan.json
+$ xpd untangle plan plan.json --format json | jq -c '.next.stage'
+"fix"
+$ sed -i '/time.sleep(1)/d' shop/orders.py && git -c user.name=xpd -c user.email=xpd@example.com commit -qam "Remove the fixed wait"
+$ xpd untangle gate no-fixed-wait --format json | jq -c '.run.rounds[0][0] | {id, outcome, fixed: (.fixed | length), added: (.added | length)}'
+{"id":"no-fixed-wait","outcome":"kept","fixed":1,"added":0}
+$ xpd untangle finish --format json | jq -c '{finished: .run.finished}'
+xpd: 7 findings at the start, 6 now: 1 fixed, 0 added, 6 left without a reason
+{"finished":true}
+```
+
 ## Exit status
 
 | Exit code | Meaning |
 | --- | --- |
-| 0 | It printed the ledger, with or without findings |
+| 0 | It printed the ledger, with or without findings, or the stage of a run was done |
+| 1 | A gate did not keep its fix, or `finish` did not end the run |
 | 2 | It could not run, as when `--since` names no commit |

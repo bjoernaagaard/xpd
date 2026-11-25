@@ -94,7 +94,9 @@ Use `xpd` whenever you write or change Python code.
   its places and evidence. Run it before a refactor of a codebase and after each round, and
   add `--since <commit>` to see which findings are fixed and which are new since that
   commit. Copies and files that change together are found in every language, and the rest
-  in Python. The `xpd-untangle` skill holds the steps, and a T3 Code workflow that runs them.
+  in Python. `xpd untangle start` begins a run that xpd records, with a plan, a gate for each fix
+  and `xpd untangle status` for the stage that comes next. The `xpd-untangle` skill holds
+  the steps.
 - `xpd optimize <paths…> --format json`: the places where code does work that a shorter or
   faster program would not do, read from the files without running anything. It lists what
   no rule of `xpd check` reports, because each finding shows only when two places are read
