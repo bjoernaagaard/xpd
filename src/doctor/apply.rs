@@ -248,6 +248,30 @@ fn write(
     if Some(&stamped.after) != stamped.before.as_ref() {
         replace(&file, &stamped.after)?;
     }
+    if let Some(release) = profile.formats_toml(stamped.kind.as_deref()) {
+        format_toml(root, &release)?;
+    }
+    Ok(())
+}
+
+/// Formats `pyproject.toml` with Tombi at `release`, the profile's TOML formatter, so the file
+/// that apply wrote passes `tombi format --check`. It runs `uv tool run`, which takes Tombi from
+/// uv's cache first, so it needs no synced environment.
+fn format_toml(root: &Path, release: &str) -> Result<()> {
+    let from = format!("tombi=={release}");
+    let output = Command::new("uv")
+        .args([
+            "--quiet", "tool", "run", "--from", &from, "tombi", "format", PYPROJECT,
+        ])
+        .current_dir(root)
+        .stdin(Stdio::null())
+        .output()
+        .with_context(|| format!("cannot run uv tool run --from {from} tombi format"))?;
+    ensure!(
+        output.status.success(),
+        "tombi format {PYPROJECT} failed: {}",
+        crate::output::hosts_only(String::from_utf8_lossy(&output.stderr).trim())
+    );
     Ok(())
 }
 

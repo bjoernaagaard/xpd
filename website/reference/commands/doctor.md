@@ -1,10 +1,10 @@
-Run `xpd doctor` at the root of a Python project to compare it with the profile, the one target setup for Ruff, ty and pytest that ships with xpd. Doctor prints a unified diff of `pyproject.toml` with the reason for each change, the lock files the project needs, and then the conditional advice that the project's code points to. `xpd doctor --apply` writes the diff, and `xpd doctor --check` exits 1 while the project differs from the profile.
+Run `xpd doctor` at the root of a Python project to compare it with the profile, the one target setup for Ruff, ty, pytest and the files that are not Python that ships with xpd. Doctor prints a unified diff of `pyproject.toml` and of each file the profile owns, with the reason for each change, the lock files the project needs, and then the conditional advice that the project's code points to. `xpd doctor --apply` writes the diff, and `xpd doctor --check` exits 1 while the project differs from the profile.
 
 The plan reads files. It compares the effect of the project's own settings, so an extra selector in `lint.ignore` that turns off only rules the profile turns off, or a ty level above the profile's, needs no edit. A tool's default does not count, because another release of the tool can change it, so the project names each setting, rule and level itself. Doctor runs uv to check and write lock files, the pinned Ruff to confirm that it accepts the settings, and the installed Ruff and ty for the conditional advice.
 
 ## What doctor shows of the project
 
-Doctor shows only the settings it owns, so that its output never carries a token from another part of `pyproject.toml`. It owns `[tool.ruff]`, `[tool.ty]`, the pytest table, `[tool.xpd]`, `[dependency-groups]`, and `dependencies` and `optional-dependencies` of `[project]`.
+Doctor shows only the settings it owns, so that its output never carries a token from another part of `pyproject.toml`. It owns `[tool.ruff]`, `[tool.ty]`, the pytest table, `[tool.xpd]`, `[dependency-groups]`, and `dependencies` and `optional-dependencies` of `[project]`, and the files that [Files that are not Python](#files-that-are-not-python) lists.
 
 - **The diff.** Each line outside those tables, such as a line of `[tool.uv]`, `[[tool.uv.index]]`, `[tool.uv.sources]` or `[tool.uv.pip]`, shows as `<hidden>`. A line shows only when everything on it belongs to those tables, so a line that also holds another setting is hidden, such as `tool = { uv = { ... }, ruff = { ... } }` or `tool.uv.index-url = "..."` beside `tool.ruff.lint...` lines. Table headers and blank lines stay, so the diff keeps its shape. A change on a hidden line shows in the list of changes and not in the diff.
 - **URLs.** In every line doctor prints, a URL keeps its scheme, host and path, and its user and password, query and fragment become `****`, as in `https://****@example.com/simple?****`. In a message of uv or Ruff that doctor passes on, a URL keeps its scheme and host only. The source links of the profile's records, which ship with xpd, print whole with their anchors, and so does only a URL that is exactly one of those links.
@@ -165,8 +165,36 @@ The profile pins the tools that check the project, at the releases its rules and
 | Hypothesis | `hypothesis==6.170.17` |
 | Ruff | `ruff==0.17.4` |
 | ty | `ty==0.0.106` |
+| Tombi | `tombi==1.11.3` |
+| rumdl | `rumdl==0.3.5` |
+| yamllint | `yamllint==1.38.0` |
+| typos | `typos==1.52.2` |
+| ShellCheck, only with shell scripts | `shellcheck-py==0.11.0.1` |
+| shfmt, only with shell scripts | `shfmt-py==4.2.0` |
+| nbstripout, only with notebooks | `nbstripout==0.9.2` |
 
 `uv.lock` must lock these releases. A lock that holds another release of one of them, or none, is out of date, so `--check` exits 1 and `--apply` runs `uv lock`. A requirement for one of them in another list that the pin does not meet is a conflict, because uv locks one release for every list. The `script` kind gets no pin, since its `pyproject.toml` holds tool settings only. Run the checks with `uv run --locked ruff check`, `uv run --locked ruff format --check`, `uv check --locked` and `uv run --locked pytest`.
+
+A project gets the ShellCheck and shfmt pins when it tracks a shell script: a `.sh` or `.bash` file, or a file without a suffix whose first line runs `sh`, `bash`, `dash` or `ksh`. ShellCheck does not read zsh. It gets the nbstripout pin when it tracks a notebook. A file that Git ignores does not count.
+
+## Files that are not Python
+
+The profile owns these files for every kind. The project keeps the first four as exact copies of the templates in [src/doctor/profiles](https://github.com/bjoernaagaard/xpd/tree/main/src/doctor/profiles), so deleting one or changing a line in it is drift. `.gitignore` and `.gitattributes` keep the project's own lines and must also hold each line of the template. Apply puts the missing ones at the top, so a later line of the project, such as `!keep.pyc` or `*.png binary`, still wins.
+
+| File | Read by | What it sets |
+| --- | --- | --- |
+| `tombi.toml` | Tombi | TOML 1.0, strict schemas, the order of keys from each file's schema, the order of arrays kept as written, and each of Tombi's lint rules as an error, the use of a deprecated key included |
+| `.rumdl.toml` | rumdl | Nine Markdown rules on whitespace and structure: `MD009`, `MD010`, `MD012`, `MD022`, `MD031`, `MD032`, `MD040`, `MD047` and `MD056`, and the files that Git ignores left out |
+| `.yamllint.yml` | yamllint | Duplicate keys, trailing spaces and a missing last newline are errors, and the files that `.gitignore` lists are left out. YAML is formatted by hand. |
+| `.editorconfig` | Editors and shfmt | UTF-8, LF line ends, a last newline and no trailing spaces, four spaces in Python and two in TOML, YAML and JSON. Markdown keeps its trailing spaces, which can end a line. |
+| `.gitignore` | Git | `.venv/`, Python bytecode, the caches of pytest, Ruff, rumdl and Hypothesis, and `build/`, `dist/` and `*.egg-info/` |
+| `.gitattributes` | Git | `* text=auto eol=lf`, so Git stores text with LF line ends |
+
+The tools read these files with `uv run --locked`, such as `uv run --locked tombi format --check`, `uv run --locked rumdl check .`, `uv run --locked yamllint .` and `uv run --locked typos`. typos runs with its own defaults, and a project adds its own words in `[tool.typos]` of `pyproject.toml`. A project with shell scripts runs `uv run --locked shellcheck` and `uv run --locked shfmt --diff` on them, and one with notebooks runs `uv run --locked nbstripout --verify` on each notebook, so a notebook is committed without its outputs. Ruff already checks the Python cells of a notebook.
+
+The `script` kind gets the same files and no pins, since its `pyproject.toml` holds tool settings only. Run its tools with `uvx`, such as `uvx tombi@1.11.3 format --check`.
+
+After apply writes `pyproject.toml`, it formats the file with Tombi 1.11.3, so the file it wrote passes `tombi format --check`. A `.gitignore` that ignores a lock file the kind needs, such as `uv.lock`, is a conflict, since every checkout needs the lock.
 
 ## Example
 
@@ -193,13 +221,13 @@ Doctor prints the diff, then one entry for each change. The `...` lines stand fo
 
 ```console
 $ xpd doctor --format text
-Profile revision 2, kind application, suggested because [project] has no [build-system], so uv runs it without building it
+Profile revision 3, kind application, suggested because [project] has no [build-system], so uv runs it without building it
   A program that runs from its checkout or as an installed command, locked in uv.lock.
 pyproject.toml records no profile yet.
 
 --- pyproject.toml
 +++ pyproject.toml
-@@ -5,10 +5,95 @@
+@@ -5,10 +5,99 @@
 
  [dependency-groups]
  dev = [
@@ -212,6 +240,10 @@ pyproject.toml records no profile yet.
 +    "hypothesis==6.170.17",
 +    "ruff==0.17.4",
 +    "ty==0.0.106",
++    "tombi==1.11.3",
++    "rumdl==0.3.5",
++    "yamllint==1.38.0",
++    "typos==1.52.2",
  ]
 
  [tool.pytest.ini_options]
@@ -238,8 +270,11 @@ pyproject.toml records no profile yet.
 +unused-ignore-comment = "error"
 ...
 +[tool.xpd.profile]
-+revision = 2
++revision = 3
 +kind = "application"
+...
+--- /dev/null
++++ tombi.toml
 ...
 Changes
   ruff lint.select: unset -> ["ALL"], tool.ruff.lint.select
@@ -258,7 +293,7 @@ xpd doctor --apply --kind application writes these changes.
 ...
 ```
 
-`xpd doctor --apply --kind application` writes this diff, runs `uv lock`, and records the revision and kind last. A second `xpd doctor --check` then prints `The project matches profile revision 2.` and exits 0.
+`xpd doctor --apply --kind application` writes this diff, runs `uv lock`, and records the revision and kind last. It also writes the owned files, and formats `pyproject.toml` with Tombi. A second `xpd doctor --check` then prints `The project matches profile revision 3.` and exits 0.
 
 ## Kinds of project
 
@@ -271,7 +306,7 @@ The first apply needs a kind, which `pyproject.toml` records. Doctor suggests on
 | `pipeline` | An application that turns data into results. | `[project]` | `uv.lock` |
 | `script` | Standalone scripts. | At least one Python file with a `# /// script` block, and a `pyproject.toml` that holds the `[tool]` table and nothing else, so the scripts declare their own dependencies and the profile adds no plugin | `<script>.lock` beside each script, by `uv lock --script` |
 
-A kind can add its own Ruff, ty and pytest values to the ones every kind gets, and the profile can own whole files for a kind, such as a workflow, which the project keeps as exact copies of templates that ship with xpd. Revision 2 gives every kind the same values, and it owns `conftest.py` at the root for `library`, `application` and `pipeline`. Hypothesis reads its profiles from Python only, so `conftest.py` registers the profile `slow`, which turns off the time limit per example and keeps every other check, beside the built-in `default` and `ci` profiles. Run `uv run --locked pytest --hypothesis-profile slow` for a long property run. A project without `conftest.py` gets the profile's copy. A project that keeps its own `conftest.py` must hold the line `settings.register_profile("slow", deadline=None)` with its import, and doctor reports a conflict until it does, since it never rewrites the project's own file.
+A kind can add its own Ruff, ty and pytest values to the ones every kind gets, and the profile can own whole files for a kind, such as a workflow, which the project keeps as exact copies of templates that ship with xpd. Revision 3 gives every kind the same values. It owns the files that [Files that are not Python](#files-that-are-not-python) lists for every kind, and `conftest.py` at the root for `library`, `application` and `pipeline`. Hypothesis reads its profiles from Python only, so `conftest.py` registers the profile `slow`, which turns off the time limit per example and keeps every other check, beside the built-in `default` and `ci` profiles. Run `uv run --locked pytest --hypothesis-profile slow` for a long property run. A project without `conftest.py` gets the profile's copy. A project that keeps its own `conftest.py` must hold the line `settings.register_profile("slow", deadline=None)` with its import, and doctor reports a conflict until it does, since it never rewrites the project's own file.
 
 ## One place for each tool
 
@@ -288,6 +323,8 @@ The profile keeps each tool's settings in its table of `pyproject.toml` at the p
 - a requirement for Ruff or ty in a dependency list other than `dev` that the profile's pin does not meet
 - an argument in `addopts` that overrides a pytest setting of the profile, such as `-o strict=false`, or that turns off a plugin of the profile, such as `-p no:randomly` or `-pno:timeout`, a `-p=<name>` that pytest cannot import, or `pytest --disable-plugin-autoload` without a `-p` that loads each plugin of the profile again
 - a layout that the kind does not allow
+- a second settings file of a tool whose file the profile owns: `.tombi.toml`, `.config/tombi.toml` or `[tool.tombi]` beside `tombi.toml`, `rumdl.toml`, `.config/rumdl.toml` or `[tool.rumdl]` beside `.rumdl.toml`, and `.yamllint` or `.yamllint.yaml` beside `.yamllint.yml`, because the tool would read it first or warn about both
+- a `.gitignore` that ignores a lock file the kind needs
 - a uv workspace, in the project or above it
 - both `[tool.pytest]` and `[tool.pytest.ini_options]` with settings
 - a profile revision that a newer xpd recorded
@@ -300,7 +337,7 @@ A project records an exception in `pyproject.toml`, beside the revision and kind
 
 ```toml
 [tool.xpd.profile]
-revision = 2
+revision = 3
 kind = "application"
 
 [[tool.xpd.profile.exceptions]]
@@ -324,7 +361,7 @@ Each xpd release holds one revision of the profile. When a newer xpd brings a ne
 
 ## What `--apply` does
 
-Apply plans first and writes nothing while the plan has a conflict, an exception that is not valid, or no kind. A setting that the pinned Ruff or ty rejects is such a conflict, so apply checks the settings it would write before it writes them. It then writes `pyproject.toml` and the owned files, runs `uv lock` for a missing or out-of-date lock, checks that no drift remains and that every lock is up to date, and records the revision and kind last. Apply keeps the comments of the items it keeps, leaves a value that already complies as it is written, and keeps the permissions of each file it replaces. It never syncs an environment, installs Git hooks, runs project scripts or publishes.
+Apply plans first and writes nothing while the plan has a conflict, an exception that is not valid, or no kind. A setting that the pinned Ruff or ty rejects is such a conflict, so apply checks the settings it would write before it writes them. It then writes `pyproject.toml` and the owned files, runs `uv lock` for a missing or out-of-date lock, checks that no drift remains and that every lock is up to date, records the revision and kind, and last formats `pyproject.toml` with the pinned Tombi through `uv tool run`. Apply keeps the comments of the items it keeps, leaves a value that already complies as it is written, and keeps the permissions of each file it replaces. It never syncs an environment, installs Git hooks, runs project scripts or publishes.
 
 Apply keeps the prior content of each file it touches in the folder `.xpd-apply` at the project root while it runs. When a lock refresh or the final check fails, apply puts every file back and exits 2. When an apply stops before it ends, the next one restores the files from that folder first.
 

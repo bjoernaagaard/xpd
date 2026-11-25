@@ -22,7 +22,7 @@ use toml_edit::{DocumentMut, Item, Value};
 use super::catalog::{Catalog, Level, Tool};
 use super::edit;
 use super::placement::Destination;
-use super::profile::{self, Exception, LockStyle, Presence, Profile, Values};
+use super::profile::{self, Exception, LockStyle, Presence, Profile, Tracked, Values};
 use super::pytest::{self, Release};
 use super::ruff;
 use super::ty;
@@ -31,6 +31,8 @@ use crate::toml::{self, Toml};
 
 /// The file that holds the profile's settings.
 pub(crate) const PYPROJECT: &str = "pyproject.toml";
+/// Git's list of files to leave untracked, at the project root.
+const GITIGNORE: &str = ".gitignore";
 /// Where the profile and its record are documented.
 const DOCS: &str = "https://bjoernaagaard.github.io/xpd/reference/commands/doctor/";
 /// The most files and folders that the search for nested configuration looks at.
@@ -173,6 +175,9 @@ pub(crate) struct Plan {
     /// The owned files that differ from their templates.
     #[serde(skip)]
     pub(crate) owned: Vec<OwnedFile>,
+    /// The tools that `[dependency-groups] dev` pins for this project.
+    #[serde(skip)]
+    pins: Vec<(String, String)>,
     /// Whether the catalog already found a setting that the pinned Ruff or ty rejects.
     #[serde(skip)]
     rejected: bool,
@@ -241,6 +246,7 @@ pub(crate) fn compute(
         before,
         after: String::new(),
         owned: Vec::new(),
+        pins: profile.pins(tracked(root)?),
         rejected: false,
     };
     let facts = planned_facts(
@@ -269,15 +275,17 @@ pub(crate) fn compute(
     };
     edits.ruff(&values, &required, &accepted);
     edits.ty(&values, &accepted);
-    let pins = edits.pins(&profile.dev_pins, facts);
+    let wanted_pins = edits.plan.pins.clone();
+    let pins = edits.pins(&wanted_pins, facts);
     let dependencies = pins.or(edits.pytest(&values, profile, facts, &accepted));
     if request.stamp {
         edits.stamp(profile, &record);
     }
     edits.verify(&required, &accepted);
     plan.after = doc.to_string();
-    plan.owned_files(root, profile)?;
+    plan.owned_files(root, profile, original.as_ref())?;
     plan.locks(root, profile, files, dependencies);
+    plan.ignored_locks(root);
     plan.locked_pins(root, profile);
     plan.diff = plan.diffs();
     Ok(plan)
@@ -566,9 +574,29 @@ impl Plan {
         }
     }
 
-    /// The owned files of the kind that differ from their templates, each with a change.
-    fn owned_files(&mut self, root: &Path, profile: &Profile) -> Result<()> {
+    /// The owned files of the kind that differ from their templates, each with a change, and a
+    /// conflict for each other place where the tool of an owned file would read its settings.
+    fn owned_files(&mut self, root: &Path, profile: &Profile, doc: Option<&Toml>) -> Result<()> {
         for owned in profile.owned(self.kind.as_deref()) {
+            for rival in &owned.rivals {
+                if root.join(rival).exists() {
+                    self.conflict(
+                        rival.clone(),
+                        None,
+                        format!("The profile keeps these settings in {}, and the same tool would also read {rival}. Remove {rival}.", owned.path),
+                    );
+                }
+            }
+            for table in &owned.tables {
+                let keys: Vec<&str> = table.split('.').collect();
+                if doc.is_some_and(|doc| toml::get(doc, &keys).is_some()) {
+                    self.conflict(
+                        PYPROJECT,
+                        None,
+                        format!("The profile keeps these settings in {}, and the same tool would also read [{table}] in {PYPROJECT}. Remove [{table}].", owned.path),
+                    );
+                }
+            }
             let path = PathBuf::from(&owned.path);
             let file = root.join(&path);
             let before = match fs::read_to_string(&file) {
@@ -581,6 +609,13 @@ impl Plan {
             if before.as_deref() == Some(owned.text) {
                 continue;
             }
+            let after = match (&before, owned.insert) {
+                (Some(text), true) => match inserted(text, owned.text) {
+                    Some(after) => after,
+                    None => continue,
+                },
+                _ => owned.text.to_owned(),
+            };
             if let (Some(line), Some(text)) = (&owned.holds, &before) {
                 if !text.lines().any(|held| held.trim_end() == line) {
                     self.conflict(
@@ -597,21 +632,71 @@ impl Plan {
                 item: format!("owned file {}", owned.path),
                 path: owned.path.clone(),
                 line: None,
-                old: if before.is_some() { "differs" } else { "missing" }.to_owned(),
-                new: "the profile's copy".to_owned(),
-                reason: owned.holds.as_ref().map_or_else(
-                    || "The profile owns this file, so the project keeps an exact copy of its template.".to_owned(),
-                    |line| format!("The profile needs the line {line} in this file, so doctor writes its template where the project has none."),
-                ),
+                old: match (&before, owned.insert) {
+                    (None, _) => "missing",
+                    (Some(_), true) => "lacks lines of the profile",
+                    (Some(_), false) => "differs",
+                }
+                .to_owned(),
+                new: if owned.insert && before.is_some() {
+                    "the profile's lines at its top"
+                } else {
+                    "the profile's copy"
+                }
+                .to_owned(),
+                reason: if owned.insert {
+                    "The profile needs each line of its template in this file, so doctor puts the missing lines at its top and keeps the project's own lines below them.".to_owned()
+                } else {
+                    owned.holds.as_ref().map_or_else(
+                        || "The profile owns this file, so the project keeps an exact copy of its template.".to_owned(),
+                        |line| format!("The profile needs the line {line} in this file, so doctor writes its template where the project has none."),
+                    )
+                },
                 source: DOCS.to_owned(),
             });
             self.owned.push(OwnedFile {
                 path,
                 before,
-                after: owned.text.to_owned(),
+                after,
             });
         }
         Ok(())
+    }
+
+    /// A conflict for each lock file of the kind that the `.gitignore` the plan leaves ignores,
+    /// since every checkout needs the lock.
+    fn ignored_locks(&mut self, root: &Path) {
+        let planned = self
+            .owned
+            .iter()
+            .find(|owned| owned.path == Path::new(GITIGNORE))
+            .map(|owned| owned.after.clone())
+            .or_else(|| fs::read_to_string(root.join(GITIGNORE)).ok());
+        let Some(text) = planned else { return };
+        let mut builder = ignore::gitignore::GitignoreBuilder::new(root);
+        for line in text.lines() {
+            if builder.add_line(None, line).is_err() {
+                return;
+            }
+        }
+        let Ok(matcher) = builder.build() else { return };
+        let ignored: Vec<PathBuf> = self
+            .locks
+            .iter()
+            .filter(|lock| {
+                matcher
+                    .matched_path_or_any_parents(&lock.file, false)
+                    .is_ignore()
+            })
+            .map(|lock| lock.file.clone())
+            .collect();
+        for file in ignored {
+            self.conflict(
+                GITIGNORE,
+                None,
+                format!("{GITIGNORE} ignores {}, which every checkout needs to install the locked releases. Remove the line that matches it.", file.display()),
+            );
+        }
     }
 
     /// A conflict for each configuration file below the root that a tool reads there.
@@ -834,7 +919,7 @@ impl Plan {
             return;
         };
         let mut reasons = Vec::new();
-        for (name, version) in &profile.dev_pins {
+        for (name, version) in &self.pins {
             let locked = pytest::locked_versions(root, name);
             if locked.is_empty() {
                 reasons.push(format!(
@@ -1301,6 +1386,68 @@ fn suggest_kind(
 }
 
 /// The Python files of `files` that hold inline script metadata.
+/// `text` with the lines of `template` that it lacks put at its top, in the template's order.
+/// `None` when it lacks none. A line counts without the spaces at its end.
+fn inserted(text: &str, template: &str) -> Option<String> {
+    let have: BTreeSet<&str> = text.lines().map(str::trim_end).collect();
+    let missing: Vec<&str> = template
+        .lines()
+        .filter(|line| !line.trim().is_empty() && !have.contains(line))
+        .collect();
+    if missing.is_empty() {
+        return None;
+    }
+    let mut after = missing.join("\n");
+    after.push('\n');
+    after.push_str(text);
+    Some(after)
+}
+
+/// Which files the project at `root` tracks that only some tools check. Git's ignore files
+/// decide what counts as tracked.
+fn tracked(root: &Path) -> Result<Tracked> {
+    let found = crate::source::files_under(Path::new(""), &[root.to_path_buf()], |path| {
+        notebook(path) || shell_script(path)
+    })?;
+    Ok(Tracked {
+        shell: found.iter().any(|path| shell_script(path)),
+        notebooks: found.iter().any(|path| notebook(path)),
+    })
+}
+
+fn notebook(path: &Path) -> bool {
+    path.extension().is_some_and(|suffix| suffix == "ipynb")
+}
+
+/// Whether `ShellCheck` and `shfmt` read `path`: a `.sh` or `.bash` file, or a file without a
+/// suffix whose first line runs `sh`, `bash`, `dash` or `ksh`, directly or through `env`.
+fn shell_script(path: &Path) -> bool {
+    const SHELLS: [&str; 4] = ["sh", "bash", "dash", "ksh"];
+    if let Some(suffix) = path.extension() {
+        return suffix == "sh" || suffix == "bash";
+    }
+    let Ok(file) = fs::File::open(path) else {
+        return false;
+    };
+    let mut first = String::new();
+    if std::io::BufRead::read_line(&mut std::io::BufReader::new(file), &mut first).is_err() {
+        return false;
+    }
+    let Some(command) = first.strip_prefix("#!") else {
+        return false;
+    };
+    let mut words = command.split_whitespace();
+    let program = words
+        .next()
+        .map(|word| word.rsplit('/').next().unwrap_or(word));
+    let shell = if program == Some("env") {
+        words.find(|word| !word.starts_with('-'))
+    } else {
+        program
+    };
+    shell.is_some_and(|shell| SHELLS.contains(&shell))
+}
+
 fn scripts(files: &[PathBuf]) -> Vec<PathBuf> {
     files
         .iter()

@@ -1,5 +1,5 @@
-schema = 2
-revision = 2
+schema = 3
+revision = 3
 summary = "The setup that xpd doctor holds a Python project to. Each value is explained by the record of the same id in decisions.jsonl."
 
 [pins]
@@ -9,9 +9,18 @@ pytest = "9.2.0"
 pytest-timeout = "2.4.0"
 pytest-randomly = "5.1.0"
 hypothesis = "6.170.17"
+tombi = "1.11.3"
+rumdl = "0.3.5"
+yamllint = "1.38.0"
+typos = "1.52.2"
+shellcheck-py = "0.11.0.1"
+shfmt-py = "4.2.0"
+nbstripout = "0.9.2"
 
 [dev]
-pins = ["pytest", "pytest-timeout", "pytest-randomly", "hypothesis", "ruff", "ty"]
+pins = ["pytest", "pytest-timeout", "pytest-randomly", "hypothesis", "ruff", "ty", "tombi", "rumdl", "yamllint", "typos"]
+shell = ["shellcheck-py", "shfmt-py"]
+notebooks = ["nbstripout"]
 
 [kinds.library]
 summary = "A package that others install. It keeps its build backend, and uv.lock locks its development environment."
@@ -20,7 +29,7 @@ project = "required"
 build-system = "required"
 scripts = "allowed"
 tool-only = false
-files = ["conftest"]
+files = ["conftest", "editorconfig", "gitattributes", "gitignore", "tombi", "rumdl", "yamllint"]
 
 [kinds.application]
 summary = "A program that runs from its checkout or as an installed command, locked in uv.lock."
@@ -29,7 +38,7 @@ project = "required"
 build-system = "allowed"
 scripts = "allowed"
 tool-only = false
-files = ["conftest"]
+files = ["conftest", "editorconfig", "gitattributes", "gitignore", "tombi", "rumdl", "yamllint"]
 
 [kinds.pipeline]
 summary = "An application that turns data into results, locked in uv.lock like an application."
@@ -38,7 +47,7 @@ project = "required"
 build-system = "allowed"
 scripts = "allowed"
 tool-only = false
-files = ["conftest"]
+files = ["conftest", "editorconfig", "gitattributes", "gitignore", "tombi", "rumdl", "yamllint"]
 
 [kinds.script]
 summary = "Standalone scripts with inline script metadata. Each script is locked in the lock file beside it, and pyproject.toml holds only tool settings."
@@ -47,12 +56,43 @@ project = "forbidden"
 build-system = "forbidden"
 scripts = "required"
 tool-only = true
-files = []
+files = ["editorconfig", "gitattributes", "gitignore", "tombi", "rumdl", "yamllint"]
 
 [files.conftest]
 path = "conftest.py"
 template = "conftest.py.template"
 holds = 'settings.register_profile("slow", deadline=None)'
+
+[files.editorconfig]
+path = ".editorconfig"
+template = "editorconfig.template"
+
+[files.gitattributes]
+path = ".gitattributes"
+template = "gitattributes.template"
+insert = true
+
+[files.gitignore]
+path = ".gitignore"
+template = "gitignore.template"
+insert = true
+
+[files.tombi]
+path = "tombi.toml"
+template = "tombi.toml.template"
+rivals = [".tombi.toml", ".config/tombi.toml"]
+tables = ["tool.tombi"]
+
+[files.rumdl]
+path = ".rumdl.toml"
+template = "rumdl.toml.template"
+rivals = ["rumdl.toml", ".config/rumdl.toml"]
+tables = ["tool.rumdl"]
+
+[files.yamllint]
+path = ".yamllint.yml"
+template = "yamllint.yml.template"
+rivals = [".yamllint", ".yamllint.yaml"]
 
 [ruff]
 select = ["ALL"]

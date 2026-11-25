@@ -3,7 +3,7 @@
 //!
 //! ```toml
 //! [tool.xpd.profile]
-//! revision = 2
+//! revision = 3
 //! kind = "application"
 //!
 //! [[tool.xpd.profile.exceptions]]
@@ -24,11 +24,15 @@
 //! metadata it needs, and which files the profile owns for it. An owned file is a native template
 //! in `src/doctor/profiles/`, listed in [`TEMPLATES`], that the project keeps as an exact copy,
 //! or, with `holds`, a file the project also writes itself, which must hold that line and is the
-//! template when the project has none.
+//! template when the project has none, or, with `insert`, a file of lines such as `.gitignore`,
+//! which must hold every line of the template and gets the missing ones at its top. `rivals` and
+//! `tables` name the other files and `pyproject.toml` tables where the same tool would read its
+//! settings, which the project must not have.
 //!
 //! `[dev]` `pins` names the tools a project runs with `uv run`. Each goes into
 //! `[dependency-groups] dev` as an exact pin at its release in `[pins]`, and `uv.lock` locks that
-//! release. `[pytest.plugin-names]` holds the names under which `-p` loads each plugin, by its
+//! release. `shell` and `notebooks` name the tools that only a project with shell scripts, or
+//! with notebooks, gets. `[pytest.plugin-names]` holds the names under which `-p` loads each plugin, by its
 //! `pytest11` entry point or its module: `-p no:<name>` turns off a plugin of the profile, and
 //! `-p <name>` loads a plugin that the profile removes.
 
@@ -44,7 +48,7 @@ use crate::toml::{self, Toml};
 const PROFILE: &str = include_str!("profile.toml");
 
 /// The shape of `profile.toml` and of `[tool.xpd.profile]` that this xpd reads.
-pub(crate) const SCHEMA: i64 = 2;
+pub(crate) const SCHEMA: i64 = 3;
 
 /// Where a project's record of the profile lives in its `pyproject.toml`.
 pub(crate) const TABLE: [&str; 3] = ["tool", "xpd", "profile"];
@@ -110,13 +114,57 @@ pub(crate) struct Owned {
     pub(crate) text: &'static str,
     /// The line that a file the project writes itself must hold. `None` for an exact copy.
     pub(crate) holds: Option<String>,
+    /// Whether the file must hold every line of the template, which apply puts at its top.
+    pub(crate) insert: bool,
+    /// Other files, by their path relative to the project root, from which the same tool would
+    /// read its settings.
+    pub(crate) rivals: Vec<String>,
+    /// Tables of `pyproject.toml`, such as `tool.tombi`, from which the same tool would read its
+    /// settings.
+    pub(crate) tables: Vec<String>,
+}
+
+/// Which files a project tracks that only some tools check.
+#[derive(Debug, Clone, Copy, Default)]
+pub(crate) struct Tracked {
+    /// Shell scripts that `ShellCheck` and `shfmt` read: a `.sh` or `.bash` file, or a file without
+    /// a suffix whose first line runs `sh`, `bash`, `dash` or `ksh`.
+    pub(crate) shell: bool,
+    /// Jupyter notebooks.
+    pub(crate) notebooks: bool,
 }
 
 /// The templates of owned files, each by its file name in `src/doctor/profiles/`.
-const TEMPLATES: &[(&str, &str)] = &[(
-    "conftest.py.template",
-    include_str!("profiles/conftest.py.template"),
-)];
+const TEMPLATES: &[(&str, &str)] = &[
+    (
+        "conftest.py.template",
+        include_str!("profiles/conftest.py.template"),
+    ),
+    (
+        "editorconfig.template",
+        include_str!("profiles/editorconfig.template"),
+    ),
+    (
+        "gitattributes.template",
+        include_str!("profiles/gitattributes.template"),
+    ),
+    (
+        "gitignore.template",
+        include_str!("profiles/gitignore.template"),
+    ),
+    (
+        "tombi.toml.template",
+        include_str!("profiles/tombi.toml.template"),
+    ),
+    (
+        "rumdl.toml.template",
+        include_str!("profiles/rumdl.toml.template"),
+    ),
+    (
+        "yamllint.yml.template",
+        include_str!("profiles/yamllint.yml.template"),
+    ),
+];
 
 /// One setting of a tool table, by its path below the table, with the value the profile wants.
 #[derive(Debug, Clone)]
@@ -499,6 +547,10 @@ pub(crate) struct Profile {
     /// The tools pinned exactly in `[dependency-groups] dev`, each with its release from
     /// `[pins]`, which `uv.lock` must lock.
     pub(crate) dev_pins: Vec<(String, String)>,
+    /// The pins that only a project with shell scripts gets.
+    pub(crate) shell_pins: Vec<(String, String)>,
+    /// The pins that only a project with notebooks gets.
+    pub(crate) notebook_pins: Vec<(String, String)>,
     pub(crate) kinds: Vec<KindSpec>,
     /// The values for every kind.
     pub(crate) base: Values,
@@ -537,7 +589,9 @@ impl Profile {
                 tool.pinned()
             );
         }
-        let dev_pins = dev_pins(top, pins)?;
+        let dev_pins = dev_pins(top, pins, "pins")?;
+        let shell_pins = dev_pins_of(top, pins, "shell")?;
+        let notebook_pins = dev_pins_of(top, pins, "notebooks")?;
         let kinds = table(top, "kinds")?
             .iter()
             .map(|(name, item)| {
@@ -575,38 +629,13 @@ impl Profile {
             .collect::<Result<Vec<_>>>()?;
         let files = table(top, "files")?
             .iter()
-            .map(|(name, item)| {
-                let file = item
-                    .as_table_like()
-                    .with_context(|| format!("files.{name} is no table"))?;
-                let template = string(file, "template")?;
-                let text = TEMPLATES
-                    .iter()
-                    .find(|(known, _)| *known == template)
-                    .map(|(_, text)| *text)
-                    .with_context(|| format!("files.{name} names the template {template}, which src/doctor/profiles/ lacks"))?;
-                let holds = file
-                    .get("holds")
-                    .map(|_| string(file, "holds"))
-                    .transpose()?;
-                if let Some(line) = &holds {
-                    ensure!(
-                        text.lines().any(|known| known == line),
-                        "files.{name} holds a line that its template lacks"
-                    );
-                }
-                Ok(Owned {
-                    name: name.to_owned(),
-                    path: string(file, "path")?,
-                    template,
-                    text,
-                    holds,
-                })
-            })
+            .map(|(name, item)| owned_file(name, item))
             .collect::<Result<Vec<_>>>()?;
         Ok(Self {
             revision: integer(top, "revision")?,
             dev_pins,
+            shell_pins,
+            notebook_pins,
             kinds,
             base: Values::read(top)?,
             forbid: PytestForbid::read(table(top, "pytest")?)?,
@@ -808,6 +837,33 @@ impl Profile {
         }
     }
 
+    /// The tools that a project which tracks `tracked` pins in `[dependency-groups] dev`.
+    pub(crate) fn pins(&self, tracked: Tracked) -> Vec<(String, String)> {
+        let mut pins = self.dev_pins.clone();
+        if tracked.shell {
+            pins.extend(self.shell_pins.iter().cloned());
+        }
+        if tracked.notebooks {
+            pins.extend(self.notebook_pins.iter().cloned());
+        }
+        pins
+    }
+
+    /// The release of Tombi that formats `pyproject.toml` after an apply, when the profile owns
+    /// `tombi.toml` for the kind `kind`.
+    pub(crate) fn formats_toml(&self, kind: Option<&str>) -> Option<String> {
+        self.owned(kind)
+            .iter()
+            .any(|file| file.path == "tombi.toml")
+            .then(|| {
+                self.dev_pins
+                    .iter()
+                    .find(|(name, _)| name == "tombi")
+                    .map(|(_, release)| release.clone())
+            })
+            .flatten()
+    }
+
     /// The files the profile owns for the kind `kind`.
     pub(crate) fn owned(&self, kind: Option<&str>) -> Vec<&Owned> {
         let Some(kind) = kind.and_then(|kind| self.kind(kind)) else {
@@ -848,13 +904,79 @@ pub(crate) fn option(
 }
 
 /// The tools of `[dev]` `pins`, each with its release from `pins`, the `[pins]` table.
-fn dev_pins(top: &dyn TableLike, pins: &dyn TableLike) -> Result<Vec<(String, String)>> {
-    strings(table(top, "dev")?, "pins")
-        .context("dev")?
+/// The owned file `name` of `[files]`.
+fn owned_file(name: &str, item: &Item) -> Result<Owned> {
+    let file = item
+        .as_table_like()
+        .with_context(|| format!("files.{name} is no table"))?;
+    let template = string(file, "template")?;
+    let text = TEMPLATES
+        .iter()
+        .find(|(known, _)| *known == template)
+        .map(|(_, text)| *text)
+        .with_context(|| {
+            format!("files.{name} names the template {template}, which src/doctor/profiles/ lacks")
+        })?;
+    let holds = file
+        .get("holds")
+        .map(|_| string(file, "holds"))
+        .transpose()?;
+    if let Some(line) = &holds {
+        ensure!(
+            text.lines().any(|known| known == line),
+            "files.{name} holds a line that its template lacks"
+        );
+    }
+    let insert = match file.get("insert") {
+        None => false,
+        Some(item) => item
+            .as_bool()
+            .with_context(|| format!("files.{name}.insert is no boolean"))?,
+    };
+    ensure!(
+        !(insert && holds.is_some()),
+        "files.{name} has both holds and insert"
+    );
+    Ok(Owned {
+        name: name.to_owned(),
+        path: string(file, "path")?,
+        template,
+        text,
+        holds,
+        insert,
+        rivals: optional_strings(file, "rivals")?,
+        tables: optional_strings(file, "tables")?,
+    })
+}
+
+/// The tools that `[dev]` names under `key`, each with its release in `[pins]`.
+fn dev_pins(top: &dyn TableLike, pins: &dyn TableLike, key: &str) -> Result<Vec<(String, String)>> {
+    with_releases(strings(table(top, "dev")?, key).context("dev")?, pins, key)
+}
+
+/// The tools that `[dev]` may name under `key`, each with its release in `[pins]`.
+fn dev_pins_of(
+    top: &dyn TableLike,
+    pins: &dyn TableLike,
+    key: &str,
+) -> Result<Vec<(String, String)>> {
+    with_releases(
+        optional_strings(table(top, "dev")?, key).context("dev")?,
+        pins,
+        key,
+    )
+}
+
+fn with_releases(
+    names: Vec<String>,
+    pins: &dyn TableLike,
+    key: &str,
+) -> Result<Vec<(String, String)>> {
+    names
         .into_iter()
         .map(|name| {
             let version = string(pins, &name)
-                .with_context(|| format!("dev.pins names {name}, which [pins] lacks"))?;
+                .with_context(|| format!("dev.{key} names {name}, which [pins] lacks"))?;
             Ok((name, version))
         })
         .collect()
