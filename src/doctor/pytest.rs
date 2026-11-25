@@ -90,7 +90,7 @@ pub(crate) fn pins_exactly(text: &str, version: &str) -> bool {
 
 /// The version clauses of the requirement `text`, such as `>=8` and `<9` in `pytest>=8,<9`,
 /// without its name, extras and markers.
-fn clauses(text: &str) -> impl Iterator<Item = &str> {
+pub(crate) fn clauses(text: &str) -> impl Iterator<Item = &str> {
     let text = text.split(';').next().unwrap_or_default();
     let spec = text
         .trim_start()

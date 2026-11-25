@@ -21,6 +21,7 @@ use toml_edit::{DocumentMut, Item, Value};
 
 use super::catalog::{Catalog, Level, Tool};
 use super::edit;
+use super::packaging;
 use super::placement::Destination;
 use super::profile::{self, Exception, LockStyle, Presence, Profile, Tracked, Values};
 use super::pytest::{self, Release};
@@ -277,12 +278,15 @@ pub(crate) fn compute(
     edits.ty(&values, &accepted);
     let wanted_pins = edits.plan.pins.clone();
     let pins = edits.pins(&wanted_pins, facts);
-    let dependencies = pins.or(edits.pytest(&values, profile, facts, &accepted));
+    let dependencies = pins
+        .or(edits.pytest(&values, profile, facts, &accepted))
+        .or(edits.packaging(&profile.packaging));
     if request.stamp {
         edits.stamp(profile, &record);
     }
     edits.verify(&required, &accepted);
     plan.after = doc.to_string();
+    plan.packaging(root, profile);
     plan.owned_files(root, profile, original.as_ref())?;
     plan.locks(root, profile, files, dependencies);
     plan.ignored_locks(root);
@@ -663,6 +667,23 @@ impl Plan {
         Ok(())
     }
 
+    /// A conflict for each way the packaging of the `pyproject.toml` the plan leaves differs from
+    /// the profile, and for each old packaging or hook file.
+    fn packaging(&mut self, root: &Path, profile: &Profile) {
+        let Some(kind) = self.kind.as_deref().and_then(|kind| profile.kind(kind)) else {
+            return;
+        };
+        let doc = toml_edit::Document::parse(self.after.clone()).ok();
+        let pinned: Vec<String> = self.pins.iter().map(|(name, _)| name.clone()).collect();
+        let needs = packaging::KindNeeds {
+            metadata: &kind.metadata,
+            project: kind.project != Presence::Forbidden,
+        };
+        for found in packaging::findings(root, doc.as_ref(), &profile.packaging, needs, &pinned) {
+            self.conflict(found.file, None, found.message);
+        }
+    }
+
     /// A conflict for each lock file of the kind that the `.gitignore` the plan leaves ignores,
     /// since every checkout needs the lock.
     fn ignored_locks(&mut self, root: &Path) {
@@ -878,10 +899,12 @@ impl Plan {
                     let mut lock = shown.clone().into_os_string();
                     lock.push(".lock");
                     let file = PathBuf::from(lock);
-                    let state = if root.join(&file).is_file() {
-                        "present"
-                    } else {
+                    let state = if !root.join(&file).is_file() {
                         "missing"
+                    } else if lists == Lists::Changed {
+                        "refresh"
+                    } else {
+                        "present"
                     };
                     self.locks.push(Lock {
                         file,
@@ -1514,8 +1537,10 @@ fn nested(root: &Path) -> Vec<(PathBuf, Vec<Tool>)> {
 
 /// The tables of `pyproject.toml` that doctor owns: it reads and edits their values, and the
 /// diff shows their lines.
-const OWNED: [&[&str]; 7] = [
+const OWNED: [&[&str]; 9] = [
     &["tool", "ruff"],
+    &["tool", "uv", "exclude-newer"],
+    &["project", "requires-python"],
     &["tool", "ty"],
     &["tool", "pytest"],
     &["tool", "xpd"],
@@ -2867,6 +2892,60 @@ impl Edits<'_> {
                 format!("{wanted:?}"),
                 (reason, DOCS.to_owned()),
             );
+        }
+        changed
+    }
+
+    /// Sets uv's cooldown in `[tool.uv]`, and the Python floor of a `[project]` that names none.
+    /// Returns whether either changed, since both change what uv locks.
+    fn packaging(&mut self, rules: &packaging::Rules) -> Lists {
+        let mut changed = Lists::Unchanged;
+        let current = self.current();
+        let cooldown = toml::get(&current, &["tool", "uv", "exclude-newer"])
+            .and_then(Item::as_value)
+            .map(|value| value.to_string().trim().to_owned());
+        let wanted = Value::from(rules.cooldown.as_str());
+        let wanted_text = wanted.to_string().trim().to_owned();
+        if cooldown.as_deref() != Some(wanted_text.as_str())
+            && edit::set(self.doc, &["tool", "uv"], "exclude-newer", wanted)
+        {
+            changed = Lists::Changed;
+            self.change(
+                ("xpd", "exclude-newer"),
+                "uv cooldown".to_owned(),
+                &["tool", "uv", "exclude-newer"],
+                cooldown.unwrap_or_else(|| "unset".to_owned()),
+                wanted_text,
+                (
+                    format!("uv takes an upload only after {}, which gives a bad release time to be noticed and pulled. For an urgent fix, name the package in exclude-newer-package until the upload ages in.", rules.cooldown),
+                    DOCS.to_owned(),
+                ),
+            );
+        }
+        let has_project = toml::get(&current, &["project"]).is_some();
+        let floor = toml::get(&current, &["project", "requires-python"]).is_some();
+        let kind_has_project = self.plan.kind.is_some() && has_project;
+        if kind_has_project && !floor {
+            let text = format!(">={}", rules.floor);
+            if edit::set(
+                self.doc,
+                &["project"],
+                "requires-python",
+                Value::from(text.as_str()),
+            ) {
+                changed = Lists::Changed;
+                self.change(
+                    ("xpd", "requires-python"),
+                    "Python floor".to_owned(),
+                    &["project", "requires-python"],
+                    "unset".to_owned(),
+                    format!("{text:?}"),
+                    (
+                        format!("A project names the oldest Python it supports, and a new one starts at {}, which is still in bugfix support. Review the floor each year.", rules.floor),
+                        DOCS.to_owned(),
+                    ),
+                );
+            }
         }
         changed
     }

@@ -3,7 +3,7 @@
 //!
 //! ```toml
 //! [tool.xpd.profile]
-//! revision = 3
+//! revision = 4
 //! kind = "application"
 //!
 //! [[tool.xpd.profile.exceptions]]
@@ -32,9 +32,12 @@
 //! `[dev]` `pins` names the tools a project runs with `uv run`. Each goes into
 //! `[dependency-groups] dev` as an exact pin at its release in `[pins]`, and `uv.lock` locks that
 //! release. `shell` and `notebooks` name the tools that only a project with shell scripts, or
-//! with notebooks, gets. `[pytest.plugin-names]` holds the names under which `-p` loads each plugin, by its
-//! `pytest11` entry point or its module: `-p no:<name>` turns off a plugin of the profile, and
-//! `-p <name>` loads a plugin that the profile removes.
+//! with notebooks, gets. `[pytest.plugin-names]` holds the names under which `-p` loads each
+//! plugin, by its `pytest11` entry point or its module: `-p no:<name>` turns off a plugin of the
+//! profile, and `-p <name>` loads a plugin that the profile removes.
+//!
+//! `[packaging]` holds uv's cooldown, the Python floor, the build backends, uv's defaults and the
+//! old packaging files, which `packaging.rs` holds a project to.
 
 use std::collections::BTreeSet;
 
@@ -48,7 +51,7 @@ use crate::toml::{self, Toml};
 const PROFILE: &str = include_str!("profile.toml");
 
 /// The shape of `profile.toml` and of `[tool.xpd.profile]` that this xpd reads.
-pub(crate) const SCHEMA: i64 = 3;
+pub(crate) const SCHEMA: i64 = 4;
 
 /// Where a project's record of the profile lives in its `pyproject.toml`.
 pub(crate) const TABLE: [&str; 3] = ["tool", "xpd", "profile"];
@@ -97,6 +100,8 @@ pub(crate) struct KindSpec {
     pub(crate) tool_only: bool,
     /// The names of the owned files, from `[files]`.
     pub(crate) files: Vec<String>,
+    /// The keys that `[project]` declares, or lists in `dynamic`.
+    pub(crate) metadata: Vec<String>,
     /// The values the kind adds to the base values.
     pub(crate) extra: Values,
 }
@@ -556,6 +561,7 @@ pub(crate) struct Profile {
     pub(crate) base: Values,
     pub(crate) forbid: PytestForbid,
     pub(crate) files: Vec<Owned>,
+    pub(crate) packaging: super::packaging::Rules,
 }
 
 impl Profile {
@@ -623,6 +629,7 @@ impl Profile {
                         .and_then(Item::as_bool)
                         .with_context(|| format!("kinds.{name}.tool-only is no boolean"))?,
                     files: strings(kind, "files")?,
+                    metadata: strings(kind, "metadata")?,
                     extra: Values::read(kind).with_context(|| format!("kinds.{name}"))?,
                 })
             })
@@ -640,6 +647,8 @@ impl Profile {
             base: Values::read(top)?,
             forbid: PytestForbid::read(table(top, "pytest")?)?,
             files,
+            packaging: super::packaging::Rules::read(table(top, "packaging")?)
+                .context("packaging")?,
         })
     }
 

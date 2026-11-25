@@ -1,5 +1,5 @@
-schema = 3
-revision = 3
+schema = 4
+revision = 4
 summary = "The setup that xpd doctor holds a Python project to. Each value is explained by the record of the same id in decisions.jsonl."
 
 [pins]
@@ -16,9 +16,10 @@ typos = "1.52.2"
 shellcheck-py = "0.11.0.1"
 shfmt-py = "4.2.0"
 nbstripout = "0.9.2"
+deptry = "0.25.1"
 
 [dev]
-pins = ["pytest", "pytest-timeout", "pytest-randomly", "hypothesis", "ruff", "ty", "tombi", "rumdl", "yamllint", "typos"]
+pins = ["pytest", "pytest-timeout", "pytest-randomly", "hypothesis", "ruff", "ty", "tombi", "rumdl", "yamllint", "typos", "deptry"]
 shell = ["shellcheck-py", "shfmt-py"]
 notebooks = ["nbstripout"]
 
@@ -29,6 +30,7 @@ project = "required"
 build-system = "required"
 scripts = "allowed"
 tool-only = false
+metadata = ["name", "version", "description", "readme", "requires-python", "urls", "license", "license-files"]
 files = ["conftest", "editorconfig", "gitattributes", "gitignore", "tombi", "rumdl", "yamllint"]
 
 [kinds.application]
@@ -38,6 +40,7 @@ project = "required"
 build-system = "allowed"
 scripts = "allowed"
 tool-only = false
+metadata = ["name", "version", "description", "readme", "requires-python", "urls"]
 files = ["conftest", "editorconfig", "gitattributes", "gitignore", "tombi", "rumdl", "yamllint"]
 
 [kinds.pipeline]
@@ -47,6 +50,7 @@ project = "required"
 build-system = "allowed"
 scripts = "allowed"
 tool-only = false
+metadata = ["name", "version", "description", "readme", "requires-python", "urls"]
 files = ["conftest", "editorconfig", "gitattributes", "gitignore", "tombi", "rumdl", "yamllint"]
 
 [kinds.script]
@@ -56,6 +60,7 @@ project = "forbidden"
 build-system = "forbidden"
 scripts = "required"
 tool-only = true
+metadata = []
 files = ["editorconfig", "gitattributes", "gitignore", "tombi", "rumdl", "yamllint"]
 
 [files.conftest]
@@ -93,6 +98,31 @@ tables = ["tool.rumdl"]
 path = ".yamllint.yml"
 template = "yamllint.yml.template"
 rivals = [".yamllint", ".yamllint.yaml"]
+
+[packaging]
+cooldown = "3 days"
+python-floor = "3.14"
+
+[packaging.backends]
+"hatchling.build" = ""
+maturin = "Cargo.toml"
+"scikit_build_core.build" = "CMakeLists.txt"
+
+[packaging.uv]
+index-strategy = "first-index"
+no-build-isolation = false
+no-build-isolation-package = []
+default-groups = ["dev"]
+
+[packaging.migrate.files]
+"setup.py" = "Move the metadata and entry points to [project], read the script for build steps before you remove it, and choose the backend by what the build needs."
+"setup.cfg" = "Move the metadata to [project] and each tool's section to its table in pyproject.toml, and let the backend find the package."
+"requirements*.txt" = "Add the direct requirements with uv add -r, put the development ones in the dev group, and export a requirements file from uv.lock only for a reader that needs one."
+"tox.ini" = "Move the environments that matter to the CI workflow, and run each command with uv on its Python and platform."
+".pre-commit-config.yaml" = "Move the hooks and their file filters to lefthook.yml, and run the project's tools with uv run --locked."
+
+[packaging.migrate.tables]
+"tool.poetry" = "Move the metadata, scripts and runtime requirements to [project], turn the groups and markers into [dependency-groups], run uv lock, and map named indexes to [tool.uv.sources]."
 
 [ruff]
 select = ["ALL"]

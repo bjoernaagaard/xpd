@@ -1,10 +1,10 @@
-Run `xpd doctor` at the root of a Python project to compare it with the profile, the one target setup for Ruff, ty, pytest and the files that are not Python that ships with xpd. Doctor prints a unified diff of `pyproject.toml` and of each file the profile owns, with the reason for each change, the lock files the project needs, and then the conditional advice that the project's code points to. `xpd doctor --apply` writes the diff, and `xpd doctor --check` exits 1 while the project differs from the profile.
+Run `xpd doctor` at the root of a Python project to compare it with the profile, the one target setup for Ruff, ty, pytest, packaging and the files that are not Python that ships with xpd. Doctor prints a unified diff of `pyproject.toml` and of each file the profile owns, with the reason for each change, the lock files the project needs, and then the conditional advice that the project's code points to. `xpd doctor --apply` writes the diff, and `xpd doctor --check` exits 1 while the project differs from the profile.
 
 The plan reads files. It compares the effect of the project's own settings, so an extra selector in `lint.ignore` that turns off only rules the profile turns off, or a ty level above the profile's, needs no edit. A tool's default does not count, because another release of the tool can change it, so the project names each setting, rule and level itself. Doctor runs uv to check and write lock files, the pinned Ruff to confirm that it accepts the settings, and the installed Ruff and ty for the conditional advice.
 
 ## What doctor shows of the project
 
-Doctor shows only the settings it owns, so that its output never carries a token from another part of `pyproject.toml`. It owns `[tool.ruff]`, `[tool.ty]`, the pytest table, `[tool.xpd]`, `[dependency-groups]`, and `dependencies` and `optional-dependencies` of `[project]`, and the files that [Files that are not Python](#files-that-are-not-python) lists.
+Doctor shows only the settings it owns, so that its output never carries a token from another part of `pyproject.toml`. It owns `[tool.ruff]`, `[tool.ty]`, the pytest table, `[tool.xpd]`, `[dependency-groups]`, `dependencies`, `optional-dependencies` and `requires-python` of `[project]`, `exclude-newer` of `[tool.uv]`, and the files that [Files that are not Python](#files-that-are-not-python) lists.
 
 - **The diff.** Each line outside those tables, such as a line of `[tool.uv]`, `[[tool.uv.index]]`, `[tool.uv.sources]` or `[tool.uv.pip]`, shows as `<hidden>`. A line shows only when everything on it belongs to those tables, so a line that also holds another setting is hidden, such as `tool = { uv = { ... }, ruff = { ... } }` or `tool.uv.index-url = "..."` beside `tool.ruff.lint...` lines. Table headers and blank lines stay, so the diff keeps its shape. A change on a hidden line shows in the list of changes and not in the diff.
 - **URLs.** In every line doctor prints, a URL keeps its scheme, host and path, and its user and password, query and fragment become `****`, as in `https://****@example.com/simple?****`. In a message of uv or Ruff that doctor passes on, a URL keeps its scheme and host only. The source links of the profile's records, which ship with xpd, print whole with their anchors, and so does only a URL that is exactly one of those links.
@@ -172,10 +172,44 @@ The profile pins the tools that check the project, at the releases its rules and
 | ShellCheck, only with shell scripts | `shellcheck-py==0.11.0.1` |
 | shfmt, only with shell scripts | `shfmt-py==4.2.0` |
 | nbstripout, only with notebooks | `nbstripout==0.9.2` |
+| deptry | `deptry==0.25.1` |
 
 `uv.lock` must lock these releases. A lock that holds another release of one of them, or none, is out of date, so `--check` exits 1 and `--apply` runs `uv lock`. A requirement for one of them in another list that the pin does not meet is a conflict, because uv locks one release for every list. The `script` kind gets no pin, since its `pyproject.toml` holds tool settings only. Run the checks with `uv run --locked ruff check`, `uv run --locked ruff format --check`, `uv check --locked` and `uv run --locked pytest`.
 
 A project gets the ShellCheck and shfmt pins when it tracks a shell script: a `.sh` or `.bash` file, or a file without a suffix whose first line runs `sh`, `bash`, `dash` or `ksh`. ShellCheck does not read zsh. It gets the nbstripout pin when it tracks a notebook. A file that Git ignores does not count.
+
+## Packaging
+
+The profile packages a project with `pyproject.toml` and uv. Doctor writes two values itself and reports every other difference as a conflict, since only the owner can choose the replacement.
+
+| Rule | What doctor does |
+| --- | --- |
+| uv waits 3 days before it takes a new upload | Sets `exclude-newer = "3 days"` in `[tool.uv]` for every kind, and refreshes the locks. For an urgent fix, name the package in `exclude-newer-package` until the upload ages in. uv also reads this for `uv lock --script`. |
+| A new project starts at Python 3.14 | Sets `requires-python = ">=3.14"` when `[project]` names none. An existing floor stays, so review it each year. |
+| No cap on Python | A conflict for `<`, `<=`, `~=` or `==` in `requires-python`. |
+| The build backend fits the code | `hatchling.build` for a pure Python package, `maturin` when `Cargo.toml` is at the root, and `scikit_build_core.build` when `CMakeLists.txt` is. Another backend, or a `[build-system]` without `build-backend`, is a conflict. Compare the old and new wheel before a release on the new backend. |
+| Requirements are broad, and exact choices live in `uv.lock` | A conflict for an entry of `dependencies` or of an extra without a lowest release, such as `"attrs"`, or with one exact release, such as `"attrs==25.4.0"`. Use `>=` at the oldest release that works, and a cap or an exclusion only for a known incompatibility. A direct reference with `@` and the profile's own pins stay. |
+| uv keeps its own defaults | A conflict for `index-strategy`, `no-build-isolation`, `no-build-isolation-package` or `default-groups` in `[tool.uv]` with another value than uv's own. |
+| `deptry` finds missing and unused dependencies | Pins `deptry==0.25.1` in `dev`. Run `uv run --locked deptry .` and review what it reports, since a plugin, an entry point or a dynamic import can need a dependency that no import shows. |
+
+Each kind declares this metadata in `[project]`, or lists it in `dynamic`:
+
+| Kind | Metadata |
+| --- | --- |
+| `library` | `name`, `version`, `description`, `readme`, `requires-python`, a `Repository` in `[project.urls]`, `license` as an SPDX expression such as `"MIT"`, and `license-files` |
+| `application`, `pipeline` | `name`, `version`, `description`, `readme`, `requires-python` and a `Repository` in `[project.urls]` |
+| `script` | None, since its `pyproject.toml` holds tool settings only |
+
+These old packaging and hook files are conflicts, each with the way to move it:
+
+| In the project | Move it |
+| --- | --- |
+| `[tool.poetry]` | Move the metadata, scripts and runtime requirements to `[project]`, turn the groups and markers into `[dependency-groups]`, run `uv lock`, and map named indexes to `[tool.uv.sources]`. |
+| `setup.py` | Move the metadata and entry points to `[project]`, read the script for build steps before you remove it, and choose the backend by what the build needs. |
+| `setup.cfg` | Move the metadata to `[project]` and each tool's section to its table in `pyproject.toml`. |
+| `requirements.txt`, `requirements-dev.txt` and any other `requirements*.txt` at the root | Add the direct requirements with `uv add -r`, put the development ones in the `dev` group, and export a requirements file from `uv.lock` only for a reader that needs one. |
+| `tox.ini` | Move the environments that matter to the CI workflow, and run each command with uv on its Python and platform. |
+| `.pre-commit-config.yaml` | Move the hooks and their file filters to `lefthook.yml`, and run the project's tools with `uv run --locked`. |
 
 ## Files that are not Python
 
@@ -204,7 +238,12 @@ The example project reruns each failed test twice.
 [project]
 name = "example"
 version = "0.1.0"
+description = "An example project."
+readme = "README.md"
 requires-python = ">=3.12"
+
+[project.urls]
+Repository = "https://example.com/example"
 
 [dependency-groups]
 dev = [
@@ -221,13 +260,13 @@ Doctor prints the diff, then one entry for each change. The `...` lines stand fo
 
 ```console
 $ xpd doctor --format text
-Profile revision 3, kind application, suggested because [project] has no [build-system], so uv runs it without building it
+Profile revision 4, kind application, suggested because [project] has no [build-system], so uv runs it without building it
   A program that runs from its checkout or as an installed command, locked in uv.lock.
 pyproject.toml records no profile yet.
 
 --- pyproject.toml
 +++ pyproject.toml
-@@ -5,10 +5,99 @@
+@@ -10,10 +10,103 @@
 
  [dependency-groups]
  dev = [
@@ -244,6 +283,7 @@ pyproject.toml records no profile yet.
 +    "rumdl==0.3.5",
 +    "yamllint==1.38.0",
 +    "typos==1.52.2",
++    "deptry==0.25.1",
  ]
 
  [tool.pytest.ini_options]
@@ -269,11 +309,13 @@ pyproject.toml records no profile yet.
 +missing-type-argument = "warn"
 +unused-ignore-comment = "error"
 ...
++[tool.uv]
++exclude-newer = "3 days"
++
 +[tool.xpd.profile]
-+revision = 3
++revision = 4
 +kind = "application"
 ...
---- /dev/null
 +++ tombi.toml
 ...
 Changes
@@ -281,10 +323,10 @@ Changes
     Profile ["ALL"]. Every Ruff rule runs unless a written reason in the ignore list turns it off.
     Source: https://docs.astral.sh/ruff/linter/#rule-selection
 ...
-  pytest --reruns: --reruns 2 -> removed, tool.pytest.ini_options.addopts at line 14
+  pytest --reruns: --reruns 2 -> removed, tool.pytest.ini_options.addopts at line 19
     Keep the first failure visible so you can find and fix its cause.
     Source: https://github.com/pytest-dev/pytest-rerunfailures/blob/master/README.rst
-  pytest --strict-markers: --strict-markers -> removed, tool.pytest.ini_options.addopts at line 14
+  pytest --strict-markers: --strict-markers -> removed, tool.pytest.ini_options.addopts at line 19
 ...
 Locks
   uv.lock is missing. --apply runs uv lock.
@@ -293,7 +335,7 @@ xpd doctor --apply --kind application writes these changes.
 ...
 ```
 
-`xpd doctor --apply --kind application` writes this diff, runs `uv lock`, and records the revision and kind last. It also writes the owned files, and formats `pyproject.toml` with Tombi. A second `xpd doctor --check` then prints `The project matches profile revision 3.` and exits 0.
+`xpd doctor --apply --kind application` writes this diff, runs `uv lock`, and records the revision and kind last. It also writes the owned files, and formats `pyproject.toml` with Tombi. A second `xpd doctor --check` then prints `The project matches profile revision 4.` and exits 0.
 
 ## Kinds of project
 
@@ -306,7 +348,7 @@ The first apply needs a kind, which `pyproject.toml` records. Doctor suggests on
 | `pipeline` | An application that turns data into results. | `[project]` | `uv.lock` |
 | `script` | Standalone scripts. | At least one Python file with a `# /// script` block, and a `pyproject.toml` that holds the `[tool]` table and nothing else, so the scripts declare their own dependencies and the profile adds no plugin | `<script>.lock` beside each script, by `uv lock --script` |
 
-A kind can add its own Ruff, ty and pytest values to the ones every kind gets, and the profile can own whole files for a kind, such as a workflow, which the project keeps as exact copies of templates that ship with xpd. Revision 3 gives every kind the same values. It owns the files that [Files that are not Python](#files-that-are-not-python) lists for every kind, and `conftest.py` at the root for `library`, `application` and `pipeline`. Hypothesis reads its profiles from Python only, so `conftest.py` registers the profile `slow`, which turns off the time limit per example and keeps every other check, beside the built-in `default` and `ci` profiles. Run `uv run --locked pytest --hypothesis-profile slow` for a long property run. A project without `conftest.py` gets the profile's copy. A project that keeps its own `conftest.py` must hold the line `settings.register_profile("slow", deadline=None)` with its import, and doctor reports a conflict until it does, since it never rewrites the project's own file.
+A kind can add its own Ruff, ty and pytest values to the ones every kind gets, and the profile can own whole files for a kind, such as a workflow, which the project keeps as exact copies of templates that ship with xpd. Revision 4 gives every kind the same tool values. It owns the files that [Files that are not Python](#files-that-are-not-python) lists for every kind, and `conftest.py` at the root for `library`, `application` and `pipeline`. Hypothesis reads its profiles from Python only, so `conftest.py` registers the profile `slow`, which turns off the time limit per example and keeps every other check, beside the built-in `default` and `ci` profiles. Run `uv run --locked pytest --hypothesis-profile slow` for a long property run. A project without `conftest.py` gets the profile's copy. A project that keeps its own `conftest.py` must hold the line `settings.register_profile("slow", deadline=None)` with its import, and doctor reports a conflict until it does, since it never rewrites the project's own file.
 
 ## One place for each tool
 
@@ -337,7 +379,7 @@ A project records an exception in `pyproject.toml`, beside the revision and kind
 
 ```toml
 [tool.xpd.profile]
-revision = 3
+revision = 4
 kind = "application"
 
 [[tool.xpd.profile.exceptions]]

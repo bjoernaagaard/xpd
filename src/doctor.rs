@@ -14,6 +14,7 @@ mod apply;
 pub mod catalog;
 mod edit;
 mod evidence;
+mod packaging;
 mod placement;
 mod plan;
 mod probe;
