@@ -89,6 +89,11 @@ pub(crate) fn run() -> ExitCode {
     code
 }
 
+/// Answers `initialize` and serves the client until it exits.
+///
+/// The client's diagnostic refresh support is read from the raw request at
+/// `capabilities.workspace.diagnostics.refreshSupport`, because lsp-types 0.97.0 parses only
+/// the singular `diagnostic` field and would drop the plural one that clients send.
 fn serve(connection: &Connection) -> Result<ExitCode> {
     let (id, params) = connection
         .initialize_start()
