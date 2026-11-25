@@ -93,10 +93,10 @@ def build(settings: Settings) -> FastMCP:
     project = Project(Root.at(settings.root) if settings.root else None)
     xpd = Xpd(find_binary())
     fallback_rules = catalog.Catalog(tuple(xpd.run_now(BUILTIN_RULES)))
-    skills = [
-        Skill.from_files({file.path: file.text for file in skill.files})
-        for skill in xpd.run_now(SKILLS)
-    ]
+    skills = []
+    for skill in xpd.run_now(SKILLS):
+        files = {file.path: file.text for file in skill.files}
+        skills.append(Skill.from_files(files))
     skill_uris = {skill.name: str(skill.to_mcp_skill().uri) for skill in skills}
     mcp = FastMCP(
         "xpd",

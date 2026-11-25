@@ -1,8 +1,8 @@
 """The project root. Tools read files, `fix` writes them and `equiv` runs scripts, so every path
 a client passes must resolve inside it."""
 
-from dataclasses import dataclass
 from pathlib import Path
+from typing import NamedTuple
 from urllib.parse import urlparse
 from urllib.request import url2pathname
 
@@ -36,8 +36,7 @@ def uses_handshake(ctx: Context) -> bool:
     )
 
 
-@dataclass(frozen=True)
-class Root:
+class Root(NamedTuple):
     path: Path
 
     @classmethod
@@ -63,8 +62,7 @@ class RootsRequiredError(Exception):
         self.request = request
 
 
-@dataclass(frozen=True)
-class Project:
+class Project(NamedTuple):
     """Where the root of a call comes from: the server's settings, or else the client's roots,
     which is how a server that starts outside the project learns where the project is."""
 

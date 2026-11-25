@@ -5,7 +5,9 @@ import asyncio
 import json
 from collections.abc import Iterable
 from dataclasses import dataclass, field
+from functools import partial
 from pathlib import Path
+from typing import NamedTuple
 
 import yaml
 from fastmcp import Context, FastMCP
@@ -39,8 +41,7 @@ RULE_SUFFIXES = {".yml", ".yaml"}
 Inputs = tuple[tuple[str, int, int], ...]
 
 
-@dataclass(frozen=True)
-class Catalog:
+class Catalog(NamedTuple):
     """Every rule that `xpd rules` lists: the built-in rules, and those of the project's own
     rule project when the root has one."""
 
@@ -122,7 +123,8 @@ def inputs(root: Path) -> Inputs:
     under the rule and utility folders that stay inside `root`."""
     boundary = root.resolve()
     files: list[Path] = [boundary / name for name in (*CONFIG_NAMES, MANIFEST_NAME)]
-    config = next((boundary / name for name in CONFIG_NAMES if (boundary / name).is_file()), None)
+    present = (boundary / name for name in CONFIG_NAMES if (boundary / name).is_file())
+    config = next(present, None)
     if config is not None:
         manifest = boundary / MANIFEST_NAME
         dirs = [
@@ -177,6 +179,19 @@ class Catalogs:
             return catalog
 
 
+def selects(
+    rule: Rule, *, severity: Severity | None, fixable: bool | None, needle: str | None
+) -> bool:
+    """Whether `rule` has the severity and the fix that a listing asks for, and holds `needle`,
+    which is already case folded, in its id, message or documentation."""
+    if severity is not None and rule.severity != severity:
+        return False
+    if fixable is not None and (rule.fix is not None) != fixable:
+        return False
+    text = f"{rule.rule}\n{rule.message}\n{rule.doc or ''}".casefold()
+    return needle is None or needle in text
+
+
 def register(mcp: FastMCP, catalog: Catalog, xpd: Xpd, project: Project) -> None:
     catalogs = Catalogs(xpd, project, catalog)
 
@@ -203,18 +218,9 @@ def register(mcp: FastMCP, catalog: Catalog, xpd: Xpd, project: Project) -> None
         selected = await catalogs.load(ctx)
         rules = selected.of(package) if package else list(selected.rules)
         needle = query.casefold() if query else None
-        return RuleList(
-            rules=[
-                rule
-                for rule in rules
-                if (severity is None or rule.severity == severity)
-                and (fixable is None or (rule.fix is not None) == fixable)
-                and (
-                    needle is None
-                    or needle in f"{rule.rule}\n{rule.message}\n{rule.doc or ''}".casefold()
-                )
-            ]
-        )
+        wanted = partial(selects, severity=severity, fixable=fixable, needle=needle)
+        kept = [rule for rule in rules if wanted(rule)]
+        return RuleList(rules=kept)
 
     @mcp.tool(name=ToolName.RULE, tags={"rules"}, annotations=READS)
     async def one_rule(ctx: Context, package: str, rule: str) -> Rule:

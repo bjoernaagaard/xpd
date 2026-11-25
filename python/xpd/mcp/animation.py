@@ -69,11 +69,11 @@ class AnimationRender(Output):
     @computed_field
     @property
     def resources(self) -> dict[str, str]:
-        return {
-            artifact: artifact_uri(self.id, filename)
-            for artifact, (filename, _, _) in ARTIFACTS.items()
-            if getattr(self, artifact)
-        }
+        found = {}
+        for artifact, (filename, _, _) in ARTIFACTS.items():
+            if getattr(self, artifact):
+                found[artifact] = artifact_uri(self.id, filename)
+        return found
 
 
 class AnimationSource(Output):

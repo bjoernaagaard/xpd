@@ -5,7 +5,7 @@ import { promisify } from "node:util";
 
 const { workflow, step, title } = T3;
 const exec = promisify(execFile);
-const project = join(homedir(), "src/pdx");
+const project = join(homedir(), "src/xpd");
 
 function collect(name, args, input = "") {
   return step(

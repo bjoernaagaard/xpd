@@ -51,9 +51,8 @@ def choice_problems(discovery: Discovery) -> list[str]:
     failures = []
     if choice.name not in {entry.name for entry in discovery.candidates.entries()}:
         failures.append(f"{choice.name} is not among the recorded candidates.")
-    selected = next(
-        (entry for entry in discovery.candidates.entries() if entry.name == choice.name), None
-    )
+    named = (entry for entry in discovery.candidates.entries() if entry.name == choice.name)
+    selected = next(named, None)
     if selected is not None and selected.kind == "symbol" and choice.name not in choice.symbols:
         failures.append("The chosen symbol must be listed among the symbols the code calls.")
     return failures
@@ -87,16 +86,16 @@ async def inspect_calls(xpd: Xpd, root: Path, paths: list[str], discovery: Disco
             except ToolError:
                 failures.append(f"{place} {name} is not known to api.")
                 continue
-            entry = next((item for item in entries if item.name == name), None)
+            named = (item for item in entries if item.name == name)
+            entry = next(named, None)
             if entry is None or entry.signature is None:
                 failures.append(f"{place} {name} is not an indexed callable symbol.")
                 continue
             used.add(name)
             checked += 1
             failures.extend(keyword_problems(node, entry, place))
-    failures.extend(
-        f"No direct imported call to {name}." for name in choice.symbols if name not in used
-    )
+    unused = [name for name in choice.symbols if name not in used]
+    failures.extend(f"No direct imported call to {name}." for name in unused)
     return Gate(
         name="indexed-api-calls",
         stage="discovery",

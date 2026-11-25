@@ -3,6 +3,7 @@
 import json
 import re
 import sys
+from collections import defaultdict
 from collections.abc import Iterator
 from pathlib import Path
 from typing import NoReturn
@@ -22,7 +23,7 @@ except ImportError as e:
 
 def unique_count(s: pd.Series) -> int | None:
     try:
-        return int(s.nunique(dropna=True))
+        return s.nunique(dropna=True)
     except TypeError:  # cells hold unhashable values such as lists or dicts
         return None
 
@@ -52,14 +53,14 @@ def wide_findings(names: list[str]) -> Iterator[dict[str, object]]:
     A frame with such columns is wide: the years stand in the header where they could stand in
     a column of their own.
     """
-    groups: dict[str, list[str]] = {}
+    groups: defaultdict[str, list[str]] = defaultdict(list)
     for name in names:
         if YEAR.fullmatch(name):
-            groups.setdefault("a year", []).append(name)
+            groups["a year"].append(name)
         elif DATE.fullmatch(name):
-            groups.setdefault("a date", []).append(name)
+            groups["a date"].append(name)
         elif stem := STEM.fullmatch(name):
-            groups.setdefault(stem.group(1), []).append(name)
+            groups[stem.group(1)].append(name)
     for what, columns in groups.items():
         if len(columns) < SHARED:
             continue
@@ -133,18 +134,15 @@ def main() -> None:
         )
         if finding := category_finding(s, unique, int(mem[c])):
             findings.append(finding)
-    print(
-        json.dumps(
-            {
-                "file": str(path),
-                "pandas": pd.__version__,
-                "rows": len(df),
-                "memory_bytes": int(mem.sum()),
-                "columns": cols,
-                "findings": findings,
-            }
-        )
-    )
+    report = {
+        "file": str(path),
+        "pandas": pd.__version__,
+        "rows": len(df),
+        "memory_bytes": int(mem.sum()),
+        "columns": cols,
+        "findings": findings,
+    }
+    print(json.dumps(report))
 
 
 if __name__ == "__main__":

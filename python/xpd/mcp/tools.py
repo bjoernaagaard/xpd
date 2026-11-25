@@ -1,7 +1,7 @@
 """The tools that run xpd on the project's files."""
 
 from collections.abc import Sequence
-from dataclasses import dataclass
+from typing import NamedTuple
 
 from fastmcp import Context, FastMCP
 from mcp.types import (
@@ -46,8 +46,7 @@ async def unsafe_confirmed(
     return answer
 
 
-@dataclass(frozen=True)
-class Analysis:
+class Analysis(NamedTuple):
     xpd: Xpd
     project: Project
 

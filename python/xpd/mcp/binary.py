@@ -9,8 +9,8 @@ import subprocess
 import sys
 import sysconfig
 from collections.abc import Callable, Sequence
-from dataclasses import dataclass
 from pathlib import Path
+from typing import NamedTuple
 
 from fastmcp.exceptions import ToolError
 from pydantic import TypeAdapter
@@ -37,8 +37,7 @@ FINDINGS = frozenset({0, 1})
 SUCCESS = frozenset({0})
 
 
-@dataclass(frozen=True)
-class Command[T]:
+class Command[T](NamedTuple):
     """One xpd command: its leading arguments, the shape of its JSON and its result codes."""
 
     args: tuple[str, ...]
@@ -68,7 +67,7 @@ BUILTIN_RULES = Command(("rules", "--builtin", "--format", "json"), RULES.decode
 SKILLS = Command(("skill", "--json"), TypeAdapter(list[SkillSource]).validate_json, SUCCESS)
 
 
-def _json_error(stdout: bytes) -> bytes | None:
+def json_error(stdout: bytes) -> bytes | None:
     """The error that equiv and refit report as JSON on stdout. The script's own prints and
     warnings go to stderr, so stderr alone would hide the reason."""
     try:
@@ -100,8 +99,7 @@ def find_binary() -> Path:
     raise RuntimeError(msg)
 
 
-@dataclass(frozen=True)
-class Xpd:
+class Xpd(NamedTuple):
     binary: Path
 
     async def run[T](
@@ -168,7 +166,7 @@ class Xpd:
         stderr: bytes,
     ) -> T:
         if code not in command.results:
-            reason = (_json_error(stdout) or stderr or stdout).decode(errors="replace").strip()
+            reason = (json_error(stdout) or stderr or stdout).decode(errors="replace").strip()
             shown = " ".join([*command.args[:1], *args])
             msg = f"xpd {shown} exited with {code}: {reason}"
             raise ToolError(msg)

@@ -17,11 +17,8 @@ try:
     from sklearn.model_selection import cross_val_score, train_test_split
     from sklearn.pipeline import Pipeline
 except ImportError as error:
-    print(
-        json.dumps(
-            {"error": f"Refit needs pandas and scikit-learn in the project's Python. {error}"}
-        )
-    )
+    missing = {"error": f"Refit needs pandas and scikit-learn in the project's Python. {error}"}
+    print(json.dumps(missing))
     sys.exit(2)
 
 
@@ -80,9 +77,8 @@ def refit(file: str) -> dict:
         msg = "The saved object is not a sklearn.pipeline.Pipeline."
         raise TypeError(msg)
     fitted = clone(saved).fit(train, train_y)
-    output = next(
-        name for name in ("predict_proba", "decision_function", "predict") if hasattr(saved, name)
-    )
+    methods = ("predict_proba", "decision_function", "predict")
+    output = next(name for name in methods if hasattr(saved, name))
     old, new = getattr(saved, output)(held), getattr(fitted, output)(held)
     left, right = np.asarray(old), np.asarray(new)
     gap = None

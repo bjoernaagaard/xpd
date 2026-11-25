@@ -46,7 +46,12 @@ MIN_FOLDS = 2
 # The libraries that SEED_RULES covers, as the detail of `split-is-seeded` names them.
 *seed_libraries, last_library = (label for label, _ in SEED_RULES.values())
 SEED_LIBRARIES = f"{', '.join(seed_libraries)} or {last_library}"
-SEED_IDS = {(pack, rule) for pack, (_, names) in SEED_RULES.items() for rule in names}
+SEED_IDS: set[tuple[str, str]] = set()
+for seed_pack, (_, seed_rules) in SEED_RULES.items():
+    SEED_IDS.update((seed_pack, rule) for rule in seed_rules)
+
+
+NO_SOURCE = "which is no input column and which no earlier step adds."
 
 
 def gate(
@@ -68,7 +73,8 @@ def data_is_profiled(profile: Profile, contract: Contract) -> Gate:
         failures.append(f"The contract names {data.file}, and the profile is of {profile.file}.")
     if data.rows != profile.rows:
         failures.append(f"The contract counts {data.rows} rows, and the file has {profile.rows}.")
-    target = next((column for column in profile.columns if column.column == data.target), None)
+    named = (column for column in profile.columns if column.column == data.target)
+    target = next(named, None)
     if target is None:
         failures.append(f"{profile.file} has no column {data.target}.")
     elif target.nulls:
@@ -94,11 +100,8 @@ def split_covers_every_row(profile: Profile, contract: Contract) -> Gate:
 
 
 def split_is_seeded(lint: CheckReport, contract: Contract) -> Gate:
-    failures = [
-        f"{issue.file}:{issue.line} {issue.package}/{issue.rule}."
-        for issue in lint.issues
-        if (issue.package, issue.rule) in SEED_IDS
-    ]
+    unseeded = [issue for issue in lint.issues if (issue.package, issue.rule) in SEED_IDS]
+    failures = [f"{issue.file}:{issue.line} {issue.package}/{issue.rule}." for issue in unseeded]
     found = (
         f"The contract records the seed {contract.split.seed}, and check reports no unseeded "
         f"{SEED_LIBRARIES} draw."
@@ -116,11 +119,8 @@ def check_reports_no_error(lint: CheckReport) -> Gate:
     The gate does not show that a run has no leak. A rule reads the code and knows the held out
     rows by names such as `X_test`, so it misses a leak under another name and a leak that no
     rule describes."""
-    failures = [
-        f"{issue.file}:{issue.line} {issue.package}/{issue.rule}."
-        for issue in lint.issues
-        if issue.severity == "error"
-    ]
+    errors = [issue for issue in lint.issues if issue.severity == "error"]
+    failures = [f"{issue.file}:{issue.line} {issue.package}/{issue.rule}." for issue in errors]
     return gate("check-reports-no-error", "proof", ["check"], failures, "check reports no error.")
 
 
@@ -174,23 +174,18 @@ def one_pipeline(contract: Contract) -> Gate:
 def dataflow_connects(dataflow: GraphReport, contract: Contract) -> Gate:
     """A step may read the model's input columns and the columns of the steps before it. A read
     of anything else is a column that is missing when the model predicts, or the target."""
-    failures = [
-        f"{problem.file}:{problem.line} {problem.message}"
-        for problem in dataflow.problems
-        if problem.severity in {"error", "warning"}
-    ]
+    reported = {"error", "warning"}
+    problems = [problem for problem in dataflow.problems if problem.severity in reported]
+    failures = [f"{problem.file}:{problem.line} {problem.message}" for problem in problems]
     inputs = {column.column for column in contract.inputs}
     steps = 0
     for pipeline in dataflow.pipelines:
         known = set(inputs)
         for step in pipeline.steps:
             steps += 1
-            failures.extend(
-                f"{pipeline.file}:{step.line} {step.name}() reads {column}, which is no input "
-                "column and which no earlier step adds."
-                for column in step.reads
-                if column not in known
-            )
+            place = f"{pipeline.file}:{step.line} {step.name}()"
+            unknown = [column for column in step.reads if column not in known]
+            failures.extend(f"{place} reads {column}, {NO_SOURCE}" for column in unknown)
             known.update(step.columns)
     found = f"{steps} feature steps read only input columns and columns of earlier steps."
     return gate("dataflow-connects", "preprocessing", ["graph", "contract"], failures, found)
@@ -221,9 +216,8 @@ def equivalent(name: str, stage: Stage, result: Equivalence, found: str) -> Gate
 
 def versions_recorded(profile: Profile, contract: Contract) -> Gate:
     versions = contract.model.versions
-    failures = [
-        f"The contract records no version of {name}." for name in VERSIONS if not versions.get(name)
-    ]
+    missing = [name for name in VERSIONS if not versions.get(name)]
+    failures = [f"The contract records no version of {name}." for name in missing]
     if versions.get("pandas") not in {None, profile.pandas}:
         failures.append(
             f"The model was written with pandas {versions['pandas']}, and the project's Python "
@@ -296,15 +290,8 @@ def discovery_gates(contract: Contract, proof: Proof) -> list[Gate]:
         recorded = contract.discovery.decision() if contract.discovery else None
         if recorded != proof.discovery.discovery.decision():
             failures.append("The contract and proof record different discovery choices.")
-    gates.append(
-        gate(
-            "discovery-is-recorded",
-            "discovery",
-            ["contract"],
-            failures,
-            "The contract records the discovery question, candidates and reason of the proof.",
-        )
-    )
+    found = "The contract records the discovery question, candidates and reason of the proof."
+    gates.append(gate("discovery-is-recorded", "discovery", ["contract"], failures, found))
     return gates
 
 
@@ -368,10 +355,11 @@ def register(mcp: FastMCP, project: Project, rules: Catalog) -> None:
             msg = f"Cannot read {file}. {error}"
             raise ToolError(msg) from error
         except ValidationError as error:
-            fields = "; ".join(
-                " ".join([".".join(map(str, problem["loc"])), problem["msg"]]).strip()
-                for problem in error.errors()
-            )
+            problems = []
+            for problem in error.errors():
+                place = ".".join(map(str, problem["loc"]))
+                problems.append(f"{place} {problem['msg']}".strip())
+            fields = "; ".join(problems)
             msg = f"{file} is not a contract. {fields}"
             raise ToolError(msg) from error
         # The paths are compared with those of the other tools, which are relative to the root.

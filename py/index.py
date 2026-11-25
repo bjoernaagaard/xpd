@@ -166,7 +166,9 @@ class Callables(griffe.Extension):
         for name, overloads in obj.overloads.items():
             if name not in obj.members and overloads:
                 first = overloads[0]
-                merged = {p.name: p for overload in overloads for p in overload.parameters}
+                merged = {}
+                for overload in overloads:
+                    merged.update({p.name: p for p in overload.parameters})
                 function = griffe.Function(
                     name,
                     parameters=griffe.Parameters(*merged.values()),
@@ -351,14 +353,11 @@ def members(obj: griffe.Class, callables: Callables) -> list[Member]:
             if name.startswith("_") or not member.is_public:
                 continue
             if member.is_function:
-                result.append(
-                    Member(
-                        name=name,
-                        definitions=callables.definitions(member),
-                        summary=summary(member),
-                        property=False,
-                    )
+                definitions = callables.definitions(member)
+                function = Member(
+                    name=name, definitions=definitions, summary=summary(member), property=False
                 )
+                result.append(function)
             elif member.is_attribute and member.has_labels("property"):
                 result.append(
                     Member(name=name, definitions=[], summary=summary(member), property=True)
@@ -506,8 +505,9 @@ def entries(module: griffe.Module, callables: Callables) -> list[Entry]:
         best = names.get(key)
         if best is None or path_rank(path) < path_rank(best[0]):
             names[key] = (path, target)
-    return [
-        Entry(
+    found = []
+    for path, target in sorted(names.values(), key=lambda item: item[0]):
+        entry = Entry(
             kind="symbol",
             package=package,
             name=path,
@@ -518,8 +518,8 @@ def entries(module: griffe.Module, callables: Callables) -> list[Entry]:
             members=members(target, callables) if target.is_class else [],
             rules=[],
         )
-        for path, target in sorted(names.values(), key=lambda item: item[0])
-    ]
+        found.append(entry)
+    return found
 
 
 def main() -> None:

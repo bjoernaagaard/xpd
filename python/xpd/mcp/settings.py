@@ -4,9 +4,8 @@ import argparse
 import ipaddress
 import os
 from collections.abc import Sequence
-from dataclasses import dataclass
 from pathlib import Path
-from typing import Literal
+from typing import Literal, NamedTuple
 
 import fastmcp
 
@@ -33,8 +32,7 @@ def default_root() -> Path | None:
     return None if "PLUGIN_ROOT" in os.environ else Path.cwd()
 
 
-@dataclass(frozen=True)
-class Settings:
+class Settings(NamedTuple):
     """`transport`, `host` and `port` stay `None` unless a flag sets them, so FastMCP's own
     FASTMCP_TRANSPORT, FASTMCP_HOST and FASTMCP_PORT apply, with stdio on 127.0.0.1:8000."""
 

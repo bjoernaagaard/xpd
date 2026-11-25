@@ -24,7 +24,7 @@ from prefab_ui.components import (
 )
 
 from xpd.mcp.base import READS
-from xpd.mcp.models import GraphReport, Output, Severity
+from xpd.mcp.models import GraphReport, Issue, Output, Problem, Severity
 from xpd.mcp.tools import Analysis
 
 SEVERITY_BADGES = {
@@ -67,20 +67,34 @@ def dataflow_chart(report: GraphReport) -> str:
         for step in pipeline.steps:
             shown = f"{step.name}()" if step.kind == "function" else step.name
             lines.append(f"  {box(steps, 's', step.name)}[{label(shown)}]")
-        lines.extend(
-            f"  {box(steps, 's', link.source)} -->|{label(', '.join(link.columns))}| "
-            f"{box(steps, 's', link.to)}"
-            for link in pipeline.links
-        )
+        for link in pipeline.links:
+            source, to = box(steps, "s", link.source), box(steps, "s", link.to)
+            lines.append(f"  {source} -->|{label(', '.join(link.columns))}| {to}")
     nodes: dict[str, str] = {}
     lines.extend(f"  {box(nodes, 'n', name.name)}([{label(name.name)}])" for name in report.inputs)
     for node in report.nodes:
-        lines.append(f"  {box(nodes, 'n', node.name)}[{label(node.name)}]")
-        lines.extend(
-            f"  {box(nodes, 'n', source.name)} --> {box(nodes, 'n', node.name)}"
-            for source in node.inputs
-        )
+        to = box(nodes, "n", node.name)
+        lines.append(f"  {to}[{label(node.name)}]")
+        lines.extend(f"  {box(nodes, 'n', source.name)} --> {to}" for source in node.inputs)
     return "\n".join(lines)
+
+
+def issue_row(issue: Issue) -> dict[str, object]:
+    return {
+        "place": f"{issue.file}:{issue.line}" if issue.line else issue.file,
+        "severity": Badge(issue.severity, variant=SEVERITY_BADGES[issue.severity]),
+        "rule": f"{issue.package}/{issue.rule}",
+        "fix": issue.fix or "",
+        "message": issue.message,
+    }
+
+
+def problem_row(problem: Problem) -> dict[str, object]:
+    return {
+        "place": f"{problem.file}:{problem.line}",
+        "severity": Badge(problem.severity, variant=SEVERITY_BADGES[problem.severity]),
+        "message": problem.message,
+    }
 
 
 def register(mcp: FastMCP, analysis: Analysis) -> None:
@@ -97,16 +111,7 @@ def register(mcp: FastMCP, analysis: Analysis) -> None:
         report = await analysis.check(ctx, paths)
         if isinstance(report, InputRequiredResult):
             return report
-        rows = [
-            {
-                "place": f"{issue.file}:{issue.line}" if issue.line else issue.file,
-                "severity": Badge(issue.severity, variant=SEVERITY_BADGES[issue.severity]),
-                "rule": f"{issue.package}/{issue.rule}",
-                "fix": issue.fix or "",
-                "message": issue.message,
-            }
-            for issue in report.issues
-        ]
+        rows = [issue_row(issue) for issue in report.issues]
         counts = Counter(issue.severity for issue in report.issues)
         with PrefabApp() as app, Column(gap=4, css_class="p-6"):
             with Row(gap=6):
@@ -140,14 +145,7 @@ def register(mcp: FastMCP, analysis: Analysis) -> None:
         report = await analysis.graph(ctx, paths)
         if isinstance(report, InputRequiredResult):
             return report
-        rows = [
-            {
-                "place": f"{problem.file}:{problem.line}",
-                "severity": Badge(problem.severity, variant=SEVERITY_BADGES[problem.severity]),
-                "message": problem.message,
-            }
-            for problem in report.problems
-        ]
+        rows = [problem_row(problem) for problem in report.problems]
         with PrefabApp() as app, Column(gap=4, css_class="p-6"):
             Heading(content="Dataflow")
             Mermaid(chart=dataflow_chart(report))
@@ -170,6 +168,7 @@ def register(mcp: FastMCP, analysis: Analysis) -> None:
         profile = await analysis.profile(ctx, file)
         if isinstance(profile, InputRequiredResult):
             return profile
+        rows = [column.model_dump() for column in profile.columns]
         with PrefabApp() as app, Column(gap=4, css_class="p-6"):
             with Row(gap=6):
                 Metric(label="rows", value=profile.rows)
@@ -183,7 +182,7 @@ def register(mcp: FastMCP, analysis: Analysis) -> None:
                     ("unique", "Unique"),
                     ("memory_bytes", "Bytes"),
                 ),
-                rows=[column.model_dump() for column in profile.columns],
+                rows=rows,
                 search=True,
             )
         return shown(app, profile)
