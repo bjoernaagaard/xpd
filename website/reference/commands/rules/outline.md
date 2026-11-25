@@ -1,4 +1,4 @@
-Use `xpd outline` to map what files import and define before you read them in full. It lists
+Use `xpd rules outline` to map what files import and define before you read them in full. It lists
 definitions, imports and members with line numbers and signatures, without running any code, in
 any language that ast-grep parses.
 
@@ -7,7 +7,7 @@ any language that ast-grep parses.
 A file gets its definitions, each with the names of its members.
 
 ```console
-$ xpd outline samples/graph/steps.py --format text
+$ xpd rules outline samples/graph/steps.py --format text
 samples/graph/steps.py
 14: LARGE_ORDER = 1000.0
 15: PRICE = "unit_price"
@@ -27,7 +27,7 @@ A folder gets a shorter view, with the public names of each file grouped by kind
 `--match` and `--view` narrow it down.
 
 ```console
-$ xpd outline samples/graph --type function --match '^(totals|flags)' --view signatures --format text
+$ xpd rules outline samples/graph --type function --match '^(totals|flags)' --view signatures --format text
 samples/graph/impact.py
 6: def totals(orders: pd.DataFrame) -> pd.DataFrame
 

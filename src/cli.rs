@@ -89,8 +89,24 @@ struct IndexArgs {
     category_report: bool,
 }
 
+/// What `xpd rules` does in place of listing the rules.
+#[derive(Debug, Subcommand)]
+enum RulesCommand {
+    /// Create a rule project, or a rule, test case or utility in one.
+    New(author::NewArgs),
+    /// Check rule examples and review diagnostic and fix snapshots.
+    Test(crate::cases::Options),
+    /// Search code by syntax, in any language ast-grep parses, and preview or apply a rewrite.
+    #[command(visible_alias = "query")]
+    Run(RunArgs),
+    /// Map the files of a project: imports, definitions and their members, with line numbers.
+    Outline(OutlineArgs),
+}
+
 #[derive(Debug, clap::Args)]
 struct RulesOptions {
+    #[command(subcommand)]
+    command: Option<RulesCommand>,
     /// List only the rules that ship with xpd, without the project's own rules.
     #[arg(long, conflicts_with = "config")]
     builtin: bool,
@@ -191,8 +207,6 @@ struct FixArgs {
 
 #[derive(Debug, Subcommand)]
 enum Cmd {
-    /// Check rule examples and review diagnostic and fix snapshots.
-    Test(crate::cases::Options),
     /// Find libraries and rules for a task, without importing Python.
     Find(FindArgs),
     /// Show a public symbol's parameters as the source writes them, with its summary, members
@@ -329,20 +343,21 @@ enum Cmd {
   xpd chart-review app.py --run chart_figures.py --format json
   xpd chart-review --questions")]
     ChartReview(crate::chart_review::ChartReviewArgs),
-    /// Search code by syntax, in any language ast-grep parses, and preview or apply a rewrite.
-    #[command(visible_alias = "query")]
-    Run(RunArgs),
-    /// Map the files of a project: imports, definitions and their members, with line numbers.
-    Outline(OutlineArgs),
-    /// List every rule and package check, with its severity, fix and documentation.
+    /// List every rule and package check, or write, test and try rules of your own.
     ///
+    /// Without a command, it lists every rule with its severity, fix and documentation.
     /// The JSON has one object per rule, with `package`, `rule`, `severity`, `style`,
     /// `severities`, `message`, `fix`, `since`, `url` and `doc`, the Markdown that explains the
     /// rule. `style` is `house` for a rule of the house style, and `severities` holds the
     /// severity without a style setting and the one with `style = "strict"`.
-    #[command(after_long_help = "Examples:
+    #[command(
+        args_conflicts_with_subcommands = true,
+        after_long_help = "Examples:
   xpd rules
-  xpd rules --format json | jq '.[] | select(.package == \"numpy\")'")]
+  xpd rules --format json | jq '.[] | select(.package == \"numpy\")'
+  xpd rules new rule team/no-iterrows --pattern '$DF.iterrows()' --message 'Loop over columns.' --yes
+  xpd rules test"
+    )]
     Rules(RulesOptions),
     /// Compare this project with xpd's profile of Ruff, ty and pytest settings, show the edits, and apply them.
     ///
@@ -402,8 +417,6 @@ enum Cmd {
         #[arg(value_enum)]
         shell: clap_complete::Shell,
     },
-    /// Create a rule project, or a rule, test case or utility in one.
-    New(author::NewArgs),
     /// Print every command with its arguments, defaults and help as JSON, for the documentation
     /// site's command reference.
     #[command(hide = true)]
@@ -439,8 +452,6 @@ pub fn run() -> ExitCode {
             command_result(graph(&paths, format.unwrap_or(default_format)))
         }
         Cmd::ChartReview(args) => command_result(args.run(default_format)),
-        Cmd::Run(args) => command_result(args.run()),
-        Cmd::Outline(args) => command_result(args.run()),
         Cmd::Profile { file } => run_py(PROFILE_PY, &[file]),
         Cmd::Refit { contract } => run_py(REFIT_PY, &[contract]),
         Cmd::Equiv {
@@ -470,9 +481,7 @@ pub fn run() -> ExitCode {
         Cmd::Skill { json: true } => print_out(&format!("{}\n", skills::to_json())),
         Cmd::Mcp { args } => mcp::run(&args),
         Cmd::Lsp => lsp::run(),
-        Cmd::Test(options) => command_result(crate::cases::run(&options)),
         Cmd::Completions { shell } => run_completions(shell),
-        Cmd::New(args) => command_result(author::run(args)),
         Cmd::Commands => print_out(&format!("{}\n", crate::commands::to_json(Cli::command()))),
     }
 }
@@ -652,6 +661,7 @@ fn refresh_index(args: IndexArgs) -> Result<()> {
 
 fn rules(options: RulesOptions, default: Format) -> Result<ExitCode> {
     let RulesOptions {
+        command,
         format,
         builtin,
         config,
@@ -660,6 +670,13 @@ fn rules(options: RulesOptions, default: Format) -> Result<ExitCode> {
         category,
         categories,
     } = options;
+    match command {
+        Some(RulesCommand::New(args)) => return author::run(args),
+        Some(RulesCommand::Test(options)) => return crate::cases::run(&options),
+        Some(RulesCommand::Run(args)) => return args.run(),
+        Some(RulesCommand::Outline(args)) => return args.run(),
+        None => {}
+    }
     let format = format.unwrap_or(default);
     let filters = Filters { rules, severity };
     // Without a working directory there is no project folder, so only the embedded rules.

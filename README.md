@@ -185,7 +185,7 @@ xpd
 
 `profile`, `equiv` and `refit` run the project's Python, so they need pandas in the project's
 environment. `index` runs Python with Griffe, and the first `find` downloads a 333 MB search model
-once. `check --fix`, `run --update-all`, `new`, and `test -U` write project files when invoked in
+once. `check --fix`, `rules run --update-all`, `rules new`, and `rules test -U` write project files when invoked in
 those modes, and `hook` records session state in xpd's cache folder.
 
 ### Plan a pandas migration
@@ -217,7 +217,7 @@ or skfolio installed in the native runtime.
 | An agent to know when to run each command | `npx skills add bjoernaagaard/xpd` | [Agent skill](https://bjoernaagaard.github.io/xpd/guides/claude-code/#agent-skill) |
 | An agent to train a scikit-learn model with checks | `xpd mcp --code-mode` | [Train a model in code mode](https://bjoernaagaard.github.io/xpd/guides/code-mode/) |
 | Issues, fixes and rule help in your editor | Start `xpd lsp` from the editor | [Use xpd in an editor](https://bjoernaagaard.github.io/xpd/guides/editors/) |
-| A rule for your own project | `xpd new rule` | [Write a rule](https://bjoernaagaard.github.io/xpd/guides/write-a-rule/) |
+| A rule for your own project | `xpd rules new rule` | [Write a rule](https://bjoernaagaard.github.io/xpd/guides/write-a-rule/) |
 
 Install the plugin in Claude Code with the following commands. The guide has the commands for
 Codex.

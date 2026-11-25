@@ -30,7 +30,6 @@ clap_complete = "4.6.3"
 # ast-grep-config already builds globset, so this adds no package to the build.
 globset = "0.4.21"
 ignore = "0.4.34"
-# `xpd new` asks with the prompts that `ast-grep new` uses, so this adds no package to the build.
 inquire = "0.9.5"
 libcst = { version = "1.9.0", default-features = false }
 llama-cpp-2 = { version = "0.1.161", default-features = false }

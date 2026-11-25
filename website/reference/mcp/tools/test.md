@@ -1,4 +1,4 @@
-Use `test` while you write project rules, as [`xpd test`](../../../commands/test/) does. It checks
+Use `test` while you write project rules, as [`xpd rules test`](../../../commands/rules/test/) does. It checks
 the valid and invalid examples of each rule with the same scanner as `check`, and compares the
 snapshots. It changes snapshot files only with `update_snapshots`.
 
@@ -8,9 +8,9 @@ The commands below make a project with the rule `team/no-print`, and the test fi
 rule one valid and one invalid case.
 
 ```console
-$ xpd new project --pack team --yes --format json | jq -c .item
+$ xpd rules new project --pack team --yes --format json | jq -c .item
 "project"
-$ xpd new rule team/no-print --pattern 'print($X)' --message 'Use the project logger.' --with-test --yes --format json | jq -c .id
+$ xpd rules new rule team/no-print --pattern 'print($X)' --message 'Use the project logger.' --with-test --yes --format json | jq -c .id
 "team/no-print"
 ```
 
@@ -40,7 +40,7 @@ When no test case matches, the call fails. A rule that `new` just made has an em
 fails this way until the case has examples.
 
 ```text
-xpd test --skip-snapshot-tests -- exited with 2: xpd: no cases matched
+xpd rules test --skip-snapshot-tests -- exited with 2: xpd: no cases matched
 ```
 
 `skip_snapshots` and `update_snapshots` together fail with "Choose either skipping or updating

@@ -1,4 +1,4 @@
-Use `query` to find code by its syntax, as [`xpd run`](../../../commands/run/) does, and to
+Use `query` to find code by its syntax, as [`xpd rules run`](../../../commands/rules/run/) does, and to
 preview a replacement. Give exactly one of `pattern` and `kind`. It changes no file, and
 [`rewrite`](../rewrite/) writes a replacement.
 

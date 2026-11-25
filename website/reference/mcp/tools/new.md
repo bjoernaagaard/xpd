@@ -1,6 +1,6 @@
 Use `new` to create a rule project, a rule, an empty test case or a utility without
-prompts, as [`xpd new`](../../../commands/new/) does with `--yes`. `item.entity` says what to create, and
-the other fields of `item` are the answers that `xpd new` would otherwise ask for.
+prompts, as [`xpd rules new`](../../../commands/rules/new/) does with `--yes`. `item.entity` says what to create, and
+the other fields of `item` are the answers that `xpd rules new` would otherwise ask for.
 
 ## Example
 
@@ -26,5 +26,5 @@ The second call adds a rule with its Markdown and an empty test case.
 
 ## Errors
 
-A missing value fails as it does with `xpd new --yes`, and so does a rule that exists already.
+A missing value fails as it does with `xpd rules new --yes`, and so does a rule that exists already.
 Nothing is written then. A `directory` outside the project root fails before xpd runs.

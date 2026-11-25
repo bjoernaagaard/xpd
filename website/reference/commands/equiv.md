@@ -24,7 +24,10 @@ script before the change from that git commit, writes it beside the script for t
 removes it afterwards, so both versions find the same modules and data files.
 
 ```console
-$ xpd equiv report.py --since HEAD
+$ git init -q work && cp samples/equiv/old.py work/report.py && git -C work add report.py
+$ git -C work -c user.name=xpd -c user.email=xpd@example.com -c commit.gpgsign=false commit -qm "Add the report"
+$ cp samples/equiv/new.py work/report.py
+$ xpd equiv work/report.py --since HEAD
 {"equivalent": true}
 ```
 

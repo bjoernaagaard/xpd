@@ -1,5 +1,5 @@
 Use `outline` to map what files import and define before reading them in full, as
-[`xpd outline`](../../../commands/outline/) does. It returns each item with its kind, signature, source range
+[`xpd rules outline`](../../../commands/rules/outline/) does. It returns each item with its kind, signature, source range
 and members, and runs no code.
 
 ## Example

@@ -51,13 +51,17 @@ CHECK = Command(("check", "--format", "json"), TypeAdapter(CheckReport).validate
 CHART_REVIEW = Command(
     ("chart-review", "--format", "json"), TypeAdapter(ChartReview).validate_json, SUCCESS
 )
-QUERY = Command(("run", "--format", "json"), TypeAdapter(list[CodeMatch]).validate_json, FINDINGS)
-REWRITE = Command(("run", "--update-all", "--color=never"), bytes.decode, FINDINGS)
-OUTLINE = Command(
-    ("outline", "--format", "json"), TypeAdapter(list[OutlineFile]).validate_json, SUCCESS
+QUERY = Command(
+    ("rules", "run", "--format", "json"), TypeAdapter(list[CodeMatch]).validate_json, FINDINGS
 )
-NEW = Command(("new",), TypeAdapter(CreatedFiles).validate_json, SUCCESS)
-TEST = Command(("test", "--format", "json"), TypeAdapter(CaseReport).validate_json, FINDINGS)
+REWRITE = Command(("rules", "run", "--update-all", "--color=never"), bytes.decode, FINDINGS)
+OUTLINE = Command(
+    ("rules", "outline", "--format", "json"), TypeAdapter(list[OutlineFile]).validate_json, SUCCESS
+)
+NEW = Command(("rules", "new"), TypeAdapter(CreatedFiles).validate_json, SUCCESS)
+TEST = Command(
+    ("rules", "test", "--format", "json"), TypeAdapter(CaseReport).validate_json, FINDINGS
+)
 GRAPH = Command(("graph", "--format", "json"), TypeAdapter(GraphReport).validate_json, FINDINGS)
 PROFILE = Command(("profile",), TypeAdapter(Profile).validate_json, SUCCESS)
 REFIT = Command(("refit",), TypeAdapter(Refit).validate_json, FINDINGS)

@@ -1,4 +1,4 @@
-//! The documents `xpd new` writes: rules, test cases, utilities and the Markdown of a rule, each checked
+//! The documents `xpd rules new` writes: rules, test cases, utilities and the Markdown of a rule, each checked
 //! as ast-grep and xpd read it.
 
 use std::collections::BTreeMap;

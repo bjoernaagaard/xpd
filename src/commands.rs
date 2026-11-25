@@ -6,9 +6,9 @@ use clap::{Arg, ArgAction, Command};
 use serde_json::{Value, json};
 
 /// Every visible command under `root`, depth first, each with its own arguments and the groups
-/// of arguments of which it needs exactly one.
+/// of arguments of which it needs exactly one. Building the tree first fills in each subcommand's
+/// usage line and full name, such as `xpd rules new rule`.
 pub(crate) fn to_json(mut root: Command) -> Value {
-    // Building fills in each subcommand's usage line and full name, such as `xpd new rule`.
     root.build();
     Value::Array(commands(&root))
 }

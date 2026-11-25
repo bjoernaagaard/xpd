@@ -91,7 +91,7 @@ def register_authoring(mcp: FastMCP, xpd: Xpd, project: Project) -> None:
         """Create a project, rule, empty case template or shared utility without prompts.
 
         Args:
-            item: What to create, and the answers that `xpd new` would otherwise ask for.
+            item: What to create, and the answers that `xpd rules new` would otherwise ask for.
         """
         root = await project.required_root(ctx)
         names = [item.name] if item.name is not None else []

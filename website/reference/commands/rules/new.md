@@ -1,11 +1,11 @@
-Use `xpd new` to start a rule project or to add a rule, a test case or a utility to one. Run it
+Use `xpd rules new` to start a rule project or to add a rule, a test case or a utility to one. Run it
 without a command, and it asks what to create and asks for each missing value. With `--yes` it
 never asks, which suits scripts and agents.
 
 ## Examples
 
 ```console
-$ xpd new project --pack team --yes
+$ xpd rules new project --pack team --yes
 Created project
   created  /tmp/project/sgconfig.yml
   created  /tmp/project/xpd.yml
@@ -13,12 +13,12 @@ Created project
   created  /tmp/project/rule-tests/.gitkeep
   created  /tmp/project/utils/.gitkeep
   created  /tmp/project/rules/team/.gitkeep
-$ xpd new rule team/no-print --pattern 'print($X)' --message 'Use the project logger.' --with-test --yes
+$ xpd rules new rule team/no-print --pattern 'print($X)' --message 'Use the project logger.' --with-test --yes
 Created rule team/no-print
   created  /tmp/project/rules/team/no-print.yml
   created  /tmp/project/rules/team/no-print.md
   created  /tmp/project/rule-tests/team/no-print-test.yml
-$ xpd new util print-call --lang python --pattern 'print($X)' --yes
+$ xpd rules new util print-call --lang python --pattern 'print($X)' --yes
 Created util print-call
   created  /tmp/project/utils/print-call.yml
 ```

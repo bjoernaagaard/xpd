@@ -17,5 +17,5 @@ its search model. xpd uses the first of these Pythons that it finds.
 ## Exit status
 
 Most commands exit 0 when they succeed and 2 when xpd cannot run, for example because a file
-cannot be read. A command that checks something, such as `check`, `graph`, `run`, `test`,
+cannot be read. A command that checks something, such as `check`, `graph`, `rules run`, `rules test`,
 `equiv` and `refit`, exits 1 when the check finds a problem. Each command page has the details.

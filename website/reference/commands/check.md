@@ -61,7 +61,7 @@ prints one GitHub Actions workflow command for each issue, so the issues show on
 ## Project rules
 
 xpd adds your own rules from the nearest `sgconfig.yml` or `sgconfig.yaml` at or above the
-current folder, or from the file that `--config` names. [`xpd new project`](../new/project/)
+current folder, or from the file that `--config` names. [`xpd rules new project`](../rules/new/project/)
 writes one.
 
 | File or key | What it holds |

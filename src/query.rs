@@ -1,6 +1,6 @@
-//! `xpd run`: one structural search, with an optional rewrite, on ast-grep's own run command.
+//! `xpd rules run`: one structural search, with an optional rewrite, on ast-grep's own run command.
 //!
-//! The flags are declared here, so `xpd run --help` and the shell completions show them, and
+//! The flags are declared here, so `xpd rules run --help` and the shell completions show them, and
 //! clap checks them before ast-grep reads them again through `ast_grep::main_with_args`.
 
 use std::fs;
@@ -89,11 +89,11 @@ enum Heading {
     after_long_help = "Exit 0 when something matched, 1 when nothing did, 2 if xpd can't run.
 
 Examples:
-  xpd run -p 'pd.concat($$$FRAMES)' src/
-  xpd run -k call_expression -l ts web/
-  xpd run -p '$S.tz_convert(\"UTC\").tz_localize(None)' -r '$S.tz_convert(None)' analysis.py
-  xpd run -p 'np.matrix($A)' -r 'np.asarray($A)' -U src/
-  cat job.py | xpd run -p 'print($$$A)' -l python --stdin --json"
+  xpd rules run -p 'pd.concat($$$FRAMES)' src/
+  xpd rules run -k call_expression -l ts web/
+  xpd rules run -p '$S.tz_convert(\"UTC\").tz_localize(None)' -r '$S.tz_convert(None)' analysis.py
+  xpd rules run -p 'np.matrix($A)' -r 'np.asarray($A)' -U src/
+  cat job.py | xpd rules run -p 'print($$$A)' -l python --stdin --json"
 )]
 #[expect(
     clippy::struct_excessive_bools,
@@ -215,7 +215,7 @@ impl RunArgs {
             for path in &self.paths {
                 anyhow::ensure!(
                     path.to_str().is_some(),
-                    "{} is not a UTF-8 path, which xpd run cannot search",
+                    "{} is not a UTF-8 path, which xpd rules run cannot search",
                     path.display()
                 );
                 let kind = match fs::metadata(path) {

@@ -37,7 +37,7 @@ use crate::project::{self, OutlineFolders};
 use crate::query::{JsonStyle, NoIgnore, languages};
 use crate::syntax::{self, Node, Root};
 
-/// The Python rules of `xpd outline` and `xpd graph`.
+/// The Python rules of `xpd rules outline` and `xpd graph`.
 const PYTHON_RULES: &str = include_str!("outline/python.yml");
 /// Every function and method of a Python file with its parameters, for `xpd index`.
 const PYTHON_CALLABLE_RULES: &str = include_str!("outline/python-callables.yml");
@@ -359,7 +359,7 @@ fn collect_tokens<'r>(node: &Node<'r>, tokens: &mut Vec<Node<'r>>) {
     }
 }
 
-/// Which top-level items `xpd outline` lists.
+/// Which top-level items `xpd rules outline` lists.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
 enum Items {
     /// `structure` for files and stdin, `exports` when a directory is given.
@@ -373,7 +373,7 @@ enum Items {
     All,
 }
 
-/// How `xpd outline` prints the items as text.
+/// How `xpd rules outline` prints the items as text.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
 enum View {
     /// `digest` for files and stdin, `names` when a directory is given.
@@ -440,11 +440,11 @@ fn type_name(symbol_type: SymbolType) -> String {
 /// rule files that its `outlineRules` names and the .yml files in its `outlineDirs`.
 #[derive(Debug, clap::Args)]
 #[command(after_long_help = "Examples:
-  xpd outline features.py
-  xpd outline src/ --view digest
-  xpd outline . --items imports --format json
-  xpd outline src/ --type class,function --match '^Frame'
-  cat job.py | xpd outline --stdin --lang python")]
+  xpd rules outline features.py
+  xpd rules outline src/ --view digest
+  xpd rules outline . --items imports --format json
+  xpd rules outline src/ --type class,function --match '^Frame'
+  cat job.py | xpd rules outline --stdin --lang python")]
 #[expect(
     clippy::struct_excessive_bools,
     reason = "each bool is an on-off flag of the command line"

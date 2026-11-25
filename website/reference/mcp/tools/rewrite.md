@@ -1,6 +1,6 @@
 Use `rewrite` to apply a structural replacement across files. It previews the
 matches of `query`, asks the user to confirm, and only then writes the replacement with
-`xpd run --update-all`. xpd does not check a rewrite or mark it safe the way it does a rule fix.
+`xpd rules run --update-all`. xpd does not check a rewrite or mark it safe the way it does a rule fix.
 
 ## Example
 

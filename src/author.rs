@@ -1,4 +1,4 @@
-//! `xpd new`: creates a rule project, and the rules, cases and utilities in it. Every file it
+//! `xpd rules new`: creates a rule project, and the rules, cases and utilities in it. Every file it
 //! writes is checked first, as ast-grep and xpd will read it, and no file is overwritten.
 
 mod document;
@@ -32,13 +32,13 @@ use project::{Changes, Gate, Pack, Project};
 /// it fails when a required flag is missing.
 #[derive(Debug, clap::Args)]
 #[command(after_long_help = "Examples:
-  xpd new
-  xpd new project --pack team
-  xpd new rule team/no-iterrows --pattern '$DF.iterrows()' --message 'Loop over columns instead.' --yes
-  xpd new rule utc-now --language python --pattern 'datetime.utcnow()' \\
+  xpd rules new
+  xpd rules new project --pack team
+  xpd rules new rule team/no-iterrows --pattern '$DF.iterrows()' --message 'Loop over columns instead.' --yes
+  xpd rules new rule utc-now --language python --pattern 'datetime.utcnow()' \\
     --fix 'datetime.now(UTC)' --fix-safety unsafe --message 'utcnow is naive.' --with-test --yes
-  xpd new test team/no-iterrows --yes
-  xpd new util new-figure --language python --pattern 'go.Figure($$$)' --yes")]
+  xpd rules new test team/no-iterrows --yes
+  xpd rules new util new-figure --language python --pattern 'go.Figure($$$)' --yes")]
 pub(crate) struct NewArgs {
     #[command(subcommand)]
     item: Option<Item>,
@@ -75,10 +75,10 @@ enum Item {
     /// without a pack is a structural rule for any language, in the first rules folder. The
     /// rule is checked as `xpd check` and `ast-grep scan` read it before it is written.
     #[command(after_long_help = "Examples:
-  xpd new rule team/no-iterrows --pattern '$DF.iterrows()' --message 'Loop over columns.' --yes
-  xpd new rule old-api --pack team --pattern 'lib.old($X)' --fix 'lib.new($X)' \\
+  xpd rules new rule team/no-iterrows --pattern '$DF.iterrows()' --message 'Loop over columns.' --yes
+  xpd rules new rule old-api --pack team --pattern 'lib.old($X)' --fix 'lib.new($X)' \\
     --fix-safety safe --until 2.0 --message 'old was removed in 2.0.' --yes
-  xpd new rule unwrap --language rust --pattern '$X.unwrap()' --message 'Handle the error.' --yes")]
+  xpd rules new rule unwrap --language rust --pattern '$X.unwrap()' --message 'Handle the error.' --yes")]
     Rule(Box<RuleArgs>),
     /// Create an empty test case for a rule, with no valid or invalid code yet.
     ///
@@ -221,7 +221,7 @@ impl fmt::Display for Lang {
     }
 }
 
-/// What one `xpd new` made.
+/// What one `xpd rules new` made.
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 struct Outcome {
@@ -245,7 +245,7 @@ impl Outcome {
     }
 }
 
-/// Whether `xpd new` may ask for a value that the flags leave out.
+/// Whether `xpd rules new` may ask for a value that the flags leave out.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Mode {
     Ask,
@@ -302,14 +302,14 @@ impl Mode {
     }
 }
 
-/// Runs `xpd new`.
+/// Runs `xpd rules new`.
 pub(crate) fn run(args: NewArgs) -> Result<ExitCode> {
     let NewArgs { item, options } = args;
     let mode = Mode::detect(&options);
     let item = match item {
         Some(item) => item,
         None if mode == Mode::Ask => choose_item()?,
-        None => bail!("name what to create: xpd new project, rule, test or util"),
+        None => bail!("name what to create: xpd rules new project, rule, test or util"),
     };
     let directory = options.directory.as_deref();
     let outcome = match item {
@@ -387,7 +387,7 @@ fn destination(directory: Option<&Path>, mode: Mode, default: &Path) -> Result<P
 }
 
 /// The project in `--directory`, which must hold its sgconfig.yml so that a caller can confine
-/// `xpd new` to one folder. Without it, the project at or above the current folder.
+/// `xpd rules new` to one folder. Without it, the project at or above the current folder.
 fn find_project(directory: Option<&Path>, mode: Mode) -> Result<Project> {
     let cwd = std::env::current_dir().context("no current folder")?;
     let found = crate::project::nearest_config(&cwd).map_or(cwd, |config| {
@@ -592,7 +592,7 @@ fn new_test(args: TestArgs, project: &Project, mode: Mode) -> Result<Outcome> {
     let ids = project.rule_ids()?;
     let id = mode.or_ask(args.id, "ID", || {
         if ids.is_empty() {
-            bail!("the project has no rules yet. Create one with xpd new rule");
+            bail!("the project has no rules yet. Create one with xpd rules new rule");
         }
         ask_select("Rule to test:", ids.clone(), 0)
     })?;

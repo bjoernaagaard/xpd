@@ -1,5 +1,5 @@
 //! A rule project on disk: `sgconfig.yml` for ast-grep, `xpd.yml` for xpd's packs, and the
-//! folders they name. Every path `xpd new` reads or writes stays inside the project folder.
+//! folders they name. Every path `xpd rules new` reads or writes stays inside the project folder.
 
 use std::collections::BTreeMap;
 use std::fmt;
@@ -43,7 +43,7 @@ struct NewSgConfig<'a> {
     util_dirs: [&'a str; 1],
 }
 
-/// A pack entry of `xpd.yml` as `xpd new` writes one.
+/// A pack entry of `xpd.yml` as `xpd rules new` writes one.
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 struct PackEntry<'a> {
@@ -150,7 +150,7 @@ struct ExistingRule {
     public_id: Option<RuleId>,
 }
 
-/// The files one `xpd new` writes, all checked before the first is written.
+/// The files one `xpd rules new` writes, all checked before the first is written.
 #[derive(Debug, Default)]
 pub(in crate::author) struct Changes {
     create: Vec<(PathBuf, String)>,
@@ -223,7 +223,7 @@ impl Project {
     pub(in crate::author) fn find(dir: &Path) -> Result<Self> {
         let Some(config_path) = project::config_in(dir) else {
             bail!(
-                "{} has no {SGCONFIG}. Create a project with xpd new project",
+                "{} has no {SGCONFIG}. Create a project with xpd rules new project",
                 dir.display()
             );
         };

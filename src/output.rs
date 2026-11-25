@@ -4,7 +4,7 @@ use std::sync::LazyLock;
 use clap::ValueEnum;
 use regex::Regex;
 
-/// How `graph`, `rules`, `find`, `api`, `new` and `test` print what they found.
+/// How `graph`, `rules`, `find`, `api`, `rules new` and `rules test` print what they found.
 #[derive(Debug, Clone, Copy, ValueEnum)]
 pub(crate) enum Format {
     Text,

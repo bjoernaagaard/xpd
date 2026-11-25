@@ -1,11 +1,11 @@
 ---
 title: Write a rule
-description: Add a rule for your own project with xpd new and xpd test, or add a rule to one of xpd's packs.
+description: Add a rule for your own project with xpd rules new and xpd rules test, or add a rule to one of xpd's packs.
 sidebar:
   order: 5
 ---
 
-Run `xpd new rule` in your project to make a rule from a code pattern, and `xpd check` reports the
+Run `xpd rules new rule` in your project to make a rule from a code pattern, and `xpd check` reports the
 pattern from then on, in the terminal, in the editor and in the agent hook. A rule is an
 [ast-grep rule](https://ast-grep.github.io/guide/rule-config.html) in a YAML file, with a Markdown
 file beside it that explains the rule. The second half of this page shows how to add a rule to one
@@ -17,7 +17,7 @@ The example adds a rule that reports `print` calls, in an empty folder. First, c
 project.
 
 ```console
-$ xpd new project --yes
+$ xpd rules new project --yes
 Created project
   created  /tmp/project/sgconfig.yml
   created  /tmp/project/xpd.yml
@@ -30,7 +30,7 @@ xpd writes `sgconfig.yml` and `xpd.yml`, and the folders `rules/`, `rule-tests/`
 Second, create the rule from a pattern, where `$X` matches any one argument.
 
 ```console
-$ xpd new rule no-print --language python --pattern 'print($X)' --message 'Use the logger, so the output has a level and a time.' --with-test --yes
+$ xpd rules new rule no-print --language python --pattern 'print($X)' --message 'Use the logger, so the output has a level and a time.' --with-test --yes
 Created rule no-print
   created  /tmp/project/rules/no-print.yml
   created  /tmp/project/rules/no-print.md
@@ -88,21 +88,21 @@ invalid:
   - print("loaded")
 ```
 
-The first run of `xpd test --update-all` writes a snapshot of each report, and later runs of
-`xpd test` compare the reports with the snapshot.
+The first run of `xpd rules test --update-all` writes a snapshot of each report, and later runs of
+`xpd rules test` compare the reports with the snapshot.
 
 ```console
-$ xpd test --update-all
+$ xpd rules test --update-all
 no-print: passed
 no-print: updated
 2 cases, 0 failed
-$ xpd test
+$ xpd rules test
 no-print: passed
 no-print: passed
 2 cases, 0 failed
 ```
 
-`xpd test` exits with 1 when a case fails, for example when the rule misses an invalid case or
+`xpd rules test` exits with 1 when a case fails, for example when the rule misses an invalid case or
 its report differs from the snapshot. Commit the `rule-tests/__snapshots__/` folder with the rule.
 
 ## Rules for one library
@@ -111,7 +111,7 @@ A rule about a library should run only on the files that import it. Put such rul
 named after the module that the rules are about.
 
 ```console
-$ xpd new rule old-api --pack mylib --pattern 'mylib.old($X)' --fix 'mylib.new($X)' --fix-safety safe --message 'old() was removed in 2.0.' --yes
+$ xpd rules new rule old-api --pack mylib --pattern 'mylib.old($X)' --fix 'mylib.new($X)' --fix-safety safe --message 'old() was removed in 2.0.' --yes
 Created rule mylib/old-api
   created  /tmp/project/rules/mylib/old-api.yml
   created  /tmp/project/rules/mylib/old-api.md
@@ -121,13 +121,13 @@ Created rule mylib/old-api
 `--pack` adds the pack to `xpd.yml` and writes the rule to `rules/mylib/`. The rule then runs on
 files that import `mylib`, and `--fix` gives `xpd check --fix` the rewrite. `--since` and
 `--until` limit the rule to library versions, which xpd reads from the project's virtual
-environment. [`xpd new rule`](../../commands/new/rule/) lists every option, and
+environment. [`xpd rules new rule`](../../commands/rules/new/rule/) lists every option, and
 [`xpd check`](../../commands/check/#project-rules) says how xpd finds the project's rules.
 
 ## Set a pack's categories
 
-Use `xpd new project --pack mylib --category features` to record a default when you
-create a project. You can also pass `--category` to `xpd new rule` when it creates a pack.
+Use `xpd rules new project --pack mylib --category features` to record a default when you
+create a project. You can also pass `--category` to `xpd rules new rule` when it creates a pack.
 In `xpd.yml`, add module prefixes under the pack entry. Built-in packs use the same
 fields at the top level of `rules/<module>/pack.yml`.
 
