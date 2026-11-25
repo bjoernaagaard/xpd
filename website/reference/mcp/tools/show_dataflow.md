@@ -1,6 +1,6 @@
 Use `show_dataflow` to show a person the dataflow as a chart and a table, in a host that renders
 [MCP Apps](https://modelcontextprotocol.io/docs/extensions/apps). It runs as
-[`graph`](../graph/) does and returns a view built with Prefab, which the host draws with the
+[`xpd graph`](../../../commands/graph/) does and returns a view built with Prefab, which the host draws with the
 server's renderer resource. A host that does not render apps gets the JSON of `graph` as text.
 
 ## Example
@@ -18,4 +18,4 @@ shown without its columns, and `"..."` stands for the other steps.
 
 ## Errors
 
-The errors are those of [`graph`](../graph/).
+The errors are those of [`xpd graph`](../../../commands/graph/).

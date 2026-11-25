@@ -3,28 +3,19 @@
 from collections.abc import Sequence
 
 from fastmcp import FastMCP
-from fastmcp.experimental.transforms.code_mode import CodeMode
 from fastmcp.server.auth import StaticTokenVerifier
 from fastmcp.skills import Skill
 from fastmcp.skills.provider import SkillCatalogProvider
 from fastmcp_tasks import TasksExtension
 
-from xpd.mcp import animation, catalog, discovery, pipeline, prompts, structure, tools, views
+from xpd.mcp import animation, catalog, discovery, pipeline, prompts, views
 from xpd.mcp.binary import BUILTIN_RULES, SKILLS, Xpd, find_binary
 from xpd.mcp.names import ToolName
 from xpd.mcp.root import Project, Root
 from xpd.mcp.settings import Settings
+from xpd.mcp.tools import Analysis
 
-HTTP_RESTRICTED_TOOLS = frozenset(
-    {
-        ToolName.FIX,
-        ToolName.REWRITE,
-        ToolName.NEW,
-        ToolName.TEST,
-        ToolName.REFIT,
-        ToolName.EQUIV,
-    }
-)
+HTTP_RESTRICTED_TOOLS = frozenset({ToolName.GATES})
 
 
 def instructions(skill_uris: dict[str, str], *, local: bool) -> str:
@@ -40,46 +31,27 @@ def instructions(skill_uris: dict[str, str], *, local: bool) -> str:
 xpd lints Python for slow or wrong habits with pandas, NumPy, SciPy, scikit-learn, scikit-lego, \
 MAPIE, Category Encoders, linearmodels, arch, pymoo, plotly and Apache Hamilton, reads the \
 dataflow of step code and Hamilton modules, profiles data files, and checks that a refactor keeps \
-its result. Every path is relative to the project root.
+its result. Its commands run in your shell, and this server adds what a command cannot do. \
+Every path is relative to the project root.
 
-- Before choosing a library, call `{ToolName.FIND}` with the task, then `{ToolName.API}` with \
-a returned name. Call \
-`{ToolName.API}` with `Class.method` to read a method's parameters with their defaults before \
-you call it.\
-
-- After choosing and writing code, call `{ToolName.DISCOVERY_GATE}` on its files before \
-`{ToolName.EQUIV}`.\
-
-- After you write or change Python, call `{ToolName.CHECK}`. Fix every error. Fix a warning \
-unless you can \
-say why the code is right. `{ToolName.FIX}` writes xpd's fixes, and asks the user before \
-unsafe ones.
-- When you make, change or review a chart, in plotly or any other library, call \
-`{ToolName.CHART_REVIEW}` on its file. Answer each question of Tufte's book that it returns, and \
-draw a chart of another library with its plotly route.
-- Use `{ToolName.QUERY}` to find code patterns and preview replacements, and \
-`{ToolName.REWRITE}` to apply them after \
-confirmation. Use `{ToolName.OUTLINE}` to browse project symbols, imports and members in \
-supported languages.
-- Before and after a refactor of a codebase, call `{ToolName.UNTANGLE}`. It counts copies, \
-files that change together, import cycles, unused definitions and special cases, and the \
-counts measure how far the refactor is.
-- Use `{ToolName.NEW}` to create a local rule project, rule, empty case template or shared utility.
-- To learn why a rule fires and see its before and after code, call `{ToolName.RULE}`. \
-`{ToolName.RULES}` lists and \
-filters all of them.
-- After you add, move or rename a step or a Hamilton node, call `{ToolName.GRAPH}`, and reuse \
-columns that \
-exist instead of computing their formulas again.
-- Before you choose methods for a data file, call `{ToolName.PROFILE}`.
-- After you refactor data logic, call `{ToolName.EQUIV}` on the old and new script. The \
-refactor is done \
-when it says `equivalent: true`.
-- To build a model from a data file, follow the `build_pipeline` prompt. The run is done when \
-`{ToolName.GATES}` returns `passed: true` for the results of `{ToolName.PROFILE}`, \
-`{ToolName.CHECK}`, `{ToolName.GRAPH}`, `{ToolName.EQUIV}`, \
-`{ToolName.REFIT}` and `{ToolName.CONTRACT}`. With code mode on, one `execute` call chains them.
-{animate}- The show_ tools draw the same results as tables and charts in hosts that render apps.
+- Before choosing a library, run `xpd find "<task>"`, then `xpd api <name>` with a returned \
+name. `xpd api Class.method` prints a method's parameters with their defaults.
+- After you write or change Python, run `xpd check <paths>`. Fix every error. Fix a warning \
+unless you can say why the code is right. `xpd check --fix` writes the safe fixes, and \
+`xpd api <pack>/<rule>` explains a rule.
+- When you make, change or review a chart, in plotly or any other library, run \
+`xpd chart-review <file>` and answer each question of Tufte's book that it prints.
+- After you add, move or rename a step or a Hamilton node, run `xpd graph <file>`, and reuse \
+columns that exist instead of computing their formulas again.
+- Before you choose methods for a data file, run `xpd profile <file>`.
+- After you refactor data logic, run `xpd equiv <script.py> --since HEAD`. The refactor is done \
+when it prints `"equivalent": true`.
+- Before and after a refactor of a codebase, run `xpd untangle`.
+- To build a model from a data file, follow the `build_pipeline` prompt. Call \
+`{ToolName.DISCOVERY_GATE}` on the files once the library is chosen, and the run is done when \
+`{ToolName.GATES}` returns `passed: true`. `{ToolName.GATES}` runs the stages itself.
+{animate}- The show_ tools draw what `xpd check`, `xpd graph` and `xpd profile` find as tables \
+and charts in hosts that render apps.
 - {skill_uris["xpd"]}, {skill_uris["python-best-practices"]} and \
 {skill_uris["python-review"]} hold the style a linter cannot check."""
 
@@ -110,12 +82,11 @@ def build(settings: Settings) -> FastMCP:
         providers=[SkillCatalogProvider(skills)],
     )
     mcp.add_extension(TasksExtension())
-    analysis = tools.register(mcp, xpd, project)
-    structure.register(mcp, xpd, project)
+    analysis = Analysis(xpd, project)
     discovery.register(mcp, xpd, project)
     views.register(mcp, analysis)
     catalog.register(mcp, fallback_rules, xpd, project)
-    pipeline.register(mcp, project, fallback_rules)
+    pipeline.register(mcp, analysis, fallback_rules)
     prompts.register(mcp, skill_uris["python-review"])
     animation.register(mcp, xpd, project, local=transport == "stdio")
 
@@ -131,9 +102,6 @@ def build(settings: Settings) -> FastMCP:
 
     if transport != "stdio" and not settings.allow_writes:
         mcp.disable(names=set(HTTP_RESTRICTED_TOOLS), components={"tool"})
-    if settings.code_mode:
-        mcp.add_transform(CodeMode())
-
     return mcp
 
 

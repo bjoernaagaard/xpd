@@ -55,7 +55,7 @@ to print as follows.
 ```text
 on(UserPromptSubmit)
   if the prompt is about a chart
-    print the chart line     # names xpd chart-review and the MCP tool chart_review
+    print the chart line     # names xpd chart-review
   for each data file that the prompt names and the project holds
     print the data file line # names xpd profile with the path of the file
   if the prompt is about the structure of a codebase
@@ -184,7 +184,7 @@ A `UserPromptSubmit` event whose prompt is about a chart gives this answer.
 
 ```console
 $ echo '{"cwd":"/tmp/project","hook_event_name":"UserPromptSubmit","prompt":"improve my charts"}' | xpd hook
-Chart task: run `xpd chart-review <file>` (MCP tool `chart_review`) on each file that draws the chart. It lists the plotly rules that fire and the questions from Tufte's book for each chart, in plotly or any other library, with the plotly route. Add `--run <adapter.py>` to measure the drawn figure. For a new chart, `xpd api xpd/recipe/plotly-chart` prints the plotly-chart playbook, which names the same command.
+Chart task: run `xpd chart-review <file>` on each file that draws the chart. It lists the plotly rules that fire and the questions from Tufte's book for each chart, in plotly or any other library, with the plotly route. Add `--run <adapter.py>` to measure the drawn figure. For a new chart, `xpd api xpd/recipe/plotly-chart` prints the plotly-chart playbook, which names the same command.
 ```
 
 A `UserPromptSubmit` event whose prompt fits a playbook gives this answer, in a copy of the

@@ -37,7 +37,6 @@ class Settings(NamedTuple):
     FASTMCP_TRANSPORT, FASTMCP_HOST and FASTMCP_PORT apply, with stdio on 127.0.0.1:8000."""
 
     root: Path | None
-    code_mode: bool
     transport: Transport | None = None
     host: str | None = None
     port: int | None = None
@@ -49,7 +48,6 @@ class Settings(NamedTuple):
         token = os.environ.get("XPD_MCP_AUTH_TOKEN") or None
         return cls(
             root=default_root(),
-            code_mode=os.environ.get("XPD_MCP_CODE_MODE", "").lower() in TRUE,
             allow_writes=os.environ.get("XPD_MCP_ALLOW_WRITES", "").lower() in TRUE,
             auth_token=token,
         )
@@ -70,17 +68,10 @@ class Settings(NamedTuple):
             "the default is the first root the client names.",
         )
         parser.add_argument(
-            "--code-mode",
-            action=argparse.BooleanOptionalAction,
-            default=env.code_mode,
-            help="Show the tools through FastMCP's code mode, as search, get_schema and execute. "
-            "Default: XPD_MCP_CODE_MODE, else off.",
-        )
-        parser.add_argument(
             "--allow-writes",
             action=argparse.BooleanOptionalAction,
             default=env.allow_writes,
-            help="Expose file-writing and code-executing tools over HTTP. "
+            help="Expose the tools that run the project's scripts over HTTP. "
             "Default: XPD_MCP_ALLOW_WRITES, else off (stdio always allows them).",
         )
         parser.add_argument(
@@ -97,7 +88,6 @@ class Settings(NamedTuple):
         args = parser.parse_args(argv)
         return cls(
             root=args.root,
-            code_mode=args.code_mode,
             transport=args.transport,
             host=args.host,
             port=args.port,

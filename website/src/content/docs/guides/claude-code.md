@@ -184,7 +184,7 @@ state what xpd found, and a prompt about other work gets no text.
 | Event | What xpd prints | Example |
 | --- | --- | --- |
 | `SessionStart` | A brief with the rule packs that apply, the style setting, the pipelines and Hamilton nodes that `xpd graph` reads, and three commands | `Rule packs that apply: python (13 files), numpy (9 files), scipy (6 files), pandas (4 files).` |
-| `UserPromptSubmit`, for a prompt about a chart, in a project of any language | One line that names `xpd chart-review` and the MCP tool `chart_review` | ``Chart task: run `xpd chart-review <file>` (MCP tool `chart_review`) on each file that draws the chart.`` |
+| `UserPromptSubmit`, for a prompt about a chart, in a project of any language | One line that names `xpd chart-review` | ``Chart task: run `xpd chart-review <file>` on each file that draws the chart.`` |
 | `UserPromptSubmit`, for a prompt that a playbook answers | The playbook with its name, its commands in order and its rules | `xpd has a playbook for this prompt: xpd/recipe/pandas-pipeline` |
 | `UserPromptSubmit`, for a prompt that asks what to make or improve | The open issues of the project, counted by pack and severity | `plotly: 11 warnings` |
 

@@ -1,8 +1,8 @@
 """The tools that judge a pipeline run, from raw rows to a saved model: `contract` reads what the
-training script saved, and `gates` turns the results of the other tools into one verdict.
+training script saved, and `gates` runs the stages and turns their results into one verdict.
 
-These tools do not run Python or load a model. Each gate reads results that `profile`, `check`,
-`graph`, `refit` and `equiv` returned for the same run, which a code mode script hands on."""
+`gates` runs `xpd profile`, `check`, `graph`, `equiv` and `refit` on the files of the run, so
+the agent hands on no result of its own."""
 
 from collections.abc import Sequence
 
@@ -11,11 +11,12 @@ from fastmcp.exceptions import ToolError
 from mcp.types import InputRequiredResult
 from pydantic import ValidationError
 
-from xpd.mcp.base import READS, rooted
+from xpd.mcp.base import READS, RUNS_CODE, rooted
 from xpd.mcp.catalog import Catalog
 from xpd.mcp.models import (
     CheckReport,
     Contract,
+    DiscoveryProof,
     Equivalence,
     Evidence,
     Gate,
@@ -24,10 +25,12 @@ from xpd.mcp.models import (
     Profile,
     Proof,
     Refit,
+    Scripts,
     Stage,
 )
 from xpd.mcp.names import ToolName
-from xpd.mcp.root import Project
+from xpd.mcp.root import Root
+from xpd.mcp.tools import Analysis
 
 # The rules of each pack that report a split, an estimator, an encoder, a bootstrap, a simulation
 # or an optimizer run that draws without a seed. A pack without such a rule is not listed.
@@ -328,7 +331,39 @@ def judge(profile: Profile, contract: Contract, proof: Proof) -> GateReport:
     return GateReport(passed=not failed, failed=failed, gates=gates)
 
 
-def register(mcp: FastMCP, project: Project, rules: Catalog) -> None:
+def read_contract(root: Root, file: str) -> Contract:
+    """The contract in `file`, with its paths relative to the root, as the commands name them."""
+    path = root.path / root.inside(file)
+    try:
+        read = Contract.model_validate_json(path.read_bytes())
+    except OSError as error:
+        msg = f"Cannot read {file}. {error}"
+        raise ToolError(msg) from error
+    except ValidationError as error:
+        problems = []
+        for problem in error.errors():
+            place = ".".join(map(str, problem["loc"]))
+            problems.append(f"{place} {problem['msg']}".strip())
+        fields = "; ".join(problems)
+        msg = f"{file} is not a contract. {fields}"
+        raise ToolError(msg) from error
+    data, model = root.inside(read.data.file), root.inside(read.model.file)
+    code = [root.inside(raw) for raw in read.model.code]
+    for raw in (data, model, *code):
+        if not (root.path / raw).is_file():
+            msg = f"{file} names {raw}, which is no file in the project."
+            raise ToolError(msg)
+    return read.model_copy(
+        update={
+            "data": read.data.model_copy(update={"file": data}),
+            "model": read.model.model_copy(update={"file": model, "code": code}),
+        }
+    )
+
+
+def register(mcp: FastMCP, analysis: Analysis, rules: Catalog) -> None:
+    project = analysis.project
+
     # A rule that the binary renamed would never match, and its gate would pass every run.
     for package, rule in SEED_IDS:
         rules.find(package, rule)
@@ -347,40 +382,22 @@ def register(mcp: FastMCP, project: Project, rules: Catalog) -> None:
         Args:
             file: The contract, a JSON file inside the project root.
         """
-        root = await project.required_root(ctx)
-        path = root.path / root.inside(file)
-        try:
-            read = Contract.model_validate_json(path.read_bytes())
-        except OSError as error:
-            msg = f"Cannot read {file}. {error}"
-            raise ToolError(msg) from error
-        except ValidationError as error:
-            problems = []
-            for problem in error.errors():
-                place = ".".join(map(str, problem["loc"]))
-                problems.append(f"{place} {problem['msg']}".strip())
-            fields = "; ".join(problems)
-            msg = f"{file} is not a contract. {fields}"
-            raise ToolError(msg) from error
-        # The paths are compared with those of the other tools, which are relative to the root.
-        data, model = root.inside(read.data.file), root.inside(read.model.file)
-        code = [root.inside(raw) for raw in read.model.code]
-        for raw in (data, model, *code):
-            if not (root.path / raw).is_file():
-                msg = f"{file} names {raw}, which is no file in the project."
-                raise ToolError(msg)
-        return read.model_copy(
-            update={
-                "data": read.data.model_copy(update={"file": data}),
-                "model": read.model.model_copy(update={"file": model, "code": code}),
-            }
-        )
+        return read_contract(await project.required_root(ctx), file)
 
-    @mcp.tool(name=ToolName.GATES, tags={"pipeline"}, annotations=READS)
-    def gates(profile: Profile, contract: Contract, proof: Proof) -> GateReport:
-        """Judge a pipeline run from raw rows to a saved model. Each gate is one requirement,
-        with the tools whose results decide it. The run is done when `passed` is true. Changes
-        no file and runs nothing, so pass results of this run.
+    @mcp.tool(name=ToolName.GATES, tags={"pipeline"}, annotations=RUNS_CODE, task=True)
+    @rooted
+    async def gates(
+        ctx: Context, contract: str, scripts: Scripts, discovery: DiscoveryProof | None = None
+    ) -> GateReport | InputRequiredResult:
+        """Run the stages of a pipeline run, from raw rows to a saved model, and judge them.
+        Each gate is one requirement, with the commands whose results decide it. The run is
+        done when `passed` is true.
+
+        It runs `xpd profile` on the data file that the contract names, `xpd check` on the
+        three scripts, `xpd graph` on the feature steps, `xpd equiv` of the training script
+        with itself and with the prediction script, and `xpd refit` on the contract. It runs
+        the scripts with the project's Python, so run it on code you trust. It changes no
+        saved file.
 
         The gates: the data is the profiled file and its target has no nulls, the split
         covers every row, `check` reports no draw without a seed in scikit-learn, scikit-lego,
@@ -388,21 +405,41 @@ def register(mcp: FastMCP, project: Project, rules: Catalog) -> None:
         columns of the file, one Pipeline holds every step, the feature steps connect, `check`
         reports no error, the contract has a score for each fold, a raw training refit matches
         the saved model and the recorded scores, two training runs leave an equal `result`,
-        the prediction script leaves that `result` too,
-        and the versions are recorded. When discovery is supplied, include its indexed-api-calls
-        result and require the contract's discovery record to match proof.discovery.
-        Without discovery in either, thirteen gates apply.
+        the prediction script leaves that `result` too, and the versions are recorded. With
+        `discovery`, its indexed-api-calls result is a gate too, and the contract's discovery
+        record must match it. Without it, thirteen gates apply.
 
         A passed report does not judge choices made across separate runs or raw columns
-        that stand in for the target. Pass fresh tool results from this project.
+        that stand in for the target.
 
         Args:
-            profile: The result of `profile` on the data file.
-            contract: The result of `contract` on the file the training script saved.
-            proof: `lint` is the result of `check` on the training, prediction and step files.
-                `dataflow` is the result of `graph` on the file with the feature steps.
-                `reproducible` compares two runs of the training script with `equiv`.
-                `refit` is the result of refitting the saved contract. `served` is the result
-                of `equiv` with the training script as old and the loading script as new.
+            contract: The contract that the training script saved, a JSON file inside the
+                project root.
+            scripts: The training script, the prediction script and the file with the
+                feature steps.
+            discovery: The result of `discovery_gate` for this run, when the choice of a
+                library was recorded.
         """
-        return judge(profile, contract, proof)
+        root = await project.required_root(ctx)
+        read = read_contract(root, contract)
+        results = (
+            await analysis.profile(ctx, read.data.file),
+            await analysis.check(ctx, [scripts.train, scripts.predict, scripts.features]),
+            await analysis.graph(ctx, [scripts.features]),
+            await analysis.equiv(ctx, scripts.train, scripts.train),
+            await analysis.refit(ctx, contract),
+            await analysis.equiv(ctx, scripts.train, scripts.predict),
+        )
+        for result in results:
+            if isinstance(result, InputRequiredResult):
+                return result
+        profile, lint, dataflow, reproducible, refit, served = results
+        proof = Proof(
+            discovery=discovery,
+            lint=lint,
+            dataflow=dataflow,
+            reproducible=reproducible,
+            refit=refit,
+            served=served,
+        )
+        return judge(profile, read, proof)

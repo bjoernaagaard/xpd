@@ -1,26 +1,25 @@
-Use `gates` to judge a run from a data file to a saved model. It takes the results
-that [`profile`](../profile/), [`contract`](../contract/), [`check`](../check/),
-[`graph`](../graph/), [`equiv`](../equiv/), [`refit`](../refit/) and
-[`discovery_gate`](../discovery_gate/) returned, and checks each gate against them. It reads no
-file and runs nothing, so it does not prove that the files are unchanged since those calls. The
-run is done when it returns `passed: true`.
+Use `gates` to judge a run from a data file to a saved model. It runs the commands below on the
+files you name and checks each gate against what they print, so you pass it no result of another
+command. It runs the scripts with the project's Python. The run is done when it returns
+`passed: true`.
 
-| Field of `proof` | The result of |
+| What `gates` runs | On |
 | --- | --- |
-| `discovery` | `discovery_gate` on the training, prediction and step files. Optional |
-| `lint` | `check` on the same files |
-| `dataflow` | `graph` on the file with the feature steps |
-| `reproducible` | `equiv` of the training script with itself |
-| `refit` | `refit` on the saved contract |
-| `served` | `equiv` of the training script with the script that loads the model |
+| [`xpd profile`](../../../commands/profile/) | The data file that the contract names |
+| [`xpd check`](../../../commands/check/) | The training script, the prediction script and the step file |
+| [`xpd graph`](../../../commands/graph/) | The file with the feature steps |
+| [`xpd equiv`](../../../commands/equiv/) | The training script with itself, and with the script that loads the model |
+| [`xpd refit`](../../../commands/refit/) | The contract |
+
+`discovery` is optional, and it is the result of [`discovery_gate`](../discovery_gate/) on the
+same three files.
 
 ## Example
 
-In `samples/pipeline`, after `train.py` wrote its model, the results of the other tools passed
-every gate.
+In `samples/pipeline`, after `train.py` wrote its model, the call below passed every gate.
 
 ```json
-{"profile":"(profile of penguins.csv)","contract":"(contract of model/contract.json)","proof":{"discovery":"...","lint":"...","dataflow":"...","reproducible":"...","refit":"...","served":"..."}}
+{"contract":"model/contract.json","scripts":{"train":"train.py","predict":"predict.py","features":"features.py"},"discovery":"(the result of discovery_gate)"}
 ```
 
 ```json
@@ -28,9 +27,10 @@ every gate.
 ```
 
 Each entry in `gates` corresponds to one requirement in the description above; the discovery gates
-are judged only when the contract or the proof holds a discovery record.
+are judged only when the contract or the call holds a discovery record.
 
 ## Errors
 
 A gate that fails is a result, with its name in `failed` and a `detail` that says why. Arguments
-that do not match the schemas fail before any gate is judged.
+that do not match the schemas fail before any gate is judged, and so does a contract that cannot
+be read or a script that leaves no `result`.

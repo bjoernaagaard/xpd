@@ -1,6 +1,6 @@
 """Trains the penguin species model, from the raw rows to a saved Pipeline and its contract.
 
-Run it in this folder, which is the project root of the code mode run in docs/code-mode.md.
+Run it in this folder, which is the project root of the run in the guide "Train a model with gates".
 It leaves the class probabilities of the held out rows in `result`, so `xpd equiv train.py
 predict.py` checks the saved model in a new process. `xpd refit model/contract.json` fits a
 clone from raw training rows and compares its outputs and scores with this run.

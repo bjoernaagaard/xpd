@@ -1,6 +1,7 @@
 Use `contract` to read the contract that a training script saved beside its model,
 with the data file, the split, the inputs, the steps, the validation and the model file. It
-reads the JSON file and runs no binary. Pass its result to [`gates`](../gates/).
+reads the JSON file and runs no binary. [`gates`](../gates/) reads the same file itself, so call
+`contract` when you want the recorded scores or the model's versions.
 
 ## Example
 

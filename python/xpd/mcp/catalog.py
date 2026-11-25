@@ -1,11 +1,10 @@
-"""The rule catalog: the `rules` and `rule` tools, the rule resources, and completion of the
-package and rule arguments of templates and prompts."""
+"""The rule catalog: the rule resources, and completion of the package and rule arguments of
+templates and prompts."""
 
 import asyncio
 import json
 from collections.abc import Iterable
 from dataclasses import dataclass, field
-from functools import partial
 from pathlib import Path
 from typing import NamedTuple
 
@@ -21,10 +20,8 @@ from mcp.types import (
     ResourceTemplateReference,
 )
 
-from xpd.mcp.base import READS
 from xpd.mcp.binary import RULES, Xpd
-from xpd.mcp.models import Rule, RuleList, Severity
-from xpd.mcp.names import ToolName
+from xpd.mcp.models import Rule
 from xpd.mcp.root import Project
 
 RULES_URI = "xpd://rules"
@@ -179,58 +176,8 @@ class Catalogs:
             return catalog
 
 
-def selects(
-    rule: Rule, *, severity: Severity | None, fixable: bool | None, needle: str | None
-) -> bool:
-    """Whether `rule` has the severity and the fix that a listing asks for, and holds `needle`,
-    which is already case folded, in its id, message or documentation."""
-    if severity is not None and rule.severity != severity:
-        return False
-    if fixable is not None and (rule.fix is not None) != fixable:
-        return False
-    text = f"{rule.rule}\n{rule.message}\n{rule.doc or ''}".casefold()
-    return needle is None or needle in text
-
-
 def register(mcp: FastMCP, catalog: Catalog, xpd: Xpd, project: Project) -> None:
     catalogs = Catalogs(xpd, project, catalog)
-
-    @mcp.tool(name=ToolName.RULES, tags={"rules"}, annotations=READS)
-    async def list_rules(
-        ctx: Context,
-        package: str | None = None,
-        severity: Severity | None = None,
-        *,
-        fixable: bool | None = None,
-        query: str | None = None,
-    ) -> RuleList:
-        """List xpd's rules and package checks, without their documentation. Every filter is
-        optional, and they combine. Use `rule` to read one rule with examples.
-
-        Args:
-            package: Only this pack, by module name, such as pandas, numpy, scipy, sklearn,
-                sklego, mapie, category_encoders, linearmodels, arch, pymoo or plotly.
-            severity: Only rules of this severity.
-            fixable: True for rules with a fix, False for rules without one.
-            query: Only rules whose id, message or documentation contains this text, in any
-                case.
-        """
-        selected = await catalogs.load(ctx)
-        rules = selected.of(package) if package else list(selected.rules)
-        needle = query.casefold() if query else None
-        wanted = partial(selects, severity=severity, fixable=fixable, needle=needle)
-        kept = [rule for rule in rules if wanted(rule)]
-        return RuleList(rules=kept)
-
-    @mcp.tool(name=ToolName.RULE, tags={"rules"}, annotations=READS)
-    async def one_rule(ctx: Context, package: str, rule: str) -> Rule:
-        """Read one rule: why it matters, what it reports, and its before and after examples.
-
-        Args:
-            package: The rule's pack, by module name, such as pandas.
-            rule: The rule id, such as chained-assignment.
-        """
-        return (await catalogs.load(ctx)).find(package, rule)
 
     @mcp.resource(
         RULES_URI,

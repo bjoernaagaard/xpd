@@ -15,10 +15,8 @@ classifiers = [
   "Topic :: Software Development :: Quality Assurance",
 ]
 dynamic = ["version", "description", "readme", "keywords"]
-# The MCP server, `xpd mcp`, with apps, code mode and task support. FastMCP stays within one minor release,
-# and prefab-ui, which draws the app views, is pinned because its releases break often.
 dependencies = [
-  "fastmcp[apps,code-mode,tasks]~=4.2.0",
+  "fastmcp[apps,tasks]~=4.2.0",
   "prefab-ui==0.21.1",
   # The server reads sgconfig.yml and xpd.yml to learn which rule files a project has.
   "pyyaml>=6",

@@ -1,12 +1,14 @@
 ---
 title: Connect an agent with MCP
-description: Add xpd's MCP server to Claude Code or another client, pick the project root, and let the agent lint, fix and look up libraries.
+description: Add xpd's MCP server to Claude Code or another client, pick the project root, and give the agent the tools that a shell command cannot be.
 sidebar:
   order: 2
 ---
 
-Run `claude mcp add xpd -- uvx xpd mcp`, and Claude Code can call xpd's tools, such as `check`,
-`fix`, `find` and `equiv`, without a shell. The server speaks the
+Run `claude mcp add xpd -- uvx xpd mcp`, and Claude Code gets the 11 tools of xpd that a shell
+command cannot be: the views that draw results, the gates of a model run, and the animation
+tools. The agent runs every other part of xpd, such as `xpd check` and `xpd find`, in its shell,
+and the server's instructions name those commands. The server speaks the
 [Model Context Protocol](https://modelcontextprotocol.io) (MCP), and it takes every rule and every
 result from the xpd binary of the same install, so it matches the version you run. The
 [MCP reference](../../mcp/) lists each tool, resource and prompt.
@@ -67,64 +69,32 @@ server then asks the client on each call for its
 the client shares with servers. When none of them is a folder on the machine, a tool fails with a
 message that names `--root` and `XPD_MCP_ROOT`.
 
-## Lint and fix through the tools
+## What the server adds to the commands
 
-A tool call runs the xpd binary in the project root and returns its JSON as a typed result. For
-example, `check` with `paths` set to `["samples/bad.py"]` runs `xpd check` and returns the five
-issues of the sample.
+A tool runs the xpd binary in the project root and returns its JSON as a typed result, or draws
+it.
+
+| Tools | What they do | The command they build on |
+| --- | --- | --- |
+| [`show_issues`](../../mcp/tools/show_issues/), [`show_dataflow`](../../mcp/tools/show_dataflow/), [`show_columns`](../../mcp/tools/show_columns/) | Draw a table or a chart in a host that renders MCP Apps | `xpd check`, `xpd graph`, `xpd profile` |
+| [`discovery_gate`](../../mcp/tools/discovery_gate/), [`contract`](../../mcp/tools/contract/), [`gates`](../../mcp/tools/gates/) | Judge a run from a data file to a saved model, as [Train a model with gates](../gates/) shows | `xpd api`, `profile`, `check`, `graph`, `equiv`, `refit` |
+| The five `animate_` tools | Render and inspect a Manim scene, as [Animate a concept with Manim](../animate/) shows | `xpd animate` |
 
 ```mermaid
 sequenceDiagram
     participant Agent
     participant Server as xpd mcp
     participant Binary as xpd binary
-    Agent->>Server: check(paths=["samples/bad.py"])
+    Agent->>Server: show_issues(paths=["samples/bad.py"])
     Server->>Server: check that the path is inside the project root
     Server->>Binary: xpd check --format json -- samples/bad.py
     Binary-->>Server: {"fixed": 0, "fixable": 0, "issues": [...]}
-    Server-->>Agent: the same JSON, as a typed result
+    Server-->>Agent: the issues as a table, and the same JSON as text
 ```
 
-Each issue in the result has the fields below.
-
-```json
-{
-  "package": "pandas",
-  "rule": "merge-without-validate",
-  "file": "samples/bad.py",
-  "line": 8,
-  "column": 5,
-  "severity": "warning",
-  "message": "merge without validate= can silently duplicate rows.",
-  "fix": null
-}
-```
-
-[`fix`](../../mcp/tools/fix/) writes the safe fixes. With `unsafe` set to `true`, it first asks
-the user, through the client, whether it may write the fixes that may change what the code does.
-When the user declines, it writes only the safe fixes. [`rewrite`](../../mcp/tools/rewrite/) asks
-the same way before it writes a structural replacement.
-
-The `lint_and_fix` prompt gives the agent the whole loop. The agent lints, fixes, and lints again
-until only warnings it can explain are left. The [prompts](../../mcp/prompts/) page lists the
-other four prompts.
-
-## Look up a library before writing code
-
-Have the agent call `find` with the task in plain words, and then `api` with a name that `find`
-returned. Both read the index inside the xpd binary, so they work for a library that the project
-hasn't installed.
-
-```text
-find(task="time series bootstrap for cross validation")
-  returns up to 5 symbols, 3 rules and 3 recipes, each kind ranked on its own
-api(name="mapie.subsample.BlockBootstrap")
-  returns the parameters as the source writes them, the summary, the members
-  and the rules that guard the name
-```
-
-The first `find` on a machine downloads the 333 MB model that ranks entries by meaning, so it can
-take a few minutes. [`xpd find`](../../commands/find/) says where the model is saved.
+The server also gives the agent five [prompts](../../mcp/prompts/), each with the steps of one
+workflow and the commands to run, and the [resources](../../mcp/resources/) that hold the rules
+and the skills.
 
 ## Settings
 
@@ -135,15 +105,14 @@ variables of your shell.
 | Flag | Environment | Default | Effect |
 | --- | --- | --- | --- |
 | `--root PATH` | `XPD_MCP_ROOT` | The folder the server started in, or the client's first root for a plugin | The project root |
-| `--code-mode` | `XPD_MCP_CODE_MODE=1` | Off | Lists FastMCP's `search`, `get_schema` and `execute` in place of xpd's tools, as [code mode](../code-mode/) shows |
-| `--allow-writes` | `XPD_MCP_ALLOW_WRITES=1` | Off over HTTP, on over stdio | Exposes file-writing and code-executing tools (`fix`, `rewrite`, `new`, `test`, `refit`, `equiv`) over HTTP |
+| `--allow-writes` | `XPD_MCP_ALLOW_WRITES=1` | Off over HTTP, on over stdio | Exposes `gates`, which runs the project's scripts, over HTTP |
 | — | `XPD_MCP_AUTH_TOKEN` | Unset | Bearer token for HTTP clients; required when binding HTTP to a non-loopback `--host` |
 | `--transport stdio\|http` | `FASTMCP_TRANSPORT` | `stdio` | How clients connect |
 | `--host HOST` | `FASTMCP_HOST` | `127.0.0.1` | The address to listen on for HTTP |
 | `--port PORT` | `FASTMCP_PORT` | `8000` | The port for HTTP |
 
-`XPD_MCP_CODE_MODE` and `XPD_MCP_ALLOW_WRITES` also take `true`, `yes` and `on`, and
-`--no-code-mode` or `--no-allow-writes` turns each flag off again. [`xpd mcp`](../../commands/mcp/)
+`XPD_MCP_ALLOW_WRITES` also takes `true`, `yes` and `on`, and `--no-allow-writes` turns the flag
+off again. [`xpd mcp`](../../commands/mcp/)
 prints the same list with `xpd mcp -h`.
 
 ## Serve several clients over HTTP
@@ -156,7 +125,7 @@ uvx xpd mcp --transport http --port 8000
 
 Clients then connect to `http://127.0.0.1:8000/mcp`. Over HTTP, the server requires a
 server-selected project root (`--root`, `XPD_MCP_ROOT`, or the starting working directory) and
-exposes read-only tools unless `--allow-writes` or `XPD_MCP_ALLOW_WRITES=1` is set. Binding a
+leaves out `gates` unless `--allow-writes` or `XPD_MCP_ALLOW_WRITES=1` is set. Binding a
 non-loopback `--host` requires `XPD_MCP_AUTH_TOKEN` for bearer authentication.
 
 ## Call the server from a terminal
@@ -166,5 +135,5 @@ check a result.
 
 ```sh
 uvx fastmcp list --command 'uvx xpd mcp' --resources --prompts
-uvx fastmcp call --command 'uvx xpd mcp' --target rule --input-json '{"package": "pandas", "rule": "row-loop"}'
+uvx fastmcp call --command 'uvx xpd mcp' --target contract --input-json '{"file": "model/contract.json"}'
 ```

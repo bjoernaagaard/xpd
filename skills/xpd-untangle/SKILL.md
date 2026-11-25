@@ -138,9 +138,6 @@ The `id` of a finding is made from its kind and from what it is about, such as t
 name or the value, and not from a line. It stays the same when code moves within a file, and
 it changes when the file is renamed.
 
-When the xpd MCP server is connected, the tool `untangle` takes `paths`, `kinds`, `limit` and
-`since` and returns the same JSON.
-
 ## As a T3 Code workflow
 
 `untangle.workflow.ts`, beside this file, runs the loop as a durable workflow of T3 Code, with

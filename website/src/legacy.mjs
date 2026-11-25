@@ -72,29 +72,29 @@ const claudeCodeFragments = {
 
 const mcpFragments = {
   install: 'guides/mcp/#add-the-server-to-a-client',
-  'how-a-call-runs': 'guides/mcp/#lint-and-fix-through-the-tools',
+  'how-a-call-runs': 'guides/mcp/#what-the-server-adds-to-the-commands',
   tools: 'mcp/#tools',
-  'confirmation-of-unsafe-fixes': 'mcp/tools/fix/',
+  'confirmation-of-unsafe-fixes': 'commands/check/',
   'background-tasks': 'mcp/#background-tasks',
   resources: 'mcp/resources/',
   prompts: 'mcp/prompts/',
   settings: 'guides/mcp/#settings',
   http: 'guides/mcp/#serve-several-clients-over-http',
   'other-ways-to-run-it': 'guides/mcp/#call-the-server-from-a-terminal',
-  'library-discovery': 'guides/mcp/#look-up-a-library-before-writing-code',
-  'the-discovery-record': 'guides/code-mode/#discovery-before-execution',
+  'library-discovery': 'commands/find/',
+  'the-discovery-record': 'guides/gates/#discovery-before-the-run',
   'the-discovery-gate': 'mcp/tools/discovery_gate/',
 };
 
 const codeModeFragments = {
-  'the-run-in-order': 'guides/code-mode/#run-the-stages-in-one-call',
-  'discovery-before-execution': 'guides/code-mode/#discovery-before-execution',
-  'the-stages': 'guides/code-mode/#the-stages',
-  'the-gates': 'guides/code-mode/#the-gates',
-  'a-run-from-raw-rows-to-a-saved-model': 'guides/code-mode/#before-you-start',
-  'the-prediction-script': 'guides/code-mode/#the-stages',
-  'a-leaky-script-stops-at-check': 'guides/code-mode/#a-leak-stops-the-run-at-check',
-  'limits-that-no-gate-checks': 'guides/code-mode/#what-the-gates-dont-check',
+  'the-run-in-order': 'guides/gates/#run-the-gates-in-one-call',
+  'discovery-before-execution': 'guides/gates/#discovery-before-the-run',
+  'the-stages': 'guides/gates/#the-stages',
+  'the-gates': 'guides/gates/#the-gates',
+  'a-run-from-raw-rows-to-a-saved-model': 'guides/gates/#before-you-start',
+  'the-prediction-script': 'guides/gates/#the-stages',
+  'a-leaky-script-stops-at-check': 'guides/gates/#a-leak-fails-a-gate',
+  'limits-that-no-gate-checks': 'guides/gates/#what-the-gates-dont-check',
 };
 
 const lspFragments = {
@@ -166,8 +166,8 @@ export function legacyPages() {
       { path: 'claude-code.html', page: 'guides/claude-code/', fragments: claudeCodeFragments },
       { path: 'claude-code/index.html', page: 'guides/claude-code/', fragments: claudeCodeFragments },
       { path: 'mcp.html', page: 'guides/mcp/', fragments: mcpFragments },
-      { path: 'code-mode.html', page: 'guides/code-mode/', fragments: codeModeFragments },
-      { path: 'code-mode/index.html', page: 'guides/code-mode/', fragments: codeModeFragments },
+      { path: 'code-mode.html', page: 'guides/gates/', fragments: codeModeFragments },
+      { path: 'code-mode/index.html', page: 'guides/gates/', fragments: codeModeFragments },
       { path: 'lsp.html', page: 'guides/editors/', fragments: lspFragments },
       { path: 'lsp/index.html', page: 'guides/editors/', fragments: lspFragments },
       { path: 'rules.html', page: 'rules/', fragments: rulesFragments(docs) },

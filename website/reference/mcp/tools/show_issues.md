@@ -1,6 +1,6 @@
 Use `show_issues` to show a person the issues as a table, in a host that renders
 [MCP Apps](https://modelcontextprotocol.io/docs/extensions/apps). It runs as
-[`check`](../check/) does and returns a view built with Prefab, which the host draws with the
+[`xpd check`](../../../commands/check/) does and returns a view built with Prefab, which the host draws with the
 server's renderer resource. A host that does not render apps gets the JSON of `check` as text.
 
 ## Example
@@ -18,4 +18,4 @@ message, and `"..."` stands for the other issues.
 
 ## Errors
 
-The errors are those of [`check`](../check/).
+The errors are those of [`xpd check`](../../../commands/check/).

@@ -1,8 +1,7 @@
 """App tools: the results of check, graph and profile as UIs that a host renders with Prefab.
 
-An app tool's structured content is the UI, so each view is a tool of its own and the data tools
-keep their output schemas. A view's text content is the same JSON the data tool returns, for a
-host that renders no UI and for the model."""
+An app tool's structured content is the UI. A view's text content is the same JSON that the
+command prints, for a host that renders no UI and for the model."""
 
 from collections import Counter
 from itertools import count
@@ -103,7 +102,7 @@ def register(mcp: FastMCP, analysis: Analysis) -> None:
         ctx: Context, paths: list[str] | None = None
     ) -> ToolResult | InputRequiredResult:
         """Show what `check` finds as a sortable, searchable table, in hosts that render MCP
-        Apps. Use `check` when you need the data.
+        Apps. Run `xpd check` when you need the data.
 
         Args:
             paths: Files or folders inside the project root. Default: the whole root.
@@ -137,7 +136,7 @@ def register(mcp: FastMCP, analysis: Analysis) -> None:
     @mcp.tool(app=True, tags={"dataflow", "app"}, annotations=READS)
     async def show_dataflow(ctx: Context, paths: list[str]) -> ToolResult | InputRequiredResult:
         """Show what `graph` reads as a flowchart of steps or nodes and a table of its problems,
-        in hosts that render MCP Apps. Use `graph` when you need the data.
+        in hosts that render MCP Apps. Run `xpd graph` when you need the data.
 
         Args:
             paths: Files or folders inside the project root.

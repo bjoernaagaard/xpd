@@ -14,18 +14,6 @@ class Output(BaseModel):
     model_config = ConfigDict(extra="allow", frozen=True, serialize_by_alias=True)
 
 
-class CaseOutcome(Output):
-    id: str
-    source: str
-    status: str
-    actual: dict[str, object] | None = None
-
-
-class CaseReport(Output):
-    cases: list[CaseOutcome]
-    failed: int
-
-
 class Issue(Output):
     """One finding of `xpd check`. A package warning has no line or column."""
 
@@ -47,115 +35,6 @@ class CheckReport(Output):
     issues: list[Issue]
 
 
-class Chart(Output):
-    """One chart call of a file, with the plotly call that draws its kind."""
-
-    line: int
-    call: str = Field(description="The call as the file writes it, such as px.pie or ax.bar.")
-    kind: str = Field(
-        description="pie, bar, histogram, line, area, scatter, box, heatmap, map or panels."
-    )
-    library: str = Field(description="plotly, matplotlib, seaborn or pandas.")
-    plotly: str = Field(description="The plotly call that draws a chart of this kind.")
-
-
-class MeasuredFact(Output):
-    """A fact that `run` measured on a drawn figure, under the question it answers."""
-
-    figure: str
-    fact: str
-    summary: str
-    findings: list[str] = Field(description="What the fact names as a fault, if anything.")
-
-
-class ReviewQuestion(Output):
-    """A question of Tufte's book that applies to a chart of the file."""
-
-    id: str
-    page: int = Field(description="The printed page of the second edition.")
-    principle: str
-    text: str
-    look: str = Field(description="What to look at in the chart to answer it.")
-    plotly: str = Field(description="The plotly code that follows the principle.")
-    rules: list[str] = Field(description="The plotly rules that report it in code.")
-    reported: list[str] = Field(description="Those of the rules that fire on the file.")
-    charts: list[int] = Field(description="The lines of the charts it applies to.")
-    measured: list[MeasuredFact]
-
-
-class ChartReview(Output):
-    """What `xpd chart-review` found for one file: its charts, the plotly rules that fire and
-    the questions of the book for each chart."""
-
-    file: str | None
-    libraries: list[str]
-    charts: list[Chart]
-    issues: list[Issue]
-    questions: list[ReviewQuestion]
-    facts: JsonValue = Field(
-        description="With run: the measured figures, or the error that stopped the run."
-    )
-
-
-class LedgerPlace(Output):
-    """One place of a finding of `xpd untangle`."""
-
-    path: str
-    line: int | None = Field(default=None, description="Counted from 1. None for a whole file.")
-    end_line: int | None = Field(default=None, description="The last line of a copy.")
-
-
-class LedgerFinding(Output):
-    """One place where the code gets wrong which pieces change together."""
-
-    id: str = Field(description="The name the finding keeps at another commit.")
-    new: bool | None = Field(default=None, description="With since: the commit did not have it.")
-    kind: str
-    places: list[LedgerPlace]
-    evidence: str = Field(description="What was measured, as one sentence.")
-
-
-class LedgerKind(Output):
-    kind: str
-    count: int
-    was: int | None = Field(default=None, description="With since: the count at that commit.")
-
-
-class LedgerGroup(Output):
-    """The count of one group: hidden-link, needless-link, surplus or special-case."""
-
-    group: str
-    count: int
-    was: int | None = None
-    kinds: list[LedgerKind]
-
-
-class LedgerSummary(Output):
-    count: int
-    was: int | None = None
-    new: int | None = Field(default=None, description="With since: findings the commit lacked.")
-    fixed: int | None = Field(default=None, description="With since: findings that are gone.")
-    groups: list[LedgerGroup]
-
-
-class LedgerRead(Output):
-    files: int
-    python: int
-    commits: int = Field(description="The commits of git history that were read. 0 without git.")
-
-
-class Ledger(Output):
-    """What `xpd untangle` found: every count, and the strongest findings of each kind."""
-
-    read: LedgerRead
-    since: str | None = None
-    summary: LedgerSummary
-    findings: list[LedgerFinding]
-    fixed: list[LedgerFinding] | None = Field(
-        default=None, description="With since: the findings of the commit that are gone."
-    )
-
-
 class SourcePosition(Output):
     line: int
     column: int
@@ -172,16 +51,6 @@ class SourceRange(Output):
     end: SourcePosition
 
 
-class CodeMatch(Output):
-    text: str
-    file: str
-    language: str
-    range: SourceRange
-    replacement: str | None = None
-    replacement_offsets: dict[str, int] | None = Field(default=None, alias="replacementOffsets")
-    meta_variables: dict[str, JsonValue] = Field(default_factory=dict, alias="metaVariables")
-
-
 class OutlineEntry(Output):
     name: str
     role: str
@@ -193,17 +62,6 @@ class OutlineEntry(Output):
     is_exported: bool = Field(default=False, alias="isExported")
     is_public: bool | None = Field(default=None, alias="isPublic")
     members: list["OutlineEntry"] = Field(default_factory=list)
-
-
-class OutlineFile(Output):
-    path: str
-    language: str
-    items: list[OutlineEntry]
-
-
-class CreatedFiles(Output):
-    created_files: list[str] = Field(alias="createdFiles")
-    modified_files: list[str] = Field(default_factory=list, alias="modifiedFiles")
 
 
 class Step(Output):
@@ -342,10 +200,6 @@ class Rule(RuleSummary):
     """One rule with its documentation, which has examples and notes."""
 
     doc: str | None = Field(description="The rule's documentation as Markdown.")
-
-
-class RuleList(Output):
-    rules: list[RuleSummary]
 
 
 class SkillFile(Output):
@@ -586,6 +440,18 @@ class DiscoveryProof(BaseModel):
     discovery: Discovery
     paths: list[str]
     gate: Gate
+
+
+class Scripts(BaseModel):
+    """The three scripts of a pipeline run, each a path inside the project root."""
+
+    model_config = ConfigDict(frozen=True)
+
+    train: str = Field(description="The training script, which leaves its output in `result`.")
+    predict: str = Field(
+        description="The script that loads the saved model and leaves the same `result`."
+    )
+    features: str = Field(description="The file with the feature steps.")
 
 
 class Proof(BaseModel):

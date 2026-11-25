@@ -56,7 +56,7 @@ The offline animation workflow and its editable Manim recipes.
 
 ## skill://xpd-untangle/
 
-The steps of a refactor of a whole codebase, which [`untangle`](../tools/untangle/) measures.
+The steps of a refactor of a whole codebase, which [`xpd untangle`](../../commands/untangle/) measures.
 
 ## xpd://animation/{job_id}/video.mp4
 

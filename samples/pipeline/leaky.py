@@ -1,4 +1,4 @@
-"""The training script of train.py with one leak, to show a gate of docs/code-mode.md failing.
+"""The training script of train.py with one leak, to show a gate of the guide "Train a model with gates" failing.
 
 It picks the regularization strength by the score on the held out rows, so the score it reports
 for those rows is too high. `xpd check leaky.py` reports the loop as sklearn/tune-on-test. The

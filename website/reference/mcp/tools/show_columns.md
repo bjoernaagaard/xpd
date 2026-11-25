@@ -1,6 +1,6 @@
 Use `show_columns` to show a person the columns as a table, in a host that renders
 [MCP Apps](https://modelcontextprotocol.io/docs/extensions/apps). It runs as
-[`profile`](../profile/) does and returns a view built with Prefab, which the host draws with the
+[`xpd profile`](../../../commands/profile/) does and returns a view built with Prefab, which the host draws with the
 server's renderer resource. A host that does not render apps gets the JSON of `profile` as text.
 
 ## Example
@@ -18,4 +18,4 @@ The text content of the result is the report of `profile`. Its first column is s
 
 ## Errors
 
-The errors are those of [`profile`](../profile/).
+The errors are those of [`xpd profile`](../../../commands/profile/).

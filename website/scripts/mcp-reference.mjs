@@ -228,18 +228,6 @@ export async function generateMcpReference(mcp, { repository, mcpFolder, mcpOut,
       '',
       'The [resources](./resources/) page lists the resources and templates, and the [prompts](./prompts/) page lists the prompts.',
       '',
-      '## Code mode',
-      '',
-      `With ${code('--code-mode')}, the server lists these ${mcp.code_mode_tools.length} tools in place of the ones above.`,
-      '',
-      '| Tool | Arguments | Description |',
-      '| --- | --- | --- |',
-      ...mcp.code_mode_tools.map((tool) => {
-        const required = new Set(tool.inputSchema.required ?? []);
-        const args = Object.keys(tool.inputSchema.properties ?? {}).map((name) => code(required.has(name) ? name : `${name}?`));
-        return `| ${code(tool.name)} | ${args.join(', ') || 'none'} | ${cell(tool.description)} |`;
-      }),
-      '',
       '## Instructions',
       '',
       'The server gives the agent these instructions when it connects.',

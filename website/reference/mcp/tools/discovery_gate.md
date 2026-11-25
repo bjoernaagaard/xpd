@@ -1,8 +1,8 @@
-Use `discovery_gate` after choosing a library with [`find`](../find/) and
-[`api`](../api/), before any project code runs. It checks that the files call the chosen symbols
+Use `discovery_gate` after choosing a library with [`xpd find`](../../../commands/find/) and
+[`xpd api`](../../../commands/api/), before any project code runs. It checks that the files call the chosen symbols
 with names and keywords that xpd's index knows, and that the record of the choice is consistent.
 It reads the source and runs nothing. Pass its result to [`gates`](../gates/) as
-`proof.discovery`.
+`discovery`.
 
 ```text
 discovery_gate(paths, discovery)

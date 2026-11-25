@@ -159,7 +159,7 @@ Pick the page for what you want to do next.
 | Read what a rule reports and how to fix it | [Rules](rules/) |
 | Show a coding agent the issues of each file it edits | [Claude Code and other agents](guides/claude-code/) |
 | Give an agent xpd's tools, rules and prompts | [Connect an agent with MCP](guides/mcp/) |
-| Take a data file to a saved scikit-learn model with checks that xpd runs | [Train a model in code mode](guides/code-mode/) |
+| Take a data file to a saved scikit-learn model with checks that xpd runs | [Train a model with gates](guides/gates/) |
 | See issues, fixes and rule help in an editor | [Use xpd in an editor](guides/editors/) |
 | Report a pattern of your own project | [Write a rule](guides/write-a-rule/) |
 | Look up a command, its options and its exit status | [Commands](commands/) |

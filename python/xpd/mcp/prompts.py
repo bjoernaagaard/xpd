@@ -1,78 +1,15 @@
-"""Prompts for the workflows of the xpd skill. Each names the tools to run and when it is done."""
-
-import json
+"""Prompts for the workflows of the xpd skill. Each names the commands and tools to run and when
+it is done."""
 
 from fastmcp import FastMCP
 
 from xpd.mcp.catalog import PACK_URI, RULE_URI
 from xpd.mcp.names import ToolName
 
-DISCOVERY = f"""\
-found = await call_tool("{ToolName.FIND}", {{"task": TASK}})
-inspected = {{
-    kind: [await call_tool("{ToolName.API}", {{"name": item["name"]}}) for item in found[kind]]
-    for kind in ("symbols", "rules", "recipes")
-}}
-discovery = {{
-    "question": {{"task": TASK}}, "candidates": inspected,
-    "choice": {{"name": CHOICE, "reason": REASON, "symbols": SYMBOLS}},
-}}
-api_proof = await call_tool("{ToolName.DISCOVERY_GATE}", {{
-    "paths": [TRAIN, PREDICT, FEATURES], "discovery": discovery,
-}})
-if not api_proof["gate"]["passed"]:
-    return api_proof
-"""
-
-# The stages of a pipeline run as one code mode script. Each result is handed to `gates`.
-STAGES = f"""\
-profile = await call_tool("{ToolName.PROFILE}", {{"file": DATA}})
-lint = await call_tool("{ToolName.CHECK}", {{"paths": [TRAIN, PREDICT, FEATURES]}})
-if any(issue["severity"] == "error" for issue in lint["issues"]):
-    return {{"passed": False, "lint": lint, "discovery": api_proof}}
-dataflow = await call_tool("{ToolName.GRAPH}", {{"paths": [FEATURES]}})
-reproducible = await call_tool("{ToolName.EQUIV}", {{"old": TRAIN, "new": TRAIN}})
-served = await call_tool("{ToolName.EQUIV}", {{"old": TRAIN, "new": PREDICT}})
-contract = await call_tool("{ToolName.CONTRACT}", {{"file": CONTRACT}})
-refitted = await call_tool("{ToolName.REFIT}", {{"file": CONTRACT}})
-proof = {{
-    "lint": lint, "dataflow": dataflow, "refit": refitted,
-    "reproducible": reproducible,
-    "served": served, "discovery": api_proof,
-}}
-report = await call_tool("{ToolName.GATES}", \
-{{"profile": profile, "contract": contract, "proof": proof}})
-return {{
-    "passed": report["passed"],
-    "gates": [
-        {{"name": gate["name"], "passed": gate["passed"], "detail": gate["detail"]}}
-        for gate in report["gates"]
-    ],
-    "refit": refitted,
-    "validation": contract["validation"],
-    "model": contract["model"],
-}}"""
-
 
 def discovery_task(target: str, task: str = "") -> str:
-    """The task that `find` gets, and that the script records as the discovery question."""
+    """The task that `xpd find` gets, and that the contract records as the discovery question."""
     return task or f"predict {target}"
-
-
-def stages_script(data: str, target: str, task: str = "") -> str:
-    """The script for one project: the paths as constants, then the stages."""
-    paths = {
-        "DATA": data,
-        "FEATURES": "features.py",
-        "TRAIN": "train.py",
-        "PREDICT": "predict.py",
-        "CONTRACT": "model/contract.json",
-        "TASK": discovery_task(target, task),
-        "CHOICE": "sklearn.linear_model.LogisticRegression",
-        "REASON": "Class probabilities for the species target.",
-    }
-    constants = [f"{name} = {json.dumps(path)}" for name, path in paths.items()]
-    return "\n".join([*constants, "SYMBOLS = [CHOICE]", DISCOVERY, STAGES])
 
 
 def register(mcp: FastMCP, review_uri: str) -> None:
@@ -85,18 +22,17 @@ def register(mcp: FastMCP, review_uri: str) -> None:
         """
         return f"""Lint {path} with xpd and fix what it finds.
 
-1. Call the `{ToolName.CHECK}` tool with paths ["{path}"].
-2. Call the `{ToolName.FIX}` tool with the same paths to write the safe fixes.
-3. For each issue left, read the rule with the `{ToolName.RULE}` tool and change the code as its
+1. Run `xpd check {path} --format json`.
+2. Run `xpd check {path} --fix` to write the safe fixes.
+3. For each issue left, read the rule with `xpd api <pack>/<rule>` and change the code as its
    example shows. Fix every `error`. Fix a `warning` unless you can say why the code is right
    here, and say so. Don't silence rules.
-4. If an issue has an unsafe fix, you may call `{ToolName.FIX}` with `unsafe` true. The user \
-is asked to
-   confirm. Read the diff afterwards.
+4. If an issue has an unsafe fix, ask the user before you run `xpd check {path} --fix
+   --unsafe-fixes`. Read the diff afterwards.
 5. A `pandas/missing-<package>` warning names a package the project lacks. Ask the user before
    you add it.
-6. Call `{ToolName.CHECK}` again. You are done when it reports no error and every warning left has a
-   reason."""
+6. Run `xpd check {path}` again. You are done when it reports no error and every warning left
+   has a reason."""
 
     @mcp.prompt(tags={"review"})
     def review(target: str, package: str = "", rule: str = "") -> str:
@@ -120,10 +56,10 @@ is asked to
 
 1. Read {review_uri} and follow it. It cites a rule for every finding.
 2. If {target} is a git range, list the changed .py files with git and review those.
-3. Call the `{ToolName.CHECK}` tool on the files. Each issue is a finding. Cite it as
-   `<package>/<rule>` and link the rule's `url` from the `{ToolName.RULE}` tool.
-4. If a file has a pipeline of steps or Apache Hamilton nodes, call the `{ToolName.GRAPH}` \
-tool on it and
+3. Run `xpd check <files> --format json`. Each issue is a finding. Cite it as
+   `<package>/<rule>` and link the rule's `url`, which `xpd rules --rule <package>/<rule>
+   --format json` prints.
+4. If a file has a pipeline of steps or Apache Hamilton nodes, run `xpd graph <file>` and
    add its errors and warnings as findings.
 5. Then read the code for what a linter cannot see, as the skill describes.
 6. Report the findings, worst first, each with the file and line, the rule, and the fix. Change
@@ -131,7 +67,7 @@ tool on it and
 
     @mcp.prompt(tags={"refactor"})
     def refactor_data_logic(path: str, goal: str) -> str:
-        """Refactor data logic and prove with `equiv` that the result did not change.
+        """Refactor data logic and prove with `xpd equiv` that the result did not change.
 
         Args:
             path: The script to refactor, inside the project root.
@@ -139,22 +75,20 @@ tool on it and
         """
         return f"""Refactor {path} so that: {goal}
 
-1. If the script reads a data file, call the `{ToolName.PROFILE}` tool on it first, so your \
-choices fit
-   the real dtypes, nulls and sizes.
-2. Copy {path} to a new file beside it, such as {path}.old.py, before you change anything.
-   Both files must leave their output in a variable named `result`. Add one if it is missing.
-3. Change {path}. Call the `{ToolName.CHECK}` tool on it and fix what it reports.
-4. Call the `{ToolName.EQUIV}` tool with old set to the copy and new set to {path}. The \
-refactor is done
-   only when it returns `equivalent` true. If it returns false, read `detail` and fix the new
-   code, not the comparison.
-5. Delete the copy, and tell the user what changed and that `{ToolName.EQUIV}` passed."""
+1. If the script reads a data file, run `xpd profile <file>` first, so your choices fit the
+   real dtypes, nulls and sizes.
+2. The script must leave its output in a variable named `result`. Add one if it is missing,
+   and commit that before you change anything else, so the commit holds the old script.
+3. Change {path}. Run `xpd check {path}` and fix what it reports.
+4. Run `xpd equiv {path} --since HEAD`. The refactor is done only when it prints
+   `"equivalent": true`. If it prints false, read `detail` and fix the new code, not the
+   comparison.
+5. Tell the user what changed and that `xpd equiv` passed."""
 
     @mcp.prompt(tags={"dataflow"})
     def add_to_dataflow(path: str, change: str) -> str:
         """Add or change a step of step code or a node of Apache Hamilton modules, and check the
-        dataflow with `graph` before and after.
+        dataflow with `xpd graph` before and after.
 
         Args:
             path: The module with the steps or nodes, inside the project root.
@@ -162,21 +96,20 @@ refactor is done
         """
         return f"""Make this change to the dataflow in {path}: {change}
 
-1. Call the `{ToolName.GRAPH}` tool on {path} first. For Apache Hamilton, pass every module of the
+1. Run `xpd graph {path} --format json` first. For Apache Hamilton, pass every module of the
    Driver. Read `pipelines[].steps` or `nodes` to see what exists.
 2. Reuse a column or node that exists instead of computing its formula again.
 3. In step code, return `frame.assign(...)` or `frame.join(...)`, and don't write
    `frame["x"] = ...` on the frame a step was given.
-4. Make the change, then call `{ToolName.GRAPH}` again. Fix every `error`. Fix a `warning` \
-unless you can
-   say why the code is right. For Hamilton, a warning about an input one edit from a node name
+4. Make the change, then run `xpd graph` again. Fix every `error`. Fix a `warning` unless you
+   can say why the code is right. For Hamilton, a warning about an input one edit from a node name
    is usually a typing error.
-5. Call the `{ToolName.CHECK}` tool on {path} and fix what it reports."""
+5. Run `xpd check {path}` and fix what it reports."""
 
     @mcp.prompt(tags={"pipeline"})
     def build_pipeline(data: str, target: str, task: str = "") -> str:
         """Build a scikit-learn model from a data file, save it with its contract, and show
-        with `gates` that `check` reports no error, that a raw training refit agrees, and that
+        with `gates` that `xpd check` reports no error, that a raw training refit agrees, and that
         a new Python process predicts from the saved file.
 
         Args:
@@ -184,25 +117,19 @@ unless you can
             target: The column the model predicts.
             task: The task in plain words, before choosing a library.
         """
-        script = stages_script(data, target, task)
+        found = discovery_task(target, task)
         return f"""Build a model that predicts {target} from {data}. Write three scripts in the \
 project root, which is where each of them runs, and save the model in the folder model.
 
-First call `{ToolName.FIND}` with the task {discovery_task(target, task)}, then \
-`{ToolName.API}` on the candidates.
-Keep each candidate's kind, name, signature, summary and guarding rules. Kinds may include
-recipes as well as symbols and rules. Choose a candidate and state why. For a recipe, name
-its indexed callable symbols too. Set TASK, CHOICE, REASON and SYMBOLS in the script to those
-values. The LogisticRegression values below are an example, not a choice for every task.
+First run `xpd find "{found}" --format json`, then `xpd api <name> --format json` on the
+candidates. Keep each candidate's kind, name, signature, summary and guarding rules. Kinds may
+include recipes as well as symbols and rules. Choose a candidate and state why. For a recipe,
+name its indexed callable symbols too.
 Check the project's dependency declaration and environment. Say when a chosen library is
 not installed. Get permission before adding it through the project's dependency manager.
 Never install silently, and do not treat successful discovery as proof of installation.
-The sandbox cannot write files or ask an LLM to choose. Write the files with the agent's
-normal editing tools before execute. One execute call repeats discovery and checks that
-written choice, then checks code and runs the pipeline stages. It does not generate code.
 
-1. Call the `{ToolName.PROFILE}` tool on {data}. Choose the steps from the real dtypes, nulls \
-and distinct
+1. Run `xpd profile {data}`. Choose the steps from the real dtypes, nulls and distinct
    values. The target must have no nulls.
 2. Write features.py. It holds the features that read one row at a time, as step code: each
    step returns `frame.assign(...)`, and one function runs them as `frame.pipe(a).pipe(b)`.
@@ -217,8 +144,9 @@ and distinct
      rounding. Then fit it on the training rows and score the held out rows once.
      Choose no setting by that score.
    - Record the full discovery question, inspected candidates and choice with its reason
-     as `discovery` in the contract. Use the same values passed to discovery_gate. They are
-     the planning input for the split, preprocessing and model stages.
+     as `discovery` in the contract. Use the same values passed to
+     `{ToolName.DISCOVERY_GATE}`. They are the planning input for the split, preprocessing and
+     model stages.
    - Save the Pipeline with joblib to model/model.joblib, and save model/contract.json in
      the shape below.
    - List features.py under `code` in the contract's `model`. The saved Pipeline holds the
@@ -233,11 +161,14 @@ and distinct
    scikit-learn is another version, or when a file under `code` is missing. It repeats the
    split from the contract, loads the model, and leaves the same in `result` as train.py
    does.
-5. Run discovery_gate and check before any equiv call. Stop on a failed gate or lint error.
-   Run the stages. With code mode on, call `execute` once with the script below. Without it,
-   call the same tools in the same order.
-6. The run is done when `passed` is true. For a gate that failed, read its `detail`, fix the
-   scripts and run the stages again. Never edit the contract by hand.
+5. Call `{ToolName.DISCOVERY_GATE}` with the three scripts as paths and the discovery record:
+   the question as `{{"task": "{found}"}}`, the candidates you read, and the choice with its
+   name, reason and symbols. Stop and fix the scripts when its gate fails.
+6. Call `{ToolName.GATES}` with the contract model/contract.json, the scripts train.py,
+   predict.py and features.py, and the result of `{ToolName.DISCOVERY_GATE}` as `discovery`.
+   It runs the stages itself. The run is done when `passed` is true. For a gate that failed,
+   read its `detail`, fix the scripts and call `{ToolName.GATES}` again. Never edit the
+   contract by hand.
 7. Refit checks the saved model against raw training rows. Review choices across separate
    runs and raw columns that stand in for the target, since those need other evidence.
 
@@ -262,10 +193,4 @@ The contract, with the values of the run in place of these:
     "code": ["features.py"]
   }}
 }}
-```
-
-The script for `execute`:
-
-```python
-{script}
 ```"""

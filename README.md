@@ -213,10 +213,10 @@ or skfolio installed in the native runtime.
 | You want | Do | Guide |
 | --- | --- | --- |
 | An agent to see the issues of each file it edits, and to keep working while one has an error or a warning | Install the plugin, or add `xpd hook` to the agent's hooks | [Claude Code and other agents](https://bjoernaagaard.github.io/xpd/guides/claude-code/) |
-| An agent to call xpd's tools | `claude mcp add xpd -- uvx xpd mcp` | [Connect an agent with MCP](https://bjoernaagaard.github.io/xpd/guides/mcp/) |
+| An agent to draw results, judge a model run and render animations | `claude mcp add xpd -- uvx xpd mcp` | [Connect an agent with MCP](https://bjoernaagaard.github.io/xpd/guides/mcp/) |
 | The hook, the MCP server and the skills in one step | Install this repository as a plugin in Claude Code or Codex | [Agent plugin](https://bjoernaagaard.github.io/xpd/guides/claude-code/#agent-plugin) |
 | An agent to know when to run each command | `npx skills add bjoernaagaard/xpd` | [Agent skill](https://bjoernaagaard.github.io/xpd/guides/claude-code/#agent-skill) |
-| An agent to train a scikit-learn model with checks | `xpd mcp --code-mode` | [Train a model in code mode](https://bjoernaagaard.github.io/xpd/guides/code-mode/) |
+| An agent to train a scikit-learn model with checks | The `gates` tool of `xpd mcp` | [Train a model with gates](https://bjoernaagaard.github.io/xpd/guides/gates/) |
 | Issues, fixes and rule help in your editor | Start `xpd lsp` from the editor | [Use xpd in an editor](https://bjoernaagaard.github.io/xpd/guides/editors/) |
 | A rule for your own project | `xpd rules new rule` | [Write a rule](https://bjoernaagaard.github.io/xpd/guides/write-a-rule/) |
 

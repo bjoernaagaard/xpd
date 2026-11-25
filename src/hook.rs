@@ -460,7 +460,7 @@ fn user_prompt(cwd: &Path, prompt: &str) -> Result<ExitCode> {
     let chart = chart_prompt(prompt);
     if chart {
         text.push(
-            "Chart task: run `xpd chart-review <file>` (MCP tool `chart_review`) on each file \
+            "Chart task: run `xpd chart-review <file>` on each file \
              that draws the chart. It lists the plotly rules that fire and the questions from \
              Tufte's book for each chart, in plotly or any other library, with the plotly route. \
              Add `--run <adapter.py>` to measure the drawn figure. For a new chart, \
@@ -471,7 +471,7 @@ fn user_prompt(cwd: &Path, prompt: &str) -> Result<ExitCode> {
     }
     text.extend(data_files(&cwd, prompt).iter().map(|file| {
         format!(
-            "Data file task: `xpd profile {file}` (MCP tool `profile`) prints the type, the \
+            "Data file task: `xpd profile {file}` prints the type, the \
              missing values and the number of distinct values of each column of {file}, with \
              findings on its shape. It comes before the choice of a method and before code that \
              reads the file."
@@ -479,7 +479,7 @@ fn user_prompt(cwd: &Path, prompt: &str) -> Result<ExitCode> {
     }));
     if untangle_prompt(prompt) {
         text.push(
-            "Codebase refactor task: `xpd untangle` (MCP tool `untangle`) reads the files and \
+            "Codebase refactor task: `xpd untangle` reads the files and \
              the git history and lists the places where the code gets wrong which pieces change \
              together: copies, files that change in the same commits, import cycles, unused \
              definitions and special cases, each with its evidence. The count of each kind \

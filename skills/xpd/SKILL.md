@@ -25,7 +25,7 @@ Use `xpd` whenever you write or change Python code.
   instead of writing `frame["x"] = ...`, and follow the plotly pack in a chart.
   The hook also prints a brief of the project when a session starts, and the playbook that
   answers a prompt. Read that playbook with `xpd api` before you write the code.
-- `xpd chart-review <file> --format json` or MCP `chart_review`: run it whenever you make,
+- `xpd chart-review <file> --format json`: run it whenever you make,
   change or review a chart, in plotly, Dash, matplotlib, seaborn, pandas or any other library,
   also when the chart is one part of a larger task. It lists each chart with its kind and the
   plotly call that draws it, the plotly rules that fire, and the questions of Tufte's book that
@@ -44,8 +44,8 @@ Use `xpd` whenever you write or change Python code.
   frame pipeline, `feature-module` for model features, `linear-script` for a script that
   changes a frame line by line, and `plotly-chart` for a figure. `xpd api xpd/recipe/<name>`
   prints one.
-  In code mode, read these lists directly. Record inspected candidates in the same grouped
-  shape. A symbol read directly through `api` counts as a candidate when recorded there.
+  For a model run, record the inspected candidates in the same grouped shape. A symbol read
+  directly through `xpd api` counts as a candidate when recorded there.
   `xpd api <dotted.name>` reads a result with its guarding rules and with each parameter as
   the source writes it, so it shows the type annotation and the default. A stub file writes
   `...` for a default, which says only that the parameter is optional. Read a method with
@@ -99,11 +99,8 @@ Use `xpd` whenever you write or change Python code.
   training rows and compare outputs and scores with the contract. Needs pandas
   and scikit-learn.
 
-When the xpd MCP server is connected, call its tools instead of the shell commands.
-`check`, `fix`, `graph`, `untangle`, `profile`, `equiv`, `refit`, `find` and `api` match the commands
-of the same names, and `fix` is `check --fix`. `outline`, `new` and `test` match
-`xpd rules outline`, `xpd rules new` and `xpd rules test`. `query` and
-`rewrite` are `xpd rules run` without and with a replacement. They take the same paths and
-return the same JSON. `rules` lists the rules without their documentation, and `rule`
-returns one rule with it. `discovery_gate`, `contract` and `gates` judge a run from a
-data file to a saved model.
+The xpd MCP server holds only what a shell command cannot be, so run the commands above in
+the shell also when the server is connected. Its `discovery_gate`, `contract` and `gates` tools
+judge a run from a data file to a saved model, and `gates` runs the stages itself. Its three
+`show_` tools draw what `xpd check`, `xpd graph` and `xpd profile` find, in a host that renders
+apps.

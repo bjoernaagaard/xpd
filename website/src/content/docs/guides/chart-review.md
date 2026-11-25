@@ -8,8 +8,7 @@ sidebar:
 The plotly rules apply Edward Tufte's book "The Visual Display of Quantitative Information",
 second edition, to plotly code. Much of the book is about what the code of a figure does not
 show, such as whether money is deflated or whether a change is shown with the years around it.
-`xpd chart-review` covers the whole book for each chart of a file. It is one entry point, on the
-command line and as the MCP tool `chart_review`, and both print the same findings.
+`xpd chart-review` covers the whole book for each chart of a file.
 
 | It prints | From |
 | --- | --- |
@@ -28,10 +27,10 @@ project of any language. The agent then runs the review on each file that draws 
 
 ```console
 $ echo '{"cwd":"/tmp/project","hook_event_name":"UserPromptSubmit","prompt":"review the charts in my dashboard"}' | xpd hook
-Chart task: run `xpd chart-review <file>` (MCP tool `chart_review`) on each file that draws the chart. It lists the plotly rules that fire and the questions from Tufte's book for each chart, in plotly or any other library, with the plotly route. Add `--run <adapter.py>` to measure the drawn figure. For a new chart, `xpd api xpd/recipe/plotly-chart` prints the plotly-chart playbook, which names the same command.
+Chart task: run `xpd chart-review <file>` on each file that draws the chart. It lists the plotly rules that fire and the questions from Tufte's book for each chart, in plotly or any other library, with the plotly route. Add `--run <adapter.py>` to measure the drawn figure. For a new chart, `xpd api xpd/recipe/plotly-chart` prints the plotly-chart playbook, which names the same command.
 ```
 
-1. Run `xpd chart-review <file>`, or call `chart_review` with `{"path": "<file>"}`.
+1. Run `xpd chart-review <file>`.
 2. Fix each plotly rule that fires.
 3. Answer each question from the chart and its data, and change the chart where the answer is no.
 4. Redraw a chart of another library with its plotly route, unless the user keeps the library.
