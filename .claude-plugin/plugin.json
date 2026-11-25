@@ -1,6 +1,6 @@
 {
   "name": "xpd",
-  "version": "0.47.2",
+  "version": "0.48.0",
   "description": "Lints Python that uses pandas, NumPy, SciPy, scikit-learn, scikit-lego, MAPIE, Category Encoders, linearmodels, arch, pymoo, plotly or Apache Hamilton for slow operations and wrong results, after each edit and through MCP tools.",
   "author": {
     "name": "Bjørn Aagaard",
