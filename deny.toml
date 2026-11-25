@@ -5,6 +5,7 @@ all-features = true
 
 [advisories]
 yanked = "deny"
+unused-ignored-advisory = "deny"
 ignore = [
     { id = "RUSTSEC-2021-0139", reason = "ast-grep terminal colors; unmaintained-only advisory" },
     { id = "RUSTSEC-2024-0436", reason = "libcst compile-time macro; unmaintained-only advisory" },
