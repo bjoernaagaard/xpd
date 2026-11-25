@@ -855,7 +855,7 @@ fn open_issues(project: &Path, files: &[PathBuf]) -> Result<String> {
     ));
     lines.push(
         "`xpd check . --format json` lists each issue with its file and line, and \
-         `xpd rules --rule <pack>/<rule>` explains a rule."
+         `xpd api <pack>/<rule>` explains a rule."
             .to_owned(),
     );
     Ok(lines.join("\n"))

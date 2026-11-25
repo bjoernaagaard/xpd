@@ -1,4 +1,4 @@
-"""Trace order amounts to the dashboard with xpd impact."""
+"""Trace order amounts to the dashboard with xpd graph impact."""
 
 import pandas as pd
 

@@ -191,7 +191,7 @@ those modes, and `hook` records session state in xpd's cache folder.
 
 ### Plan a pandas migration
 
-`xpd map features.py --entry add_features --from pandas --to polars` reads the
+`xpd graph map features.py --entry add_features --from pandas --to polars` reads the
 source and proposes native Polars operations. It shows the stages, observed
 columns and behavior that needs more evidence. Use `--format json` for a
 structured report. Exit 0 means the plan has no unresolved items, 1 means

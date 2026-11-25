@@ -1,9 +1,9 @@
-Use `xpd impact` to trace a proposed change from a column or transformation
+Use `xpd graph impact` to trace a proposed change from a column or transformation
 to the outputs and callers that need checking. It reads Python source without
 running it.
 
 Name the pipeline with `--entry`. Use `--column` for an observed input or
-produced column, or `--transformation` for a step named by [`xpd graph`](../graph/).
+produced column, or `--transformation` for a step named by [`xpd graph`](../).
 The report gives the producer and dependency path for each affected output.
 It lists direct callers in the file with the source lines where they use those
 outputs and a case to verify. Dynamic lookups and callers outside the file
@@ -16,7 +16,7 @@ The audit reads only `order_id`. The dashboard can also select a column at
 runtime, so the report flags that lookup.
 
 ```console
-$ xpd impact samples/graph/impact.py --entry features --column net_amount --format text
+$ xpd graph impact samples/graph/impact.py --entry features --column net_amount --format text
 samples/graph/impact.py:19: impact of column "net_amount" in features()
 ...
 Output "share": totals [net_amount] (samples/graph/impact.py:7) -> shares [customer_share] (samples/graph/impact.py:12) -> publish_names [share] (samples/graph/impact.py:16)
@@ -35,7 +35,7 @@ on one row. The dashboard's `share` goes from 50 to 20. The audit reads only
 which reads may change. Run the callers to check the actual values.
 
 ```console
-$ xpd impact samples/graph/impact.py --entry inline_features --column net_amount --format text
+$ xpd graph impact samples/graph/impact.py --entry inline_features --column net_amount --format text
 samples/graph/impact.py:34: impact of column "net_amount" in inline_features()
 samples/graph/impact.py:36: producer .assign(net_amount) [net_amount]
 Output "renamed": .assign(net_amount) [net_amount] (samples/graph/impact.py:36) -> .rename [renamed] (samples/graph/impact.py:37)
@@ -63,7 +63,7 @@ def dashboard(orders):
 ```
 
 ```console
-$ xpd impact branch_rename.py --entry publish --transformation publish --format text
+$ xpd graph impact branch_rename.py --entry publish --transformation publish --format text
 branch_rename.py:1: impact of transformation "publish" in publish()
 branch_rename.py:3: producer publish [share]
 Output "share": publish [share] (branch_rename.py:3)

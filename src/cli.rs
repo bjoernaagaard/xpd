@@ -205,6 +205,15 @@ struct FixArgs {
     unsafe_fixes: bool,
 }
 
+/// What `xpd graph` does in place of printing the dataflow.
+#[derive(Debug, Subcommand)]
+enum GraphCommand {
+    /// Trace a pipeline column or transformation to outputs and callers without running Python.
+    Impact(ImpactArgs),
+    /// Plan a pandas-to-Polars or eager-to-lazy Polars rewrite without running Python.
+    Map(MapArgs),
+}
+
 #[derive(Debug, Subcommand)]
 enum Cmd {
     /// Find libraries and rules for a task, without importing Python.
@@ -297,10 +306,6 @@ enum Cmd {
         #[arg(long)]
         contract: Option<PathBuf>,
     },
-    /// Plan a pandas-to-Polars or eager-to-lazy Polars rewrite without running Python.
-    Map(MapArgs),
-    /// Trace a pipeline column or transformation to outputs and callers without running Python.
-    Impact(ImpactArgs),
     /// Preview and render editable Manim animations.
     #[command(subcommand)]
     Animate(crate::animate::Animation),
@@ -316,10 +321,21 @@ enum Cmd {
     /// `frame.pipe(a).pipe(b)`, is read as step code. The other files are read as the Hamilton
     /// modules of one Driver. Nothing is imported or run. Exit 1 when the code would raise or
     /// Python drops a function, 2 if xpd can't run.
-    #[command(after_long_help = "Examples:
+    ///
+    /// `impact` and `map` read one pipeline of the same kind, to trace a change through it or
+    /// to plan its rewrite in Polars. Write `./impact` or `./map` for a path of that name.
+    #[command(
+        args_conflicts_with_subcommands = true,
+        subcommand_negates_reqs = true,
+        after_long_help = "Examples:
   xpd graph features.py
-  xpd graph loaders.py features.py --format json")]
+  xpd graph loaders.py features.py --format json
+  xpd graph impact features.py --entry features --column net_amount
+  xpd graph map features.py --entry add_features --from pandas --to polars"
+    )]
     Graph {
+        #[command(subcommand)]
+        command: Option<GraphCommand>,
         /// Files or directories (directories respect .gitignore).
         #[arg(required = true)]
         paths: Vec<PathBuf>,
@@ -449,9 +465,19 @@ pub fn run() -> ExitCode {
         })()),
         Cmd::Index(args) => unit_result(refresh_index(args)),
         Cmd::Hook => crate::hook::run(),
-        Cmd::Graph { paths, format } => {
-            command_result(graph(&paths, format.unwrap_or(default_format)))
-        }
+        Cmd::Graph {
+            command: Some(GraphCommand::Impact(args)),
+            ..
+        } => unit_result(args.run(default_format)),
+        Cmd::Graph {
+            command: Some(GraphCommand::Map(args)),
+            ..
+        } => command_result(args.run(default_format)),
+        Cmd::Graph {
+            command: None,
+            paths,
+            format,
+        } => command_result(graph(&paths, format.unwrap_or(default_format))),
         Cmd::ChartReview(args) => command_result(args.run(default_format)),
         Cmd::Untangle(args) => command_result(args.run(default_format)),
         Cmd::Profile { file } => run_py(PROFILE_PY, &[file]),
@@ -461,8 +487,6 @@ pub fn run() -> ExitCode {
             since,
             contract,
         } => command_result(equiv(&scripts, since.as_deref(), contract)),
-        Cmd::Map(args) => command_result(args.run(default_format)),
-        Cmd::Impact(args) => unit_result(args.run(default_format)),
         Cmd::Animate(command) => command_result(command.run()),
         Cmd::Rules(options) => command_result(rules(options, default_format)),
         Cmd::Doctor {

@@ -1,4 +1,4 @@
-Use `xpd map` to plan a native Polars reimplementation of a named pandas
+Use `xpd graph map` to plan a native Polars reimplementation of a named pandas
 pipeline or to plan an eager-to-lazy rewrite of a Polars pipeline. It reads
 the Python source without importing or running it.
 
@@ -9,7 +9,7 @@ observable writes that need attention before the rewrite.
 
 Supply `--contract` to declare ordered input and output schemas,
 positional row identity and the output materialization boundary. The
-[comparison contract](../equiv/) also tells `xpd equiv` how to compare
+[comparison contract](../../equiv/) also tells `xpd equiv` how to compare
 the native Polars result with the original pandas result on the same
 data. `map` checks observed column names against the declared schemas.
 `equiv` verifies the actual returned columns, order, types and values.
@@ -18,7 +18,7 @@ A complete plan still needs that comparison.
 ## Example
 
 ```console
-$ xpd map samples/pipeline/features.py --entry add_features --from pandas --to polars --format text
+$ xpd graph map samples/pipeline/features.py --entry add_features --from pandas --to polars --format text
 samples/pipeline/features.py:28: add_features (pandas to polars, partial)
 Observed input columns: bill_depth_mm, bill_length_mm, body_mass_g, flipper_length_mm
 ...
@@ -33,7 +33,7 @@ adapters and unresolved calls to check. The pandas `--contract` option applies
 only to the pandas pair.
 
 ```sh
-xpd map examples/skfolio-migration/replay.py --entry main --from skfolio --to polars --format text
+xpd graph map examples/skfolio-migration/replay.py --entry main --from skfolio --to polars --format text
 uv run --no-project examples/skfolio-migration/replay.py
 ```
 
@@ -68,12 +68,12 @@ def dynamic_projection(path, columns):
 ```
 
 ```console
-$ xpd map readings.py --entry eager --from polars --to polars --format text
+$ xpd graph map readings.py --entry eager --from polars --to polars --format text
 readings.py:4: eager (polars to polars, complete)
 ...
 6: proposed [materialization] Collect once at the return to preserve the DataFrame result.
 ...
-$ xpd map readings.py --entry dynamic_projection --from polars --to polars --format json
+$ xpd graph map readings.py --entry dynamic_projection --from polars --to polars --format json
 ...
   "status": "partial",
 ...
