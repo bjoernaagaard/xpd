@@ -10,6 +10,7 @@ class ToolName(StrEnum):
     EQUIV = auto()
     CHECK = auto()
     CHART_REVIEW = auto()
+    UNTANGLE = auto()
     FIX = auto()
     QUERY = auto()
     REWRITE = auto()

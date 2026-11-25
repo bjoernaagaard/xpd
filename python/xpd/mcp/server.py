@@ -61,6 +61,9 @@ draw a chart of another library with its plotly route.
 `{ToolName.REWRITE}` to apply them after \
 confirmation. Use `{ToolName.OUTLINE}` to browse project symbols, imports and members in \
 supported languages.
+- Before and after a refactor of a codebase, call `{ToolName.UNTANGLE}`. It counts copies, \
+files that change together, import cycles, unused definitions and special cases, and the \
+counts measure how far the refactor is.
 - Use `{ToolName.NEW}` to create a local rule project, rule, empty case template or shared utility.
 - To learn why a rule fires and see its before and after code, call `{ToolName.RULE}`. \
 `{ToolName.RULES}` lists and \

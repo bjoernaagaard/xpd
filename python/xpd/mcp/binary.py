@@ -25,6 +25,7 @@ from xpd.mcp.models import (
     DiscoveryMatches,
     Equivalence,
     GraphReport,
+    Ledger,
     OutlineFile,
     Profile,
     Refit,
@@ -51,6 +52,7 @@ CHECK = Command(("check", "--format", "json"), TypeAdapter(CheckReport).validate
 CHART_REVIEW = Command(
     ("chart-review", "--format", "json"), TypeAdapter(ChartReview).validate_json, SUCCESS
 )
+UNTANGLE = Command(("untangle", "--format", "json"), TypeAdapter(Ledger).validate_json, SUCCESS)
 QUERY = Command(
     ("rules", "run", "--format", "json"), TypeAdapter(list[CodeMatch]).validate_json, FINDINGS
 )

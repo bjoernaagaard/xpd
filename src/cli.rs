@@ -343,6 +343,7 @@ enum Cmd {
   xpd chart-review app.py --run chart_figures.py --format json
   xpd chart-review --questions")]
     ChartReview(crate::chart_review::ChartReviewArgs),
+    Untangle(crate::untangle::UntangleArgs),
     /// List every rule and package check, or write, test and try rules of your own.
     ///
     /// Without a command, it lists every rule with its severity, fix and documentation.
@@ -452,6 +453,7 @@ pub fn run() -> ExitCode {
             command_result(graph(&paths, format.unwrap_or(default_format)))
         }
         Cmd::ChartReview(args) => command_result(args.run(default_format)),
+        Cmd::Untangle(args) => command_result(args.run(default_format)),
         Cmd::Profile { file } => run_py(PROFILE_PY, &[file]),
         Cmd::Refit { contract } => run_py(REFIT_PY, &[contract]),
         Cmd::Equiv {

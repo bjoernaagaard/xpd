@@ -5,7 +5,7 @@ stdin, and xpd reads the event's name from `hook_event_name`. The
 | Event | What xpd does |
 | --- | --- |
 | `SessionStart` | Records the commit that is checked out and the project's drift from its profile, and prints a brief of the project for the agent |
-| `UserPromptSubmit` | Points a chart prompt to [`xpd chart-review`](../chart-review/), a prompt that names a data file to [`xpd profile`](../profile/) and a refactor prompt to [`xpd equiv`](../equiv/), and prints the playbook that answers the prompt, or the open issues of the project when the prompt asks what to improve |
+| `UserPromptSubmit` | Points a chart prompt to [`xpd chart-review`](../chart-review/), a prompt that names a data file to [`xpd profile`](../profile/) a prompt about the structure of a codebase to [`xpd untangle`](../untangle/) and a refactor prompt to [`xpd equiv`](../equiv/), and prints the playbook that answers the prompt, or the open issues of the project when the prompt asks what to improve |
 | `PostToolUse` | Lints the files that the edit changed, so the agent sees their issues |
 | `Stop` | Lints the Python files that the session changed, and holds the turn while one has an error or a warning, or while the session moved the project away from its profile |
 
@@ -58,6 +58,8 @@ on(UserPromptSubmit)
     print the chart line     # names xpd chart-review and the MCP tool chart_review
   for each data file that the prompt names and the project holds
     print the data file line # names xpd profile with the path of the file
+  if the prompt is about the structure of a codebase
+    print the untangle line  # names xpd untangle and the xpd-untangle skill
   if the prompt is about a chart, or the project has no Python file
     stop
   if the prompt asks for a refactor
@@ -78,6 +80,11 @@ A prompt names a data file when one of its words is the path of a `.csv`, `.parq
 or `.xlsx` file that exists, and xpd prints the line for the first three. A `.json` file gets no
 line, because a JSON file in a prompt is most often a settings file.
 
+A prompt is about the structure of a codebase when it holds a word such as untangle, restructure,
+decouple, architecture, spaghetti or duplication, or "dead code" or "technical debt". Refactor,
+clean, simplify and reorganize count only beside a word for the whole, such as codebase, repo,
+project or modules, so "refactor this function" gets no untangle line.
+
 A prompt asks for a refactor when it holds a word such as refactor, rewrite, vectorize, optimize or
 simplify, the Danish omskriv or refaktorer, or "speed up". Port, convert, migrate and move count
 only beside pandas, Polars, NumPy, DuckDB or PyArrow, so "open the port" gets no refactor line.
@@ -92,6 +99,8 @@ improve, optimize or make the code better.
 | "gennemgå graferne i mit dashboard" | The chart line |
 | "what is in sales.csv?" | The data file line with `xpd profile sales.csv` |
 | "chart the columns of sales.csv" | The chart line and the data file line |
+| "untangle this codebase" | The untangle line |
+| "refactor the whole project" | The untangle line and the refactor line |
 | "refactor report.py so it has no row loop" | The refactor line |
 | "port report.py to polars" | The refactor line |
 | "build a robust pandas pipeline for feature engineering" | The playbook `xpd/recipe/pandas-pipeline` |

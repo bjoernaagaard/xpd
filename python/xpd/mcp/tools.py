@@ -10,12 +10,13 @@ from mcp.types import (
 
 from xpd.mcp.base import READS, RUNS_CODE, WRITES, confirmed, rooted, run
 from xpd.mcp.base import run as xpd_run
-from xpd.mcp.binary import CHART_REVIEW, CHECK, EQUIV, GRAPH, PROFILE, REFIT, Xpd
+from xpd.mcp.binary import CHART_REVIEW, CHECK, EQUIV, GRAPH, PROFILE, REFIT, UNTANGLE, Xpd
 from xpd.mcp.models import (
     ChartReview,
     CheckReport,
     Equivalence,
     GraphReport,
+    Ledger,
     Profile,
     Refit,
 )
@@ -97,6 +98,38 @@ class Analysis(NamedTuple):
         """
         root = await self.project.required_root(ctx)
         return await run(ctx, self.xpd, GRAPH, root, root.all_inside(paths))
+
+    @rooted
+    async def untangle(
+        self,
+        ctx: Context,
+        paths: list[str] | None = None,
+        kinds: list[str] | None = None,
+        limit: int = 20,
+        since: str | None = None,
+    ) -> Ledger | InputRequiredResult:
+        """List the places where the code gets wrong which pieces change together, read from
+        the files and the git history without running anything. Changes no file.
+
+        Run it before a refactor of a codebase and after each round of it. `summary` counts each
+        kind in four groups: hidden links, needless links, surplus and special cases. `findings`
+        holds the strongest of each kind with its places and the evidence. Copies and files that
+        change together are found in every language, and the rest is read from Python. Judge
+        each finding against the code, since a count is evidence and not a verdict.
+
+        Args:
+            paths: Files or folders inside the project root. Default: the whole root.
+            kinds: List only these kinds, such as `copy` or `import-cycle`.
+            limit: The most findings to list of each kind. 0 lists every finding.
+            since: A commit whose counts are returned as `was` beside the counts of today.
+        """
+        root = await self.project.required_root(ctx)
+        flags = ["--limit", str(limit)]
+        if kinds:
+            flags += ["--kind", ",".join(kinds)]
+        if since is not None:
+            flags += ["--since", since]
+        return await run(ctx, self.xpd, UNTANGLE, root, root.all_inside(paths or ["."]), *flags)
 
     @rooted
     async def profile(self, ctx: Context, file: str) -> Profile | InputRequiredResult:
@@ -194,6 +227,10 @@ def register_lint(mcp: FastMCP, xpd: Xpd, project: Project, analysis: Analysis) 
 
 def register_data(mcp: FastMCP, xpd: Xpd, project: Project, analysis: Analysis) -> None:
     mcp.tool(name=ToolName.GRAPH, tags={"dataflow"}, annotations=READS)(analysis.graph)
+
+    mcp.tool(name=ToolName.UNTANGLE, tags={"structure"}, annotations=READS, task=True)(
+        analysis.untangle
+    )
 
     mcp.tool(name=ToolName.PROFILE, tags={"data"}, annotations=READS, task=True)(analysis.profile)
 

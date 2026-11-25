@@ -12,6 +12,7 @@ python-best-practices
 python-review
 xpd
 xpd-animate
+xpd-untangle
 ```
 
 ## Exit status

@@ -54,6 +54,10 @@ One rule's documentation as Markdown, the same text as its [rule page](../../rul
 
 The offline animation workflow and its editable Manim recipes.
 
+## skill://xpd-untangle/
+
+The steps of a refactor of a whole codebase, which [`untangle`](../tools/untangle/) measures.
+
 ## xpd://animation/{job_id}/video.mp4
 
 The video of a local preview or final render.

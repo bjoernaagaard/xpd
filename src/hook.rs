@@ -10,7 +10,7 @@ use std::collections::{BTreeMap, HashSet};
 use std::fs;
 use std::io::{self, Read, Write};
 use std::path::{Path, PathBuf};
-use std::process::{Command, ExitCode, Stdio};
+use std::process::ExitCode;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use crate::severity::Severity;
@@ -22,6 +22,7 @@ use serde_json::{Value, json};
 use crate::catalog::Filters;
 use crate::embed;
 use crate::fix_safety::Applicability;
+use crate::git;
 use crate::graph::Graph;
 use crate::index;
 use crate::report::Issue;
@@ -440,8 +441,8 @@ fn placed(read: &[(&PathBuf, Census)], count: impl Fn(&Census) -> usize) -> Stri
     )
 }
 
-/// Offers the offline animation guide, the chart review and the profile of a data file even
-/// before a project has Python files. In Python projects, also routes a refactor, other
+/// Offers the offline animation guide, the chart review, the profile of a data file and the
+/// ledger of a codebase refactor even before a project has Python files. In Python projects, also routes a refactor, other
 /// playbooks and requests for open issues. A chart prompt gets no playbook, because the chart
 /// line names its own.
 fn user_prompt(cwd: &Path, prompt: &str) -> Result<ExitCode> {
@@ -476,6 +477,17 @@ fn user_prompt(cwd: &Path, prompt: &str) -> Result<ExitCode> {
              reads the file."
         )
     }));
+    if untangle_prompt(prompt) {
+        text.push(
+            "Codebase refactor task: `xpd untangle` (MCP tool `untangle`) reads the files and \
+             the git history and lists the places where the code gets wrong which pieces change \
+             together: copies, files that change in the same commits, import cycles, unused \
+             definitions and special cases, each with its evidence. The count of each kind \
+             measures the refactor, and `xpd untangle --since <commit>` prints the count at \
+             that commit beside the count of today. The `xpd-untangle` skill holds the steps."
+                .to_owned(),
+        );
+    }
     if !chart && !project_files(&cwd, 1).is_empty() {
         if refactor_prompt(prompt) {
             text.push(
@@ -571,6 +583,60 @@ fn refactor_prompt(prompt: &str) -> bool {
         .collect();
     let has = |list: &[&str]| words.iter().any(|word| list.contains(word));
     has(&STRONG) || (has(&WEAK) && has(&LIBRARIES)) || lowered.contains("speed up")
+}
+
+/// Whether `prompt` asks to change the structure of a codebase, in English or Danish. A word
+/// about structure routes alone. A word for a refactor routes only beside a word for the whole
+/// codebase, so "refactor this function" stays with the route for data logic.
+fn untangle_prompt(prompt: &str) -> bool {
+    const STRUCTURE: [&str; 14] = [
+        "untangle",
+        "untangling",
+        "restructure",
+        "restructuring",
+        "decouple",
+        "decoupling",
+        "architecture",
+        "spaghetti",
+        "duplication",
+        "omstrukturer",
+        "omstrukturere",
+        "omstrukturering",
+        "arkitektur",
+        "arkitekturen",
+    ];
+    const REFACTOR: [&str; 9] = [
+        "refactor",
+        "refactoring",
+        "clean",
+        "cleanup",
+        "simplify",
+        "reorganize",
+        "reorganise",
+        "refaktorer",
+        "oprydning",
+    ];
+    const WHOLE: [&str; 8] = [
+        "codebase",
+        "repo",
+        "repository",
+        "project",
+        "modules",
+        "kodebase",
+        "kodebasen",
+        "projektet",
+    ];
+    let lowered = prompt.to_lowercase();
+    let words: Vec<&str> = lowered
+        .split(|character: char| !character.is_alphanumeric())
+        .filter(|word| !word.is_empty())
+        .collect();
+    let has = |list: &[&str]| words.iter().any(|word| list.contains(word));
+    has(&STRUCTURE)
+        || (has(&REFACTOR) && has(&WHOLE))
+        || lowered.contains("dead code")
+        || lowered.contains("technical debt")
+        || lowered.contains("tech debt")
 }
 
 /// Whether `prompt` asks to make, change or review a chart, in any chart library. A strong word,
@@ -1014,11 +1080,11 @@ fn changed_files(here: &Path, records: &[Record]) -> Result<Vec<PathBuf>> {
 
 /// Tracked differences from `base` and untracked paths, both NUL-delimited.
 fn git_changes(top: &Path, base: &str) -> Result<(String, String)> {
-    let tracked = git_checked(
+    let tracked = git::output(
         top,
         &["diff", "--name-only", "-z", "--diff-filter=d", base, "--"],
     )?;
-    let untracked = git_checked(top, &["ls-files", "--others", "--exclude-standard", "-z"])?;
+    let untracked = git::output(top, &["ls-files", "--others", "--exclude-standard", "-z"])?;
     Ok((tracked, untracked))
 }
 
@@ -1035,7 +1101,7 @@ fn blob_ids<'a>(
     for batch in names.chunks(64) {
         let mut args = vec!["hash-object", "--no-filters", "--"];
         args.extend_from_slice(batch);
-        let hashes = git_checked(top, &args)?;
+        let hashes = git::output(top, &args)?;
         ids.extend(
             batch
                 .iter()
@@ -1122,30 +1188,10 @@ fn checked_out(top: &Path) -> Option<String> {
         .map(|name| name.trim().to_owned())
 }
 
-/// What `git` prints for `args` in `folder`, preserving spawn, status, and stderr details.
-fn git_checked(folder: &Path, args: &[&str]) -> Result<String> {
-    let output = Command::new("git")
-        .current_dir(folder)
-        .args(args)
-        .stdin(Stdio::null())
-        .output()
-        .with_context(|| format!("failed to run git {}", args.first().copied().unwrap_or("")))?;
-    if output.status.success() {
-        return Ok(String::from_utf8_lossy(&output.stdout).into_owned());
-    }
-    let stderr = String::from_utf8_lossy(&output.stderr);
-    let stderr = stderr.trim();
-    let subcommand = args.first().copied().unwrap_or("");
-    if stderr.is_empty() {
-        anyhow::bail!("git {subcommand} failed ({})", output.status);
-    }
-    anyhow::bail!("git {subcommand} failed ({}): {stderr}", output.status)
-}
-
 /// What `git` prints for `args` in `folder`. `None` when git cannot start or the command
 /// fails.
 fn git(folder: &Path, args: &[&str]) -> Option<String> {
-    git_checked(folder, args).ok()
+    git::output(folder, args).ok()
 }
 
 /// The time now, in seconds since 1970.

@@ -88,12 +88,19 @@ Use `xpd` whenever you write or change Python code.
 - `xpd rules run --pattern '<code>' <paths…> --json`: find code by its syntax, such as
   `'$X.iterrows()'`. Add `--rewrite '<code>'` to preview a replacement, and
   `--update-all` to write every match.
+- `xpd untangle <paths…> --format json`: the ledger of a codebase refactor, read from the
+  files and the git history without running anything. It counts copies, files that change
+  together, import cycles, unused definitions and special cases, each finding with its
+  places and evidence. Run it before a refactor of a codebase and after each round, and
+  add `--since <commit>` to see each count beside the count at that commit. Copies and files
+  that change together are found in every language, and the rest in Python. The
+  `xpd-untangle` skill holds the steps.
 - `xpd refit <contract.json>`: refit a saved scikit-learn Pipeline on its raw
   training rows and compare outputs and scores with the contract. Needs pandas
   and scikit-learn.
 
 When the xpd MCP server is connected, call its tools instead of the shell commands.
-`check`, `fix`, `graph`, `profile`, `equiv`, `refit`, `find` and `api` match the commands
+`check`, `fix`, `graph`, `untangle`, `profile`, `equiv`, `refit`, `find` and `api` match the commands
 of the same names, and `fix` is `check --fix`. `outline`, `new` and `test` match
 `xpd rules outline`, `xpd rules new` and `xpd rules test`. `query` and
 `rewrite` are `xpd rules run` without and with a replacement. They take the same paths and

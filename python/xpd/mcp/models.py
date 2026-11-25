@@ -97,6 +97,58 @@ class ChartReview(Output):
     )
 
 
+class LedgerPlace(Output):
+    """One place of a finding of `xpd untangle`."""
+
+    path: str
+    line: int | None = Field(default=None, description="Counted from 1. None for a whole file.")
+    end_line: int | None = Field(default=None, description="The last line of a copy.")
+
+
+class LedgerFinding(Output):
+    """One place where the code gets wrong which pieces change together."""
+
+    kind: str
+    places: list[LedgerPlace]
+    evidence: str = Field(description="What was measured, as one sentence.")
+
+
+class LedgerKind(Output):
+    kind: str
+    count: int
+    was: int | None = Field(default=None, description="With since: the count at that commit.")
+
+
+class LedgerGroup(Output):
+    """The count of one group: hidden-link, needless-link, surplus or special-case."""
+
+    group: str
+    count: int
+    was: int | None = None
+    kinds: list[LedgerKind]
+
+
+class LedgerSummary(Output):
+    count: int
+    was: int | None = None
+    groups: list[LedgerGroup]
+
+
+class LedgerRead(Output):
+    files: int
+    python: int
+    commits: int = Field(description="The commits of git history that were read. 0 without git.")
+
+
+class Ledger(Output):
+    """What `xpd untangle` found: every count, and the strongest findings of each kind."""
+
+    read: LedgerRead
+    since: str | None = None
+    summary: LedgerSummary
+    findings: list[LedgerFinding]
+
+
 class SourcePosition(Output):
     line: int
     column: int
