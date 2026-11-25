@@ -1,6 +1,7 @@
 """Builds the xpd MCP server from its settings, and runs it."""
 
 from collections.abc import Sequence
+from importlib.util import find_spec
 
 from fastmcp import FastMCP
 from fastmcp.experimental.transforms.code_mode import CodeMode
@@ -140,6 +141,13 @@ def main(argv: Sequence[str] | None = None) -> None:
         transport, _ = settings.validate_transport()
     except ValueError as error:
         raise SystemExit(str(error)) from error
+    if settings.code_mode and find_spec("pydantic_monty") is None:
+        message = (
+            "Code mode is not available on Windows on Arm, because pydantic-monty, "
+            "which runs it, has no wheel for that platform. Run xpd mcp without --code-mode "
+            "and without XPD_MCP_CODE_MODE."
+        )
+        raise SystemExit(message)
     mcp = build(settings)
     options = settings.transport_options() if transport != "stdio" else {}
     mcp.run(transport=transport, **options)
