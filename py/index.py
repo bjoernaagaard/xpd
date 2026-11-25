@@ -522,6 +522,25 @@ def entries(module: griffe.Module, callables: Callables) -> list[Entry]:
     return found
 
 
+def looping_link(root: Path) -> Path | None:
+    """Find a directory link that would make Griffe visit the same folders again.
+
+    Griffe 2.4.1 walks the tree with `followlinks=True`. A link loops when it resolves to a
+    folder that is the same as, or above, a folder the walk passed through to reach it. Every
+    other link is followed once, as Griffe follows it.
+    """
+    passed = {root: frozenset({root.resolve()})}
+    for folder, names, _files in os.walk(root, followlinks=True):
+        chain = passed[Path(folder)]
+        for name in names:
+            child = Path(folder) / name
+            real = child.resolve()
+            if child.is_symlink() and any(seen.is_relative_to(real) for seen in chain):
+                return child
+            passed[child] = chain | {real}
+    return None
+
+
 def main() -> None:
     source, package, version = sys.argv[1:]
     logging.getLogger("griffe").setLevel(logging.ERROR)
@@ -530,12 +549,11 @@ def main() -> None:
         root /= package
     elif (root / "src" / package).is_dir():
         root /= f"src/{package}"
-    for folder, names, _files in os.walk(root):
-        for name in names:
-            if (Path(folder) / name).is_symlink():
-                sys.exit(
-                    f"Index building does not follow the directory link {Path(folder) / name}."
-                )
+    if link := looping_link(root):
+        sys.exit(
+            f"Index building does not follow the directory link {link}, "
+            "because it leads back to a folder above it."
+        )
     callables = Callables()
     loader = Loader(callables, search_paths=[root.parent], allow_inspection=False)
     module = loader.load(root)
