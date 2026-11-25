@@ -379,6 +379,49 @@ pub(crate) fn ruff_verdict(root: &Path, text: &str, fetch: Fetch) -> Verdict {
     }
 }
 
+/// Whether the locked pytest of the project at `root` starts with the settings on disk. It runs
+/// `uv run --locked pytest --markers`, which loads each plugin that `addopts` names and reads
+/// each option, and imports no test module. `--help` would not do, because pytest prints its
+/// help before it rejects an option it does not know. uv syncs the project's environment first
+/// when it has to.
+pub(crate) fn pytest_verdict(root: &Path) -> Verdict {
+    let output = Command::new("uv")
+        .args(["run", "--locked", "--quiet", "pytest", "--markers"])
+        .args(["-p", "no:cacheprovider"])
+        .env("PYTHONDONTWRITEBYTECODE", "1")
+        .current_dir(root)
+        .stdin(Stdio::null())
+        .output();
+    let output = match output {
+        Ok(output) => output,
+        Err(error) => return Verdict::Unverified(format!("cannot run uv: {error}")),
+    };
+    if output.status.success() {
+        return Verdict::Accepts;
+    }
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    let lines: Vec<String> = stderr
+        .lines()
+        .map(str::trim)
+        .filter(|line| !line.is_empty())
+        .map(crate::output::hosts_only)
+        .collect();
+    let errors: Vec<&str> = lines
+        .iter()
+        .filter_map(|line| {
+            line.strip_prefix("ERROR:")
+                .or_else(|| line.strip_prefix("pytest: error:"))
+        })
+        .map(str::trim)
+        .filter(|line| !line.starts_with("usage:"))
+        .collect();
+    if errors.is_empty() {
+        Verdict::Unverified(lines.join(" "))
+    } else {
+        Verdict::Rejects(errors.join(" "))
+    }
+}
+
 /// The `[tool.ruff]` table of the `pyproject.toml` text `text` as the text of a `ruff.toml`,
 /// whose keys are those of `[tool.ruff]` at its top. Empty when the table is missing.
 fn ruff_table(text: &str) -> String {

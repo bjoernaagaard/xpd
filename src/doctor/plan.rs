@@ -877,6 +877,27 @@ impl Plan {
         }
     }
 
+    /// Runs the locked pytest of a project that matches the profile, and records a conflict when
+    /// pytest cannot start with the settings on disk, or the reason it could not run. A project
+    /// that drifts is not run, because its settings are about to change. Neither is a project
+    /// with no `uv.lock`, such as one of standalone scripts, which has no environment of its own.
+    pub(crate) fn check_pytest(&mut self, root: &Path) {
+        if self.drifts() || !root.join("uv.lock").is_file() {
+            return;
+        }
+        match validate::pytest_verdict(root) {
+            validate::Verdict::Accepts => {}
+            validate::Verdict::Rejects(cause) => self.conflict(
+                PYPROJECT,
+                None,
+                format!("pytest cannot start with the settings in {PYPROJECT}: {cause}"),
+            ),
+            validate::Verdict::Unverified(reason) => self.unverified.push(format!(
+                "doctor could not run pytest to check the [tool.pytest] settings: {reason}"
+            )),
+        }
+    }
+
     /// Marks each present lock that `uv lock --check` finds out of date as one to refresh. Apart
     /// from this step and [`Plan::check_tools`], the plan reads files only.
     ///

@@ -5,8 +5,9 @@
 //! doctor prints it with the conditional advice of `doctor/decisions.jsonl`, `--check` exits 1
 //! when the project drifts, and `--apply` writes the plan. Missing tools leave the conditional
 //! advice unverified locally. Computing the plan runs no tool. `--check` then runs uv on the
-//! lock files, and every mode runs the pinned Ruff on the settings when it is installed. Every
-//! line doctor prints has the credentials of each URL redacted.
+//! lock files and the locked pytest with `--markers`, and every mode runs the pinned Ruff on the
+//! settings when it is installed. Every line doctor prints has the credentials of each URL
+//! redacted.
 
 mod advice;
 mod apply;
@@ -86,6 +87,7 @@ fn report(format: Format, mode: Mode, kind: Option<&str>, out: &mut String) -> R
             let mut plan = plan::compute(&root, &catalog, &profile, &files, request)?;
             plan.check_tools(&root, validate::Fetch::Online);
             plan.check_locks(&root)?;
+            plan.check_pytest(&root);
             match format {
                 Format::Json => writeln!(out, "{}", serde_json::to_string_pretty(&plan)?)?,
                 Format::Text => out.push_str(&plan.to_text()),

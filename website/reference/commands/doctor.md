@@ -330,6 +330,8 @@ Apply keeps the prior content of each file it touches in the folder `.xpd-apply`
 
 `--check` runs `uv lock --check` for each lock that exists, so it needs uv.
 
+When the project matches the profile and has a `uv.lock`, `--check` also runs `uv run --locked pytest --markers`, which loads each plugin that `addopts` names and reads each option, and imports no test module. A plugin that is not installed or an option pytest does not know is a conflict, so `--check` exits 1. uv creates or syncs `.venv` for this run when it has to.
+
 Doctor checks the Ruff settings it would leave with Ruff 0.17.4 itself, so the answer is the same before and after `uv sync`. It runs the Ruff of the project's environment or of `PATH` when that is Ruff 0.17.4, and else `uv tool run --from ruff==0.17.4 ruff`, from uv's cache first, with `ruff --config` naming a copy of `[tool.ruff]` alone. `--check` and `--apply` fetch Ruff 0.17.4 from the index when the cache lacks it, and plain `xpd doctor` reads the cache only. When no route works, doctor lists the reason under `Unverified` and never says that the project matches. `--check` then exits 2, and `--apply` writes nothing.
 
 ## Stop hook
