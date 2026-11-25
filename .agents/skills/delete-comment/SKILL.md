@@ -1,6 +1,8 @@
 ---
 name: delete-comment
 description: Audit code comments in xpd and retire legacy allowances when removing or migrating a batch.
+metadata:
+  internal: true
 ---
 
 In Codex on this host, invoke `$xpd:delete-comment`. Run from the repository root. Use the named paths, or the whole repository when no paths are given.
