@@ -211,13 +211,19 @@ impl Graph {
         self.problems.iter().any(|p| p.level == Level::Error)
     }
 
-    /// The errors and warnings about step code, one line each, for the hook.
-    pub(crate) fn step_lines(src_path: &Path, src: &str) -> Vec<String> {
+    /// The errors and warnings about one file, one line each, for the hook: those of its step
+    /// code, and those of its Hamilton nodes when the file imports Hamilton. A problem that takes
+    /// the other modules of the Driver to see, such as a misspelled input, is left to
+    /// `xpd graph`.
+    pub(crate) fn edit_lines(src_path: &Path, src: &str) -> Vec<String> {
         let mut found: Vec<_> = steps::read(src)
             .into_iter()
             .flat_map(|pipeline| pipeline.findings)
-            .filter(|finding| finding.level != Level::Note)
             .collect();
+        if imports_hamilton(src) {
+            found.extend(nodes::read(src).findings);
+        }
+        found.retain(|finding| finding.level != Level::Note);
         found.sort_by_key(|f| (f.line, f.level));
         found
             .iter()

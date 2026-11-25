@@ -5,14 +5,14 @@ stdin, and xpd reads the event's name from `hook_event_name`. The
 | Event | What xpd does |
 | --- | --- |
 | `SessionStart` | Records the commit that is checked out and the project's drift from its profile, and prints a brief of the project for the agent |
-| `UserPromptSubmit` | Points a chart prompt to [`xpd chart-review`](../chart-review/), and otherwise prints the playbook that answers the prompt, or the open issues of the project when the prompt asks what to improve |
+| `UserPromptSubmit` | Points a chart prompt to [`xpd chart-review`](../chart-review/), a prompt that names a data file to [`xpd profile`](../profile/) and a refactor prompt to [`xpd equiv`](../equiv/), and prints the playbook that answers the prompt, or the open issues of the project when the prompt asks what to improve |
 | `PostToolUse` | Lints the files that the edit changed, so the agent sees their issues |
 | `Stop` | Lints the Python files that the session changed, and holds the turn while one has an error or a warning, or while the session moved the project away from its profile |
 
 The brief and the prompt answer are plain text on stdout, which Claude Code and Codex both add to
 what the agent reads. Each states what xpd found, and neither gives the agent an order. xpd prints
-them only in a project with a Python file, except the line for a chart prompt, which a project in
-any language gets. Each response is short.
+them only in a project with a Python file, except the lines for a chart prompt and for a data file,
+which a project in any language gets. Each response is short.
 
 ## When a session starts
 
@@ -32,7 +32,7 @@ Hamilton nodes that `xpd graph` reads: none.
 Three xpd commands fit between the edits of a session.
 - `xpd find "<task>"` ranks library symbols, rules and playbooks for a task, and it comes before the choice of a library or a method.
 - `xpd graph <file>` prints the dataflow of a file, and it comes after a step or a node is added, moved or renamed.
-- `xpd equiv old.py new.py` compares the result of two scripts, and a refactor of data logic is done when it prints {"equivalent": true}.
+- `xpd equiv <script.py> --since HEAD` compares the result of a script with the result of its committed version, and a refactor of data logic is done when it prints {"equivalent": true}. `xpd equiv old.py new.py` compares two scripts.
 ```
 
 | Line of the brief | Where xpd reads it |
@@ -55,15 +55,17 @@ to print as follows.
 ```text
 on(UserPromptSubmit)
   if the prompt is about a chart
-    print the chart line     # names xpd chart-review and the MCP tool chart_review, and stops
-  if the project has no Python file
-    print nothing
+    print the chart line     # names xpd chart-review and the MCP tool chart_review
+  for each data file that the prompt names and the project holds
+    print the data file line # names xpd profile with the path of the file
+  if the prompt is about a chart, or the project has no Python file
+    stop
+  if the prompt asks for a refactor
+    print the refactor line  # names xpd equiv <script.py> --since HEAD
   if the first recipe that find gives for the prompt is a playbook and clears the keyword threshold
     print the playbook       # its name, its commands in order, its rules and its name for xpd api
   if the prompt asks what to make or improve
     print the open issues    # counted by pack and severity, with the five rules that have the most
-  otherwise
-    print nothing
 ```
 
 A prompt is about a chart when it holds a word such as chart, graph, figure, visualization,
@@ -71,6 +73,14 @@ heatmap, pie, histogram, chartjunk or Tufte, or the Danish graf or figur, or two
 plot, plotly, matplotlib, seaborn, dash, axis and legend. Graph after a word such as dataflow,
 dependency or Hamilton, and figure in "figure out", are not about a chart, and plot alone is not,
 so "plot twist: the deploy failed" gets no chart line.
+
+A prompt names a data file when one of its words is the path of a `.csv`, `.parquet`, `.feather`
+or `.xlsx` file that exists, and xpd prints the line for the first three. A `.json` file gets no
+line, because a JSON file in a prompt is most often a settings file.
+
+A prompt asks for a refactor when it holds a word such as refactor, rewrite, vectorize, optimize or
+simplify, the Danish omskriv or refaktorer, or "speed up". Port, convert, migrate and move count
+only beside pandas, Polars, NumPy, DuckDB or PyArrow, so "open the port" gets no refactor line.
 
 A [playbook](../find/#playbooks) is one of xpd's own recipes, which holds the house style for a
 kind of task. A prompt asks what to make or improve when it asks what to do next or asks to
@@ -80,6 +90,10 @@ improve, optimize or make the code better.
 | --- | --- |
 | "improve my charts" | The chart line |
 | "gennemgå graferne i mit dashboard" | The chart line |
+| "what is in sales.csv?" | The data file line with `xpd profile sales.csv` |
+| "chart the columns of sales.csv" | The chart line and the data file line |
+| "refactor report.py so it has no row loop" | The refactor line |
+| "port report.py to polars" | The refactor line |
 | "build a robust pandas pipeline for feature engineering" | The playbook `xpd/recipe/pandas-pipeline` |
 | "make this linear" | The playbook `xpd/recipe/linear-script` |
 | "what should I make?" | The open issues |
@@ -98,7 +112,9 @@ the style setting of the project.
 
 On `PostToolUse`, xpd lints the `.py` files that the event changed. In a project with
 `sgconfig.yml`, it also lints the files that the project's rules are for. When a file holds a
-pipeline of steps, it also reports the errors and warnings of [`xpd graph`](../graph/).
+pipeline of steps or imports Hamilton, it also reports the errors and warnings that
+[`xpd graph`](../graph/) finds in that file. A problem that takes the other modules of a Hamilton
+Driver to see, such as a misspelled input, shows only in `xpd graph`.
 
 | Client | How the hook answers |
 | --- | --- |

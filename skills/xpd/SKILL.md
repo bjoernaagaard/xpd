@@ -64,9 +64,10 @@ Use `xpd` whenever you write or change Python code.
   choosing methods, so choices are based on the real data. Its `findings` name
   column names that hold values, which `melt` makes long, and text columns that
   suit `category`. Needs pandas.
-- `xpd equiv old.py new.py`: both scripts must assign `result`. Run it after
-  any refactor of data logic; a refactor isn't done until it prints
-  `"equivalent": true`. Needs pandas. The old script is the judge, so don't edit it to
+- `xpd equiv script.py --since HEAD`: compares a script you edited in place with
+  its committed version. `xpd equiv old.py new.py` compares two files. Each script
+  must assign `result`. Run it after any refactor of data logic; a refactor isn't
+  done until it prints `"equivalent": true`. Needs pandas. The old script is the judge, so don't edit it to
   make the two agree, and run both on real rows instead of a frame you typed in.
 - `xpd graph <files…> --format json`: the dataflow of a file, read without
   running it. Run it after you add, move or rename a step or a node. Fix every

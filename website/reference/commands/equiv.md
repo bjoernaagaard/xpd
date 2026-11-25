@@ -17,13 +17,24 @@ Each script runs in its own Python process of the project's Python, in the folde
 first. What a script prints goes to stderr, so stdout holds only the JSON. xpd gets each `result`
 back with Python's `pickle`, so it cannot be an object of a class that the script defines.
 
+## Compare with the committed script
+
+Add `--since <commit>` and name one script when you edited the script in place. xpd takes the
+script before the change from that git commit, writes it beside the script for the run, and
+removes it afterwards, so both versions find the same modules and data files.
+
+```console
+$ xpd equiv report.py --since HEAD
+{"equivalent": true}
+```
+
 ## Exit status
 
 | Exit code | Meaning |
 | --- | --- |
 | 0 | `{"equivalent": true}` |
 | 1 | The results differ, with the difference in `detail` |
-| 2 | A script failed, exited or left no `result` that pickle can save, or pandas is missing. The JSON has an `error` |
+| 2 | A script failed, exited or left no `result` that pickle can save, pandas is missing, or git has no such file in the commit of `--since`. The JSON has an `error`, except for the git case, which prints a line on stderr |
 
 ## Compare pandas and Polars
 

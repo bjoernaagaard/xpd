@@ -1,6 +1,7 @@
 //! The command line: its arguments, and what each command prints and exits with.
 
 use std::ffi::OsString;
+use std::fs;
 use std::io::{self, IsTerminal};
 use std::path::{Path, PathBuf};
 use std::process::{Command, ExitCode};
@@ -264,11 +265,20 @@ enum Cmd {
         file: PathBuf,
     },
     /// Check that two scripts produce an equal `result` (`DataFrame` or Series). Needs pandas.
+    ///
+    /// With `--since`, name one script, and xpd compares it with the version of the same file
+    /// in that git commit, so a script that was edited in place needs no second file.
+    #[command(
+        after_help = "Examples:\n  xpd equiv old.py new.py\n  xpd equiv report.py --since HEAD"
+    )]
     Equiv {
-        /// The script before the change. It must assign its output to `result`.
-        old: PathBuf,
-        /// The script after the change. It must assign its output to `result`.
-        new: PathBuf,
+        /// The script before the change and the script after it. With `--since`, the one script
+        /// after the change. Each must assign its output to `result`.
+        #[arg(required = true, num_args = 1..=2, value_name = "SCRIPT")]
+        scripts: Vec<PathBuf>,
+        /// Take the script before the change from this git commit, such as HEAD or main.
+        #[arg(long, value_name = "COMMIT")]
+        since: Option<String>,
         /// Compare a pandas and native Polars table using this migration contract.
         #[arg(long)]
         contract: Option<PathBuf>,
@@ -433,11 +443,11 @@ pub fn run() -> ExitCode {
         Cmd::Outline(args) => command_result(args.run()),
         Cmd::Profile { file } => run_py(PROFILE_PY, &[file]),
         Cmd::Refit { contract } => run_py(REFIT_PY, &[contract]),
-        Cmd::Equiv { old, new, contract } => {
-            let mut paths = vec![old, new];
-            paths.extend(contract);
-            run_py(EQUIV_PY, &paths)
-        }
+        Cmd::Equiv {
+            scripts,
+            since,
+            contract,
+        } => command_result(equiv(&scripts, since.as_deref(), contract)),
         Cmd::Map(args) => command_result(args.run(default_format)),
         Cmd::Impact(args) => unit_result(args.run(default_format)),
         Cmd::Animate(command) => command_result(command.run()),
@@ -836,6 +846,67 @@ fn graph(paths: &[PathBuf], format: Format) -> Result<ExitCode> {
         Ok(ExitCode::FAILURE)
     } else {
         Ok(ExitCode::SUCCESS)
+    }
+}
+
+/// Compares the `result` of two scripts, or of one script and its version in the commit
+/// `since`. That version is written beside the script for the run, so it finds the same
+/// modules and the same data files.
+fn equiv(scripts: &[PathBuf], since: Option<&str>, contract: Option<PathBuf>) -> Result<ExitCode> {
+    let (mut paths, committed) = match (scripts, since) {
+        ([old, new], None) => (vec![old.clone(), new.clone()], None),
+        ([script], Some(commit)) => {
+            let committed = Committed::write(script, commit)?;
+            (vec![committed.0.clone(), script.clone()], Some(committed))
+        }
+        ([_], None) => anyhow::bail!(
+            "name the script before the change and the script after it, or one script with --since <commit>"
+        ),
+        (_, Some(_)) => anyhow::bail!("--since takes one script, and git gives the other"),
+        (_, None) => unreachable!("clap takes one or two scripts"),
+    };
+    paths.extend(contract);
+    let code = run_py(EQUIV_PY, &paths);
+    drop(committed);
+    Ok(code)
+}
+
+/// The version of a script in a git commit, in a file that is removed when this is dropped.
+struct Committed(PathBuf);
+
+impl Committed {
+    fn write(script: &Path, commit: &str) -> Result<Self> {
+        let name = script
+            .file_name()
+            .and_then(|name| name.to_str())
+            .with_context(|| format!("{} names no file", script.display()))?;
+        let folder = match script.parent() {
+            Some(folder) if !folder.as_os_str().is_empty() => folder,
+            _ => Path::new("."),
+        };
+        let shown = Command::new("git")
+            .arg("-C")
+            .arg(folder)
+            .args(["show", &format!("{commit}:./{name}")])
+            .output()
+            .context("cannot start git")?;
+        anyhow::ensure!(
+            shown.status.success(),
+            "git has no {} in {commit}: {}",
+            script.display(),
+            String::from_utf8_lossy(&shown.stderr).trim()
+        );
+        let path = folder.join(format!(".xpd-equiv-{}-{name}", std::process::id()));
+        fs::write(&path, shown.stdout)
+            .with_context(|| format!("cannot write {}", path.display()))?;
+        Ok(Self(path))
+    }
+}
+
+/// Removes the file. It may be gone already, and the comparison is printed either way.
+impl Drop for Committed {
+    fn drop(&mut self) {
+        let _ = fs::remove_file(&self.0);
     }
 }
 

@@ -407,8 +407,9 @@ fn brief(project: &Path, files: &[PathBuf]) -> Result<String> {
          comes before the choice of a library or a method.\n\
          - `xpd graph <file>` prints the dataflow of a file, and it comes after a step or a node \
          is added, moved or renamed.\n\
-         - `xpd equiv old.py new.py` compares the result of two scripts, and a refactor of data \
-         logic is done when it prints {{\"equivalent\": true}}.",
+         - `xpd equiv <script.py> --since HEAD` compares the result of a script with the result \
+         of its committed version, and a refactor of data logic is done when it prints \
+         {{\"equivalent\": true}}. `xpd equiv old.py new.py` compares two scripts.",
         files_read(files),
         packs.join(", "),
     ))
@@ -439,8 +440,10 @@ fn placed(read: &[(&PathBuf, Census)], count: impl Fn(&Census) -> usize) -> Stri
     )
 }
 
-/// Offers the offline animation guide even before a project has Python files.
-/// In Python projects, also routes other playbooks and requests for open issues.
+/// Offers the offline animation guide, the chart review and the profile of a data file even
+/// before a project has Python files. In Python projects, also routes a refactor, other
+/// playbooks and requests for open issues. A chart prompt gets no playbook, because the chart
+/// line names its own.
 fn user_prompt(cwd: &Path, prompt: &str) -> Result<ExitCode> {
     if animation_prompt(prompt) {
         print_context(
@@ -451,34 +454,123 @@ fn user_prompt(cwd: &Path, prompt: &str) -> Result<ExitCode> {
         );
         return Ok(ExitCode::SUCCESS);
     }
-    if chart_prompt(prompt) {
-        print_context(
+    let cwd = project_root(cwd)?;
+    let mut text = Vec::new();
+    let chart = chart_prompt(prompt);
+    if chart {
+        text.push(
             "Chart task: run `xpd chart-review <file>` (MCP tool `chart_review`) on each file \
              that draws the chart. It lists the plotly rules that fire and the questions from \
              Tufte's book for each chart, in plotly or any other library, with the plotly route. \
              Add `--run <adapter.py>` to measure the drawn figure. For a new chart, \
              `xpd api xpd/recipe/plotly-chart` prints the plotly-chart playbook, which names the \
-             same command.",
+             same command."
+                .to_owned(),
         );
-        return Ok(ExitCode::SUCCESS);
     }
-    let cwd = project_root(cwd)?;
-    if project_files(&cwd, 1).is_empty() {
-        return Ok(ExitCode::SUCCESS);
-    }
-    let library = index::load(None)?.without_download(&cwd);
-    let mut text = Vec::new();
-    if let Some(playbook) = index::playbook_for(&library, prompt) {
-        text.push(playbook_lines(&playbook));
-    }
-    let lowered = prompt.to_lowercase();
-    if OPEN_ASKS.iter().any(|ask| lowered.contains(ask)) {
-        text.push(open_issues(&cwd, &project_files(&cwd, MOST_FILES))?);
+    text.extend(data_files(&cwd, prompt).iter().map(|file| {
+        format!(
+            "Data file task: `xpd profile {file}` (MCP tool `profile`) prints the type, the \
+             missing values and the number of distinct values of each column of {file}, with \
+             findings on its shape. It comes before the choice of a method and before code that \
+             reads the file."
+        )
+    }));
+    if !chart && !project_files(&cwd, 1).is_empty() {
+        if refactor_prompt(prompt) {
+            text.push(
+                "Refactor task: for a script of data logic that assigns `result`, edit the \
+                 script in place, and `xpd equiv <script.py> --since HEAD` runs the committed \
+                 script and the edited one and compares the two results. The refactor is done \
+                 when it prints {\"equivalent\": true}. For other data logic, `xpd equiv old.py \
+                 new.py` compares two scripts that each assign `result`."
+                    .to_owned(),
+            );
+        }
+        let library = index::load(None)?.without_download(&cwd);
+        if let Some(playbook) = index::playbook_for(&library, prompt) {
+            text.push(playbook_lines(&playbook));
+        }
+        let lowered = prompt.to_lowercase();
+        if OPEN_ASKS.iter().any(|ask| lowered.contains(ask)) {
+            text.push(open_issues(&cwd, &project_files(&cwd, MOST_FILES))?);
+        }
     }
     if !text.is_empty() {
         print_context(&text.join("\n"));
     }
     Ok(ExitCode::SUCCESS)
+}
+
+/// The data files that `prompt` names and the project holds, in the order of the prompt and at
+/// most `MOST_NAMED` of them. They are the formats of `xpd profile` without JSON, because a
+/// JSON file in a prompt is most often a settings file.
+fn data_files(root: &Path, prompt: &str) -> Vec<String> {
+    const FORMATS: [&str; 4] = ["csv", "parquet", "feather", "xlsx"];
+    let mut files: Vec<String> = Vec::new();
+    let named = prompt
+        .split_whitespace()
+        .map(|word| word.trim_matches(|c: char| !c.is_alphanumeric() && !"/~._-".contains(c)))
+        .map(|word| word.trim_end_matches('.'));
+    for word in named {
+        let format = Path::new(word)
+            .extension()
+            .and_then(|format| format.to_str());
+        let is_data = format.is_some_and(|format| {
+            FORMATS
+                .iter()
+                .any(|known| known.eq_ignore_ascii_case(format))
+        });
+        if is_data && !files.iter().any(|file| file == word) && root.join(word).is_file() {
+            files.push(word.to_owned());
+        }
+    }
+    files.truncate(MOST_NAMED);
+    files
+}
+
+/// Whether `prompt` asks to change code and keep its result, in English or Danish. Port,
+/// convert and migrate route only beside the name of a frame library, so "open the port" stays out.
+fn refactor_prompt(prompt: &str) -> bool {
+    const STRONG: [&str; 20] = [
+        "refactor",
+        "refactors",
+        "refactored",
+        "refactoring",
+        "rewrite",
+        "rewrites",
+        "rewriting",
+        "rewritten",
+        "vectorize",
+        "vectorise",
+        "vectorized",
+        "vectorised",
+        "optimize",
+        "optimise",
+        "simplify",
+        "refaktorer",
+        "refaktorere",
+        "refaktorering",
+        "omskriv",
+        "omskrive",
+    ];
+    const WEAK: [&str; 7] = [
+        "port",
+        "convert",
+        "translate",
+        "migrate",
+        "move",
+        "konverter",
+        "flyt",
+    ];
+    const LIBRARIES: [&str; 5] = ["pandas", "polars", "numpy", "duckdb", "pyarrow"];
+    let lowered = prompt.to_lowercase();
+    let words: Vec<&str> = lowered
+        .split(|character: char| !character.is_alphanumeric())
+        .filter(|word| !word.is_empty())
+        .collect();
+    let has = |list: &[&str]| words.iter().any(|word| list.contains(word));
+    has(&STRONG) || (has(&WEAK) && has(&LIBRARIES)) || lowered.contains("speed up")
 }
 
 /// Whether `prompt` asks to make, change or review a chart, in any chart library. A strong word,
@@ -1347,8 +1439,8 @@ struct Finding {
     holds: bool,
 }
 
-/// The issues of the files in `files`. A Python file with a pipeline of steps also gets the
-/// errors and warnings of `xpd graph`.
+/// The issues of the files in `files`. A Python file with a pipeline of steps, or one that
+/// imports Hamilton, also gets the errors and warnings that `xpd graph` finds in that file.
 fn findings(project: &Path, files: &[PathBuf]) -> Result<Vec<Finding>> {
     // One call can edit a file and then move or delete it, so a named file may be gone.
     let files: Vec<PathBuf> = (files.iter())
@@ -1367,10 +1459,9 @@ fn findings(project: &Path, files: &[PathBuf]) -> Result<Vec<Finding>> {
     let python = files.iter().filter(|file| source::is_python(file));
     let steps = python.flat_map(|file| {
         fs::read_to_string(project.join(file))
-            .map(|src| Graph::step_lines(file, &src))
+            .map(|src| Graph::edit_lines(file, &src))
             .unwrap_or_default()
     });
-    // `step_lines` gives errors and warnings only.
     let steps = steps.map(|line| Finding { line, holds: true });
     Ok(issues.chain(steps).collect())
 }
