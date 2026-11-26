@@ -45,9 +45,34 @@ pub(super) fn shapes(root: &Node<'_>) -> Shapes {
     shapes
 }
 
+/// Whether `node` is a docstring: the first named statement of a module, class or function body
+/// holding only a string literal. Skipping docstrings keeps prose out of the swap budget.
+fn is_docstring(node: &Node<'_>) -> bool {
+    if node.kind() != "expression_statement" {
+        return false;
+    }
+    let mut named = node.children().filter(Node::is_named);
+    if named.next().is_none_or(|child| child.kind() != "string") || named.next().is_some() {
+        return false;
+    }
+    let Some(parent) = node.parent() else {
+        return false;
+    };
+    if !matches!(parent.kind().as_ref(), "block" | "module") {
+        return false;
+    }
+    parent
+        .children()
+        .find(|child| child.is_named() && !child.kind().contains("comment"))
+        .is_some_and(|first| first.range() == node.range())
+}
+
 /// The token count and the shape of `node`. Adds each stretch below it to `shapes`, and returns
 /// the indexes of the nearest ones so that the caller can name itself as their parent.
 fn visit(node: &Node<'_>, shapes: &mut Shapes) -> (usize, u64, Vec<usize>) {
+    if is_docstring(node) {
+        return (0, 0, Vec::new());
+    }
     let mut hasher = DefaultHasher::new();
     let children = node.children();
     if children.len() == 0 {

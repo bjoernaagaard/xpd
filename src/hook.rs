@@ -492,12 +492,12 @@ fn user_prompt(cwd: &Path, prompt: &str) -> Result<ExitCode> {
     }
     if optimize_prompt(prompt) {
         text.push(
-            "Simplify or speed up task: `xpd optimize` reads the files and \
-             lists the work that no rule of `xpd check` reports, because each finding shows only \
-             when two places are read together: near copies, calls that a function computes \
-             twice or a loop repeats, arguments that pass a library default, and matrices that \
-             are built to be reduced, each with its evidence. Read the code of a finding before \
-             you change it. `xpd optimize --since <commit>` shows which findings are fixed. The \
+            "Simplify or speed up task: `xpd optimize` reads the files and lists rulekit issues, \
+             near copies, repeated calls and masks, loop-invariant calls, default arguments, \
+             pairwise matrices built to be reduced or contracted, full materializations indexed \
+             for one element, and linear scans in loops, each with its evidence. Use \
+             `xpd optimize start <paths> --check \"<tests>\" --bench \"<workload>\"` for a \
+             recorded run that tracks line count, timing and a gate for each change. The \
              `xpd-optimize` skill holds the steps."
                 .to_owned(),
         );

@@ -1,53 +1,56 @@
 ---
 name: xpd-optimize
-description: Make a script or a codebase shorter, simpler and faster with xpd optimize, which lists the work that no rule of xpd check reports. Use when the user asks to optimize, simplify, shorten or speed up code, to review code that the linter passes, or to find what could be done with less code.
+description: Make a script or a codebase shorter, simpler and faster with xpd optimize, combining rulekit checks, structural and performance findings, line-count tracking and benchmark gating. Use when the user asks to optimize, simplify, shorten or speed up code, to review code that the linter passes, or to find what could be done with less code.
 ---
 
 # Make code shorter and faster with xpd
 
-Use this guide when `xpd check` is clean and the code could still be shorter, simpler or faster.
+Use `xpd optimize` to review and improve a script or a whole codebase. It combines the project's
+rule packs (`xpd check` and any `sgconfig.yml` / `xpd.yml` rules) with whole-function and
+cross-place analysis, tracks code lines, and times a real workload before and after each change.
+It runs in any agent or terminal with no workflow engine.
 
-A rule reads one call at a time, so it finds a slow or wrong use of a function. It cannot know
-what the code is for. The work that is left shows only when two places of the code are read
-together, and `xpd optimize` lists the part of it that the syntax shows. It reads the files and
-runs no code.
-
-| Group | What the code does | Where it comes from |
+| Group | What the code does | Kinds in `xpd optimize` |
 | --- | --- | --- |
-| Written twice | The same code stands in two places but for a few names | `near-copy` of `xpd optimize`, and `copy` of `xpd untangle` |
-| Done again | A value is computed more than once, and one computation serves | `repeated-call` and `loop-invariant-call` of `xpd optimize` |
-| Already guaranteed | An argument, a check, a sort or a copy changes nothing, because an earlier step or the library already ensures it | `default-argument` of `xpd optimize`, and your reading |
-| Larger than the answer | A matrix, a list or a join is much larger than the result it is reduced to | `matrix-reduced` of `xpd optimize`, and your reading |
-| In the way | A wrapper only forwards, a parameter never varies, and nothing calls a function | `pass-through`, `constant-parameter` and `unreferenced` of `xpd untangle` |
+| Rulekit | A rule of `xpd check` or a project rule pack fires | `rule-issue` |
+| Written twice | The same code stands in two places but for a few names | `near-copy` (and `copy` of `xpd untangle`) |
+| Done again | A call, boolean mask, masked slice or loop body is computed more than once | `repeated-call`, `repeated-mask`, `loop-invariant-call` |
+| Already guaranteed | A keyword argument passes the library's own default | `default-argument`, and your reading |
+| Larger than the answer | A pairwise matrix is reduced or contracted, a full diff/sort/cumsum is built for one element, or a loop scans a list or frame on every pass | `matrix-reduced`, `materialized-for-one`, `linear-scan-in-loop` |
+| In the way | A wrapper only forwards, a parameter never varies, or nothing calls a function | `pass-through`, `constant-parameter`, `unreferenced` of `xpd untangle` |
 | Already in a library | Code rebuilds what a dependency of the project provides | `xpd find "<task>"`, then `xpd api <name>` |
 
-`near-copy` and `copy` are found in every programming language. The other kinds are read from
-Python. In another language, find them by reading, with the table as the list.
+`near-copy` is found in every programming language that ast-grep parses. The other kinds are read
+from Python (plus any languages covered by the project's own `sgconfig.yml` rules). In another
+language, find them by reading with the table as the list.
 
-The work is a loop of five stages, and no stage grades its own work. The commands find, you
-judge, each change is proven by a comparison of the old code with the new, and the command
-measures.
+The work is a recorded loop of five stages, and no stage grades its own work. `xpd` finds and
+records the baseline, you judge and edit, and `xpd optimize gate` proves every change by running
+the checks, counting lines, timing `--bench`, and comparing finding ids.
 
 ```text
-record the commit the work starts from, and run the project's checks
+xpd optimize start <paths> --check "<tests>" [--bench "<workload>"]
 repeat
-  list     xpd optimize, xpd untangle and your own reading
-  judge    read the code behind each finding, and drop what the code disproves
-  change   one change at a time, with every caller
-  prove    the old and the new code give the same result on the same input
-  measure  xpd optimize --since <start>, the line count and the run time
-until a round keeps no change
+  list     xpd optimize <paths> --format json (plus reading for algorithmic and library wins)
+  plan     xpd optimize plan <plan.json> (each fix names finding ids or a goal: shorter/faster/both)
+  change   one fix at a time, with every caller, committed cleanly
+  gate     xpd optimize gate <fix-id> (checks pass, findings do not rise, lines/bench proven)
+until no fix is left
+xpd optimize finish
 ```
 
-## Survey
+## Survey and start
 
-Find the commands the project checks itself with, in its hook, task and CI files: the formatter,
-the linters, `xpd check`, the type checker and the tests. Run each one, and fix what `xpd check`
-reports before you go on, because a clean linter is the starting point and no finding below
-repeats a rule.
+Find the commands the project checks itself with (formatter, linters, type checker, tests) and a
+representative workload command when speed matters. Start the recorded run:
 
-Record the baseline: the commit, the line count of the scope, the result of each check, and the
-run time of one representative workload when the code has one.
+```sh
+xpd optimize start <paths> --check "<test-command>" --bench "<workload-command>"
+```
+
+`start` records the commit, total code lines, baseline findings, each check's status, and the
+median/min/max time of `--bench` (1 warmup + 5 timed runs by default, tunable with
+`--bench-runs`). The state lives in `.git/xpd-optimize.json`, so it survives across sessions.
 
 ## List
 
@@ -59,12 +62,10 @@ xpd untangle <paths> --kind copy,pass-through,constant-parameter,unreferenced --
 ```
 
 Each finding has an `id`, its `places` and the `evidence` that was measured. The commands list
-what the syntax shows, and the rest needs the purpose of the code. So for each function, class and
-script in scope, write one sentence that names its inputs and its result and leaves out how it
-gets there. Describe the shortest program that gives the same result with the libraries the
-project already uses, and write down each difference between the code and that program, with its
-file and line. Read the callers together with the code, because a guarantee often lives in one
-place and its check in another.
+what the rules and syntax show, and the rest needs the purpose of the code. For each function,
+class and script in scope, write one sentence that names its inputs and its result and leaves out
+how it gets there. Describe the shortest program that gives the same result with the libraries the
+project already uses, and note each difference with its file and line.
 
 | What you look for | Command that helps |
 | --- | --- |
@@ -75,68 +76,66 @@ place and its check in another.
 | Which step of a pipeline reads what | `xpd graph <file>`, and `xpd graph impact` for one column |
 | A move from pandas to Polars, or from eager to lazy | `xpd graph map` |
 
-## Judge
+## Judge and plan
 
 Read the code behind each finding. A finding is a place to read and not yet a change.
 
 | Finding | Check before you change it |
 | --- | --- |
-| `near-copy` | The texts that differ are all values that one parameter can carry, and the two stretches do not change for different reasons |
-| `repeated-call` and `loop-invariant-call` | The call has no effect and gives the same value each time. xpd cannot see an effect that the name does not show, or a change through another name |
-| `default-argument` | The default of the installed version is the one in the index. `xpd api <name>` prints it |
-| `matrix-reduced` | The two sides are large enough to matter, and the result can be computed without the matrix, as with a sort, a search or one pass |
+| `rule-issue` | Read the rule with `xpd rules --rule <name>` and fix the cause |
+| `near-copy` | The differing tokens fit cleanly into parameters and the two stretches change for the same reason |
+| `repeated-call`, `repeated-mask`, `loop-invariant-call` | The expression has no hidden side effect and nothing mutates its inputs in between |
+| `default-argument` | The installed library version matches the default in `xpd api <name>` |
+| `matrix-reduced` | The result can be computed without allocating the full pairwise matrix, such as by sorting, searching, chunking, or one pass |
+| `materialized-for-one` | Indexing directly or using `min`/`max`/`argmin`/`argmax`/`sum`/`nsmallest` preserves edge cases (empty inputs, ties, NaNs) |
+| `linear-scan-in-loop` | Converting the list to a `set` or grouping the frame once preserves order and semantics |
 
-Look for the one change behind several findings before you fix them one by one. A data shape that
-fits the work often removes a conversion at every step. Search for callers outside the scope
-before you rename or remove a public name. Then sort each change.
+Group findings that share one root cause under a single fix. For an algorithmic or library
+simplification that no static finding flagged, leave `"findings": []` and set `"goal"` to
+`"shorter"`, `"faster"`, or `"both"`. Set `"changes_interface": true` whenever a fix changes a
+public name, output beyond rounding error, message or error, and get the user's approval with
+`xpd optimize approve <fix-id>` before gating it.
 
-| The change | Keep it when |
-| --- | --- |
-| Removes code and keeps the result | The result is proven equal |
-| Makes the code faster and no longer | The result is proven equal. A speedup you did not measure is reported as a guess. |
-| Makes the code faster and longer or harder to read | A measurement on the representative workload shows a gain the user would notice |
-| Changes what a user can notice: a result beyond rounding error, a public name, a message or an error | The user agrees |
+```sh
+xpd optimize plan plan.json
+```
 
-## Change and prove
+`plan.json` lists `"fixes"` in order and `"accepted"` findings with one-sentence reasons.
 
-Apply one change at a time, and update every caller with it. Then run the proof that fits.
+## Change, prove and gate
+
+Apply one fix at a time, update every caller, and prove equivalence:
 
 | The code is | Proof |
 | --- | --- |
 | A data script that assigns `result` | `xpd equiv <script.py> --since HEAD` prints `{"equivalent": true}` |
-| A function or a class | The old and the new version run on the same inputs, including an empty one and one at each boundary, and the outputs match |
-| Covered by the project's tests | The tests pass as they did at the baseline |
+| A function or a class | Run old and new code on the same inputs, including empty and boundary cases |
+| Covered by tests | The project's test suite passes as at baseline |
 
-Measure a claim about speed on the same input before and after, with the time in units, and with
-a second input size when the claim is about scaling. Drop a change that its proof or its
-measurement does not support, and say that you dropped it.
-
-## Measure
+Commit the fix and run the gate:
 
 ```sh
-xpd optimize <paths> --since <start>
-xpd check <paths>
+xpd optimize gate <fix-id>
 ```
 
-`--since` marks each finding that the start commit did not have as `new` and lists the ones that
-are gone under `fixed`. A change is done when the finding it was for is under `fixed`, no finding
-is `new`, and every check of the survey passes as it did at the baseline. A finding you judged and
-left in place stays in the ledger, so name it in the report with the reason.
+The gate keeps the fix only when:
+- every check that passed at `start` still passes,
+- the total count of findings did not rise,
+- at least one named finding is gone (or the fix's `"goal"` is met: fewer lines for `"shorter"`, at least 2% lower median `--bench` time for `"faster"`, or both for `"both"`), and
+- if `--bench` is set, median time did not regress by more than 15%.
 
-Run the loop again on the changed code, and stop when a round keeps no change.
+A fix that fails its gate exits 1 and records the reason; repair and re-gate once, or restore
+with `git reset --hard <current>` and run `xpd optimize drop <fix-id> --reason "..."`.
+`xpd optimize status` always prints the next stage.
 
-## Report
+## Finish and report
 
-Give the line count, the counts of `xpd optimize` and the measured times before and after, each
-change with its kind and the proof you ran for it, and the findings you left as they are with the
+When no planned fix remains and a fresh `xpd optimize` scan yields no further worthwhile change:
+
+```sh
+xpd optimize finish
+```
+
+Report the before/after finding counts, line counts, measured benchmark times with units and
+speedup, each kept fix with its proof, any dropped fixes, and each accepted finding with its
 reason.
-
-## A recorded run
-
-`xpd optimize start <paths> --check "<command>"` begins a run that xpd records in the git
-folder of the repository, so it survives the end of a session. `xpd optimize plan <file>` takes
-the changes in order, each with the ids of the findings it removes, and the accepted findings
-with their reasons. After each commit, `xpd optimize gate <change>` runs the checks and
-compares the findings, and exits 1 when the change is not kept. `xpd optimize status` prints
-the stage that comes next, and `xpd optimize finish` ends the run. The `xpd-untangle` skill
-describes each stage.

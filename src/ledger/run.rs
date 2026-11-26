@@ -11,6 +11,7 @@ use std::fs;
 use std::io::Read as _;
 use std::path::{Path, PathBuf};
 use std::process::{Command, ExitCode, Stdio};
+use std::time::Instant;
 
 use anyhow::{Context, Result, bail, ensure};
 use serde::{Deserialize, Serialize};
@@ -18,17 +19,22 @@ use serde::{Deserialize, Serialize};
 use crate::git;
 use crate::output::Format;
 
-use super::{Entry, Kind, Tree, at_commit, repository};
+use super::{Entry, Kind, Tree, at_commit, files, repository};
 
 /// How many times a fix may fail its gate before the next stage is to drop it.
 const ATTEMPTS: usize = 2;
 /// How much of the output of a failed check the journal keeps.
 const OUTPUT_KEPT: usize = 1500;
+/// Maximum allowed slowdown factor on `--bench` before a gate rejects a fix as a regression.
+const MAX_SLOWDOWN: f64 = 1.15;
+/// Minimum speedup factor required for a fix whose goal is `faster` or `both`.
+const MIN_SPEEDUP: f64 = 0.98;
 
 /// A stage of a run.
 #[derive(Debug, clap::Subcommand)]
 pub(crate) enum Action {
-    /// Start a run: record the commit it starts from, the paths and the checks of the project.
+    /// Start a run: record the commit it starts from, the paths, line count, checks and optional
+    /// benchmark of the project.
     Start {
         /// Files or directories to measure, inside one git repository.
         #[arg(default_value = ".")]
@@ -37,6 +43,13 @@ pub(crate) enum Action {
         /// for more than one. Each runs now, and again at every gate.
         #[arg(long = "check", value_name = "COMMAND")]
         checks: Vec<String>,
+        /// A command that runs a representative workload to time before and after each fix.
+        /// Measured with one warmup run and `--bench-runs` timed runs.
+        #[arg(long, value_name = "COMMAND")]
+        bench: Option<String>,
+        /// How many timed runs each benchmark measurement takes.
+        #[arg(long, default_value_t = 5)]
+        bench_runs: usize,
         /// Replace a run that is not finished.
         #[arg(long)]
         restart: bool,
@@ -47,14 +60,16 @@ pub(crate) enum Action {
     /// The file holds JSON such as
     /// `{"fixes": [{"id": "one-price-rule", "title": "...", "findings": ["d81b64d1"],
     /// "changes_interface": false}], "accepted": [{"finding": "cc6bc6e7", "reason": "..."}]}`.
+    /// A fix with no static finding id may set `"goal": "shorter"`, `"faster"` or `"both"` so
+    /// the gate checks line count and `--bench` timing instead.
     Plan {
         /// The JSON file of the plan, or `-` for stdin.
         file: PathBuf,
     },
     /// Record that the user said yes to a fix that changes what callers or users see.
     Approve { fix: String },
-    /// Gate a fix that is committed: run the checks and compare the findings with the commit
-    /// before it. Exit 1 when the fix is not kept.
+    /// Gate a fix that is committed: run the checks, time `--bench` when set, count lines and
+    /// compare the findings with the commit before it. Exit 1 when the fix is not kept.
     Gate { fix: String },
     /// Record that a fix was given up, after its files were restored.
     Drop {
@@ -65,8 +80,8 @@ pub(crate) enum Action {
     },
     /// Print the run and the stage that comes next.
     Status,
-    /// End the run: compare with the commit it started from. Exit 1 while a fix is open or a
-    /// new finding has no reason.
+    /// End the run: compare findings, line count and benchmark timing with the start commit.
+    /// Exit 1 while a fix is open or a new finding has no reason.
     Finish,
 }
 
@@ -76,6 +91,36 @@ struct Check {
     command: String,
     /// Whether it passed when the run started. A check that failed then gates nothing.
     passed: bool,
+}
+
+/// Measured wall-clock duration of one benchmark point, in milliseconds.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+struct Timing {
+    median_ms: f64,
+    min_ms: f64,
+    max_ms: f64,
+    runs: usize,
+}
+
+/// A benchmark command tracked across the run.
+#[derive(Debug, Serialize, Deserialize)]
+struct Bench {
+    command: String,
+    runs: usize,
+    baseline: Timing,
+    current: Timing,
+}
+
+/// What proves a fix that names no static finding id.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+enum Goal {
+    /// Must reduce total code lines in the measured paths.
+    Shorter,
+    /// Must reduce median `--bench` time by at least 2%.
+    Faster,
+    /// Must reduce both code lines and median `--bench` time.
+    Both,
 }
 
 /// How a fix ended.
@@ -88,6 +133,14 @@ enum Outcome {
         fixed: Vec<String>,
         /// The ids of the findings that the fix added.
         added: Vec<String>,
+        #[serde(default)]
+        lines_before: usize,
+        #[serde(default)]
+        lines_after: usize,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        timing_before: Option<Timing>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        timing_after: Option<Timing>,
     },
     Dropped {
         reason: String,
@@ -99,8 +152,12 @@ enum Outcome {
 struct Fix {
     id: String,
     title: String,
-    /// The ids of the findings that the fix is to remove.
+    /// The ids of the findings that the fix is to remove. May be empty when `goal` is set.
+    #[serde(default)]
     findings: Vec<String>,
+    /// Measurable target for a judgment-based fix with no static finding id.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    goal: Option<Goal>,
     /// The fix changes what code outside the paths can call, or what a user sees.
     #[serde(default)]
     changes_interface: bool,
@@ -139,8 +196,17 @@ struct Journal {
     /// The paths that are measured, from the top of the repository.
     paths: Vec<PathBuf>,
     checks: Vec<Check>,
+    /// Optional representative workload timed at start and at every gate.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    bench: Option<Bench>,
     /// How many findings the base had.
     was: usize,
+    /// Total lines of code in `paths` at the start commit.
+    #[serde(default)]
+    was_lines: usize,
+    /// Total lines of code in `paths` at `current`.
+    #[serde(default)]
+    current_lines: usize,
     /// The fixes of each round, in the order of the plan.
     rounds: Vec<Vec<Fix>>,
     /// The findings that are right as they are, each id with its reason.
@@ -221,15 +287,25 @@ impl Journal {
         }
         Next {
             stage: "fix",
-            text: format!(
-                "Make the fix {id}, \"{}\", which removes the findings {}. Keep the behavior \
-                 the same, commit it, and run `xpd {command} gate {id}`. The gate keeps the \
-                 fix when each check passes as it did at the start, a finding of the fix is \
-                 gone, and the count of findings is not higher than at {}.",
-                fix.title,
-                fix.findings.join(", "),
-                &self.current[..self.current.len().min(12)]
-            ),
+            text: if fix.findings.is_empty() {
+                format!(
+                    "Make the fix {id}, \"{}\", commit it, and run `xpd {command} gate {id}`. \
+                     The gate keeps the fix when each check passes as it did at the start, \
+                     the goal is met, and the count of findings is not higher than at {}.",
+                    fix.title,
+                    &self.current[..self.current.len().min(12)]
+                )
+            } else {
+                format!(
+                    "Make the fix {id}, \"{}\", which removes the findings {}. Keep the behavior \
+                     the same, commit it, and run `xpd {command} gate {id}`. The gate keeps the \
+                     fix when each check passes as it did at the start, a finding of the fix is \
+                     gone, and the count of findings is not higher than at {}.",
+                    fix.title,
+                    fix.findings.join(", "),
+                    &self.current[..self.current.len().min(12)]
+                )
+            },
         }
     }
 
@@ -237,10 +313,12 @@ impl Journal {
         let mut text = String::new();
         let _ = writeln!(
             text,
-            "xpd {command} run: started at {} with {} findings, now at {}",
+            "xpd {command} run: started at {} with {} findings ({} lines), now at {} ({} lines)",
             &self.base[..self.base.len().min(12)],
             self.was,
-            &self.current[..self.current.len().min(12)]
+            self.was_lines,
+            &self.current[..self.current.len().min(12)],
+            self.current_lines,
         );
         for check in &self.checks {
             let state = if check.passed {
@@ -250,12 +328,38 @@ impl Journal {
             };
             let _ = writeln!(text, "  check: {} ({state})", check.command);
         }
+        if let Some(bench) = &self.bench {
+            let _ = writeln!(
+                text,
+                "  bench: {} ({:.2} ms -> {:.2} ms, {} runs)",
+                bench.command, bench.baseline.median_ms, bench.current.median_ms, bench.runs
+            );
+        }
         for (round, fixes) in self.rounds.iter().enumerate() {
             let _ = writeln!(text, "  round {}", round + 1);
             for fix in fixes {
                 let state = match &fix.outcome {
-                    Some(Outcome::Kept { fixed, added, .. }) => {
-                        format!("kept, {} fixed, {} added", fixed.len(), added.len())
+                    Some(Outcome::Kept {
+                        fixed,
+                        added,
+                        lines_before,
+                        lines_after,
+                        timing_before,
+                        timing_after,
+                        ..
+                    }) => {
+                        let line_delta = format_line_delta(*lines_before, *lines_after);
+                        let bench_delta = match (timing_before, timing_after) {
+                            (Some(before), Some(after)) => {
+                                format!(", {}", format_speedup(*before, *after))
+                            }
+                            _ => String::new(),
+                        };
+                        format!(
+                            "kept, {} fixed, {} added{line_delta}{bench_delta}",
+                            fixed.len(),
+                            added.len()
+                        )
                     }
                     Some(Outcome::Dropped { reason }) => format!("dropped: {reason}"),
                     None => format!("open, {} failed gates", fix.attempts.len()),
@@ -273,6 +377,78 @@ impl Journal {
     }
 }
 
+/// Formats a line count change when the two counts differ.
+fn format_line_delta(before: usize, after: usize) -> String {
+    if before == 0 && after == 0 || before == after {
+        return String::new();
+    }
+    if after > before {
+        format!(", +{} lines", after - before)
+    } else {
+        format!(", -{} lines", before - after)
+    }
+}
+
+/// Formats a benchmark comparison between two median timings.
+fn format_speedup(before: Timing, after: Timing) -> String {
+    if before.median_ms > 0.0 && after.median_ms > 0.0 {
+        let ratio = before.median_ms / after.median_ms;
+        format!(
+            "{:.2} ms -> {:.2} ms ({ratio:.2}x)",
+            before.median_ms, after.median_ms
+        )
+    } else {
+        format!("{:.2} ms -> {:.2} ms", before.median_ms, after.median_ms)
+    }
+}
+
+/// Total lines across all code files under `paths`.
+fn count_lines(paths: &[PathBuf]) -> usize {
+    files(paths)
+        .into_iter()
+        .map(|(path, _)| fs::read_to_string(&path).map_or(0, |text| text.lines().count()))
+        .sum()
+}
+
+/// Rounds a millisecond measurement to two decimal places.
+fn round_ms(ms: f64) -> f64 {
+    (ms * 100.0).round() / 100.0
+}
+
+/// Times `command` with one warmup run followed by `runs` measured runs.
+fn measure_bench(command: &str, runs: usize) -> Result<Timing> {
+    let runs = runs.max(1);
+    let (passed, printed) = passes(command);
+    ensure!(
+        passed,
+        "benchmark `{command}` failed during warmup:\n{printed}"
+    );
+    let mut samples = Vec::with_capacity(runs);
+    for run in 1..=runs {
+        let started = Instant::now();
+        let (passed, printed) = passes(command);
+        let elapsed_ms = started.elapsed().as_secs_f64() * 1000.0;
+        ensure!(
+            passed,
+            "benchmark `{command}` failed on run {run}/{runs}:\n{printed}"
+        );
+        samples.push(elapsed_ms);
+    }
+    samples.sort_by(f64::total_cmp);
+    let mid = samples.len() / 2;
+    let median = if samples.len() % 2 == 1 {
+        samples[mid]
+    } else {
+        f64::midpoint(samples[mid - 1], samples[mid])
+    };
+    Ok(Timing {
+        median_ms: round_ms(median),
+        min_ms: round_ms(samples[0]),
+        max_ms: round_ms(*samples.last().expect("runs is at least 1")),
+        runs,
+    })
+}
+
 /// What a gate found, with no file or command in it.
 #[derive(Debug)]
 struct Compared {
@@ -287,6 +463,8 @@ fn judge(
     before: &BTreeSet<String>,
     after: &BTreeSet<String>,
     broken: &[String],
+    lines: (usize, usize),
+    timing: Option<(Timing, Timing)>,
 ) -> Result<Compared, String> {
     if !broken.is_empty() {
         return Err(format!(
@@ -294,7 +472,7 @@ fn judge(
             broken.join("; ")
         ));
     }
-    if !fix.findings.iter().any(|id| !after.contains(id)) {
+    if !fix.findings.is_empty() && !fix.findings.iter().any(|id| !after.contains(id)) {
         return Err("None of the findings the fix was to remove is gone.".to_owned());
     }
     if after.len() > before.len() {
@@ -307,6 +485,38 @@ fn judge(
                 .cloned()
                 .collect::<Vec<_>>()
                 .join(", ")
+        ));
+    }
+    if let Some(goal) = fix.goal {
+        let (lines_before, lines_after) = lines;
+        if matches!(goal, Goal::Shorter | Goal::Both) && lines_after >= lines_before {
+            return Err(format!(
+                "The goal is shorter code, but lines went from {lines_before} to {lines_after}."
+            ));
+        }
+        if matches!(goal, Goal::Faster | Goal::Both) {
+            let Some((tb, ta)) = timing else {
+                return Err("The goal is faster code, which needs `--bench` on `start`.".to_owned());
+            };
+            if tb.median_ms > 0.0 && ta.median_ms > tb.median_ms * MIN_SPEEDUP {
+                return Err(format!(
+                    "The goal is faster code, but benchmark median went from {:.2} ms to {:.2} ms.",
+                    tb.median_ms, ta.median_ms
+                ));
+            }
+        }
+    }
+    if let Some((tb, ta)) = timing
+        && tb.median_ms > 0.0
+        && ta.median_ms > tb.median_ms * MAX_SLOWDOWN
+        && ta.median_ms - tb.median_ms > 5.0
+        && ta.min_ms > tb.max_ms
+    {
+        return Err(format!(
+            "Benchmark regressed from {:.2} ms to {:.2} ms ({:.2}x slower).",
+            tb.median_ms,
+            ta.median_ms,
+            ta.median_ms / tb.median_ms
         ));
     }
     Ok(Compared {
@@ -410,6 +620,7 @@ fn start(
     here: &Path,
     paths: &[PathBuf],
     checks: Vec<String>,
+    bench: Option<(String, usize)>,
     found: Found<'_>,
 ) -> Result<Journal> {
     place.clean()?;
@@ -428,6 +639,18 @@ fn start(
         })
         .collect::<Result<Vec<_>>>()?;
     let base = place.head()?;
+    let lines = count_lines(&paths);
+    let bench = bench
+        .map(|(command, runs)| -> Result<Bench> {
+            let timing = measure_bench(&command, runs)?;
+            Ok(Bench {
+                command,
+                runs: timing.runs,
+                baseline: timing,
+                current: timing,
+            })
+        })
+        .transpose()?;
     let mut journal = Journal {
         current: base.clone(),
         base,
@@ -438,7 +661,10 @@ fn start(
                 command,
             })
             .collect(),
+        bench,
         was: 0,
+        was_lines: lines,
+        current_lines: lines,
         rounds: Vec::new(),
         accepted: BTreeMap::new(),
         finished: false,
@@ -464,10 +690,17 @@ fn plan(journal: &mut Journal, text: &str, command: &str, found: Found<'_>) -> R
     for fix in &plan.fixes {
         ensure!(named.insert(&fix.id), "two fixes are named {}", fix.id);
         ensure!(
-            !fix.findings.is_empty(),
-            "the fix {} names no finding",
+            !fix.findings.is_empty() || fix.goal.is_some(),
+            "the fix {} names no finding and sets no goal",
             fix.id
         );
+        if matches!(fix.goal, Some(Goal::Faster | Goal::Both)) {
+            ensure!(
+                journal.bench.is_some(),
+                "the fix {} has a speed goal, which needs `--bench` on `start`",
+                fix.id
+            );
+        }
         ensure!(
             fix.outcome.is_none() && fix.attempts.is_empty() && !fix.approved,
             "the fix {} holds fields that only xpd writes",
@@ -527,15 +760,40 @@ fn gate(journal: &mut Journal, place: &Place, id: &str, found: Found<'_>) -> Res
         .collect();
     let before = found(journal, Some(&journal.current))?;
     let after = found(journal, None)?;
+    let lines_before = journal.current_lines;
+    let lines_after = count_lines(&journal.paths);
+    let timing = if broken.is_empty()
+        && let Some(bench) = &journal.bench
+    {
+        let after_timing = measure_bench(&bench.command, bench.runs)?;
+        Some((bench.current, after_timing))
+    } else {
+        None
+    };
     let fix = journal.fix_mut(id)?;
-    match judge(fix, &before, &after, &broken) {
+    match judge(
+        fix,
+        &before,
+        &after,
+        &broken,
+        (lines_before, lines_after),
+        timing,
+    ) {
         Ok(Compared { fixed, added }) => {
             fix.outcome = Some(Outcome::Kept {
                 commit: commit.clone(),
                 fixed,
                 added,
+                lines_before,
+                lines_after,
+                timing_before: timing.map(|(before, _)| before),
+                timing_after: timing.map(|(_, after)| after),
             });
             journal.current = commit;
+            journal.current_lines = lines_after;
+            if let (Some(bench), Some((_, after_timing))) = (&mut journal.bench, timing) {
+                bench.current = after_timing;
+            }
             Ok(true)
         }
         Err(reason) => {
@@ -567,13 +825,19 @@ fn finish(journal: &mut Journal, place: &Place, found: Found<'_>) -> Result<bool
         );
         return Ok(false);
     }
+    let lines_now = count_lines(&journal.paths);
+    journal.current_lines = lines_now;
+    let bench_summary = journal.bench.as_ref().map_or_else(String::new, |bench| {
+        format!(", bench {}", format_speedup(bench.baseline, bench.current))
+    });
     eprintln!(
-        "xpd: {} findings at the start, {} now: {} fixed, {} added, {} left without a reason",
+        "xpd: {} findings at the start, {} now: {} fixed, {} added, {} left without a reason; lines {} -> {lines_now}{bench_summary}",
         before.len(),
         after.len(),
         before.difference(&after).count(),
         after.difference(&before).count(),
-        after.iter().filter(|id| !explained(id)).count()
+        after.iter().filter(|id| !explained(id)).count(),
+        journal.was_lines,
     );
     journal.finished = true;
     Ok(true)
@@ -611,6 +875,8 @@ pub(super) fn act<K: Kind, R>(
         Action::Start {
             paths,
             checks,
+            bench,
+            bench_runs,
             restart,
         } => {
             if let Ok(old) = place.read(command) {
@@ -619,7 +885,14 @@ pub(super) fn act<K: Kind, R>(
                     "a run is open. Go on with `xpd {command} status`, or replace it with --restart"
                 );
             }
-            start(&place, &here, &paths, checks, &found)?
+            start(
+                &place,
+                &here,
+                &paths,
+                checks,
+                bench.map(|cmd| (cmd, bench_runs)),
+                &found,
+            )?
         }
         Action::Plan { file } => {
             let mut journal = place.read(command)?;

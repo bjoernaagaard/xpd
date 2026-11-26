@@ -1,17 +1,18 @@
 //! `xpd optimize`: the ledger of the places where code does work that a shorter or faster
-//! program would not do, and that a rule of `xpd check` cannot see, because each of them shows
-//! only when two places of the code are read together.
+//! program would not do, combining rulekit checks with whole-function and cross-place analysis.
 //!
 //! It reads the files and runs no code. Near copies are found in every language ast-grep parses
-//! as code. The calls, the loops and the arguments are read from Python, and the defaults of
-//! library functions from the index that `xpd api` reads.
+//! as code. Rulekit checks, repeated calls and masks, loop-invariant calls, linear scans in
+//! loops, default arguments, pairwise matrices built to be reduced and full materializations
+//! indexed for one element are read from Python, with defaults from the index that `xpd api`
+//! reads.
 
 mod python;
 mod twins;
 
 use std::collections::{BTreeSet, HashMap, HashSet};
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
 use anyhow::Result;
@@ -20,10 +21,14 @@ use clap::ValueEnum;
 use rayon::prelude::*;
 use serde::Serialize;
 
+use crate::catalog::Filters;
 use crate::index::{self, Library, Method};
 use crate::ledger::{self, Ledger, Place, Select, Tree};
 use crate::output::Format;
+use crate::source;
+use crate::style::Style;
 use crate::syntax;
+use crate::workspace::Workspace;
 
 use python::{Callee, Keyword};
 
@@ -41,6 +46,7 @@ const CLASSES_SHOWN: usize = 3;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize)]
 #[serde(rename_all = "kebab-case")]
 pub(crate) enum Group {
+    Rulekit,
     WrittenTwice,
     DoneAgain,
     AlreadyGuaranteed,
@@ -51,16 +57,24 @@ pub(crate) enum Group {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, ValueEnum)]
 #[serde(rename_all = "kebab-case")]
 pub(crate) enum Kind {
+    /// A rule of `xpd check` or the project's own rule pack fires on this line.
+    RuleIssue,
     /// Two stretches of code are the same but for a few names or values.
     NearCopy,
     /// A function computes the same call more than once, with nothing changed in between.
     RepeatedCall,
-    /// A loop computes a call on every pass, and changes nothing that the call reads.
+    /// A function computes the same boolean mask or masked slice more than once.
+    RepeatedMask,
+    /// A loop or comprehension computes a call on every pass and changes nothing it reads.
     LoopInvariantCall,
     /// A keyword argument passes the value that the library function defaults to.
     DefaultArgument,
-    /// A matrix of every element against every other is built and then reduced along an axis.
+    /// A matrix of every element against every other is built and then reduced or contracted.
     MatrixReduced,
+    /// A full diff, sort or cumulative sum is built only to read one element or a short head.
+    MaterializedForOne,
+    /// A loop scans a list for membership or filters a whole frame on every pass.
+    LinearScanInLoop,
 }
 
 impl ledger::Kind for Kind {
@@ -69,6 +83,7 @@ impl ledger::Kind for Kind {
     const COMMAND: &'static str = "optimize";
 
     const GROUPS: &'static [Group] = &[
+        Group::Rulekit,
         Group::WrittenTwice,
         Group::DoneAgain,
         Group::AlreadyGuaranteed,
@@ -77,15 +92,21 @@ impl ledger::Kind for Kind {
 
     fn group(self) -> Group {
         match self {
+            Self::RuleIssue => Group::Rulekit,
             Self::NearCopy => Group::WrittenTwice,
-            Self::RepeatedCall | Self::LoopInvariantCall => Group::DoneAgain,
+            Self::RepeatedCall | Self::RepeatedMask | Self::LoopInvariantCall => Group::DoneAgain,
             Self::DefaultArgument => Group::AlreadyGuaranteed,
-            Self::MatrixReduced => Group::LargerThanTheAnswer,
+            Self::MatrixReduced | Self::MaterializedForOne | Self::LinearScanInLoop => {
+                Group::LargerThanTheAnswer
+            }
         }
     }
 
     fn heading(group: Group) -> &'static str {
         match group {
+            Group::Rulekit => {
+                "Rulekit: issues that `xpd check` and the project's own rules already report"
+            }
             Group::WrittenTwice => {
                 "Written twice: code that is the same but for a few names, which one function with a parameter replaces"
             }
@@ -96,7 +117,7 @@ impl ledger::Kind for Kind {
                 "Already guaranteed: an argument that changes nothing, because the library does the same without it"
             }
             Group::LargerThanTheAnswer => {
-                "Larger than the answer: a value much larger than the result it is reduced to"
+                "Larger than the answer: work or storage that is much larger than the result"
             }
         }
     }
@@ -109,23 +130,26 @@ struct Read {
     files: usize,
     /// The Python files among them.
     python: usize,
+    /// Total lines across the files of code.
+    lines: usize,
 }
 
 /// List the places where code does work that a shorter or faster program would not do.
 ///
-/// It reads the files and runs no code, and it lists what no rule of `xpd check` reports,
-/// because each finding shows only when two places are read together. Near copies are found in
-/// every programming language ast-grep parses. Repeated calls, calls that a loop repeats,
-/// arguments that pass a library default and matrices that are built to be reduced are read
-/// from Python. A finding is a place to read, and not yet a change: the code may differ in a way
-/// the syntax does not show. The JSON has `read`, `summary` with the count of each kind, and
+/// It reads the files and runs no code, combining `xpd check` rules with whole-function and
+/// cross-place analysis. Near copies are found in every programming language ast-grep parses.
+/// Rulekit issues, repeated calls and boolean masks, calls repeated by a loop or comprehension,
+/// arguments that pass a library default, pairwise matrices built to be reduced or contracted,
+/// full materializations indexed for one element and linear scans inside loops are read from
+/// Python. A finding is a place to read, and not yet a change: the code may differ in a way the
+/// syntax does not show. The JSON has `read`, `summary` with the count of each kind, and
 /// `findings`, each with `id`, `kind`, `places` and `evidence`. `--since` shows the count at an
 /// earlier commit beside the count of today.
 #[derive(Debug, clap::Args)]
 #[command(after_long_help = "Examples:
   xpd optimize
   xpd optimize src/ --format json
-  xpd optimize --kind near-copy,repeated-call --limit 0
+  xpd optimize --kind near-copy,repeated-call,matrix-reduced --limit 0
   xpd optimize --since main")]
 pub(crate) struct OptimizeArgs {
     #[command(flatten)]
@@ -135,14 +159,18 @@ pub(crate) struct OptimizeArgs {
 impl OptimizeArgs {
     pub(crate) fn run(self, default: Format) -> Result<ExitCode> {
         let header = |ledger: &Ledger<Kind, Read>| {
-            let Read { files, python } = ledger.read;
+            let Read {
+                files,
+                python,
+                lines,
+            } = ledger.read;
             let files = if files == 1 {
                 "1 file".to_owned()
             } else {
                 format!("{files} files")
             };
             format!(
-                "xpd optimize: {} in {files}, {python} of them Python\n",
+                "xpd optimize: {} in {files} ({lines} lines), {python} of them Python\n",
                 ledger.count()
             )
         };
@@ -156,21 +184,39 @@ struct Surveyed {
     /// The path that names the file in the key of a finding, which is the same at another
     /// commit.
     named: String,
+    lines: usize,
     shapes: twins::Shapes,
     python: Option<python::Facts>,
+    rules: Vec<(usize, String, String)>,
 }
 
 /// One file as the ledger needs it. `None` for a file that cannot be read.
-fn read(path: &std::path::Path, language: SupportLang, tree: Tree<'_>) -> Option<Surveyed> {
+fn read(
+    path: &Path,
+    language: SupportLang,
+    tree: Tree<'_>,
+    workspace: Option<&Workspace>,
+) -> Option<Surveyed> {
     let text = fs::read_to_string(path).ok()?;
     let absolute = fs::canonicalize(path).ok()?;
     let root = syntax::parse_as(&text, language);
     let shown = tree.shown(path);
+    let mut rules = Vec::new();
+    if let Some(workspace) = workspace {
+        let linted = workspace.analyze(source::File::on_disk(path), &text);
+        for found in &linted.found {
+            let issue = found.issue();
+            let line = issue.position.map_or(1, |at| at.line);
+            rules.push((line, issue.id.to_string(), issue.message));
+        }
+    }
     Some(Surveyed {
         named: tree.tracked(&absolute).unwrap_or_else(|| shown.clone()),
         shown,
+        lines: text.lines().count(),
         shapes: twins::shapes(&root.root()),
         python: (language == SupportLang::Python).then(|| python::facts(path, &root)),
+        rules,
     })
 }
 
@@ -369,17 +415,68 @@ fn python_findings(surveyed: &[Surveyed]) -> Result<Vec<Finding>> {
     Ok(findings)
 }
 
+/// The rule issues from `xpd check` and any project rule packs on the surveyed files.
+fn rule_findings(surveyed: &[Surveyed]) -> Vec<Finding> {
+    let mut findings = Vec::new();
+    for file in surveyed {
+        for (line, rule, message) in &file.rules {
+            findings.push(Finding {
+                kind: Kind::RuleIssue,
+                key: format!("{}\n{rule}\n{message}", file.named),
+                places: vec![Place::line(&file.shown, *line)],
+                evidence: format!("`{rule}`: {message}"),
+                weight: 1,
+            });
+        }
+    }
+    findings
+}
+
+/// The workspace of rules that applies to `paths`, respecting project config and style settings.
+fn rules_workspace(paths: &[PathBuf], tree: Tree<'_>) -> Result<Workspace> {
+    let root = tree
+        .top
+        .map(Path::to_path_buf)
+        .or_else(|| {
+            let first = paths.first()?;
+            let absolute = fs::canonicalize(first).ok()?;
+            Some(if absolute.is_dir() {
+                absolute
+            } else {
+                absolute.parent().unwrap_or(&absolute).to_path_buf()
+            })
+        })
+        .unwrap_or_else(|| PathBuf::from("."));
+    let filters = Filters {
+        rules: Vec::new(),
+        severity: None,
+    };
+    Workspace::open(root, None, &filters).or_else(|_| Workspace::bundled(Style::Default))
+}
+
 /// What was read and every finding of the files under `paths`.
 fn survey(paths: &[PathBuf], tree: Tree<'_>) -> Result<(Read, Vec<Entry>)> {
     let files = ledger::files(paths);
+    let workspace = (files
+        .iter()
+        .any(|(_, language)| *language == SupportLang::Python))
+    .then(|| rules_workspace(paths, tree))
+    .transpose()?;
     let mut surveyed: Vec<Surveyed> = (files.par_iter())
-        .filter_map(|(path, language)| read(path, *language, tree))
+        .filter_map(|(path, language)| {
+            let ws = workspace
+                .as_ref()
+                .filter(|ws| *language == SupportLang::Python || ws.catalog.project.is_some());
+            read(path, *language, tree, ws)
+        })
         .collect();
     let read = Read {
         files: surveyed.len(),
         python: surveyed.iter().filter(|file| file.python.is_some()).count(),
+        lines: surveyed.iter().map(|file| file.lines).sum(),
     };
-    let mut findings = python_findings(&surveyed)?;
+    let mut findings = rule_findings(&surveyed);
+    findings.extend(python_findings(&surveyed)?);
     let shapes: Vec<(&str, twins::Shapes)> = (surveyed.iter_mut())
         .map(|file| (file.shown.as_str(), std::mem::take(&mut file.shapes)))
         .collect();

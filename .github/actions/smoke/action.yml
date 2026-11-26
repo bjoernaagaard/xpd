@@ -23,4 +23,4 @@ runs:
           package="xpd==${GITHUB_REF_NAME#v}"
         fi
         uv run --isolated --no-project --python 3.13 --with "$package" -- \
-          fastmcp call --command 'xpd mcp' --target rule --input-json '{"package": "pandas", "rule": "row-loop"}'
+          fastmcp call --command 'xpd mcp' --target animate_guide --input-json '{}'

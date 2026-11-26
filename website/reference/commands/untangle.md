@@ -197,7 +197,7 @@ $ sed -i '/time.sleep(1)/d' shop/orders.py && git -c user.name=xpd -c user.email
 $ xpd untangle gate no-fixed-wait --format json | jq -c '.run.rounds[0][0] | {id, outcome, fixed: (.fixed | length), added: (.added | length)}'
 {"id":"no-fixed-wait","outcome":"kept","fixed":1,"added":0}
 $ xpd untangle finish --format json | jq -c '{finished: .run.finished}'
-xpd: 7 findings at the start, 6 now: 1 fixed, 0 added, 6 left without a reason
+xpd: 7 findings at the start, 6 now: 1 fixed, 0 added, 6 left without a reason; lines 39 -> 38
 {"finished":true}
 ```
 

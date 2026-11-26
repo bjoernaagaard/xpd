@@ -177,6 +177,31 @@ const REDUCERS: &[&str] = &[
     "var",
 ];
 
+/// Calls that contract an array with another, like matrix multiplication.
+const CONTRACTORS: &[&str] = &["dot", "einsum", "matmul", "tensordot"];
+
+/// Calls that return a boolean mask over an array or frame.
+const MASK_CALLS: &[&str] = &[
+    "between",
+    "contains",
+    "duplicated",
+    "endswith",
+    "fullmatch",
+    "isfinite",
+    "isin",
+    "isinf",
+    "isna",
+    "isnan",
+    "isnull",
+    "match",
+    "notna",
+    "notnull",
+    "startswith",
+];
+
+/// Fewest elements in a list literal inside a loop before membership testing is worth a set.
+const LINEAR_LIST_LEN: usize = 4;
+
 /// A finding that one file holds on its own.
 #[derive(Debug)]
 pub(super) struct Local {
@@ -438,6 +463,64 @@ fn exclusive(a: &[(usize, usize)], b: &[(usize, usize)]) -> bool {
     })
 }
 
+/// Whether `node` is on the left side of an assignment, loop target or delete statement.
+fn is_lhs(node: &Node<'_>) -> bool {
+    let mut child = node.clone();
+    for above in node.ancestors() {
+        match above.kind().as_ref() {
+            "assignment" | "augmented_assignment" | "for_statement" | "for_in_clause" => {
+                if above
+                    .field("left")
+                    .is_some_and(|left| left.range() == child.range())
+                {
+                    return true;
+                }
+                return false;
+            }
+            "delete_statement" => return true,
+            "pattern_list" | "tuple_pattern" | "list_pattern" | "parenthesized_expression" => {
+                child = above;
+            }
+            _ => return false,
+        }
+    }
+    false
+}
+
+/// Whether `node` builds a boolean mask over an array, series or frame.
+fn is_mask_expr(node: &Node<'_>) -> bool {
+    match node.kind().as_ref() {
+        "comparison_operator" | "boolean_operator" | "not_operator" => true,
+        "binary_operator" => node
+            .field("operator")
+            .is_some_and(|op| matches!(op.text().as_ref(), "&" | "|" | "^")),
+        "unary_operator" => node
+            .field("operator")
+            .is_some_and(|op| op.text().as_ref() == "~"),
+        "parenthesized_expression" => node
+            .children()
+            .find(Node::is_named)
+            .is_some_and(|inner| is_mask_expr(&inner)),
+        "call" => called(node).is_some_and(|name| MASK_CALLS.contains(&name.as_str())),
+        _ => false,
+    }
+}
+
+/// Whether `node` allocates a Python list value.
+fn is_list_expr(node: &Node<'_>) -> bool {
+    match node.kind().as_ref() {
+        "list" | "list_comprehension" => true,
+        "call" => called(node).is_some_and(|name| matches!(name.as_str(), "list" | "tolist")),
+        _ => false,
+    }
+}
+
+/// Whether `inner` lies completely inside the byte range of `around`.
+fn within(inner: &Node<'_>, around: &Node<'_>) -> bool {
+    let (inner, around) = (inner.range(), around.range());
+    around.start <= inner.start && inner.end <= around.end
+}
+
 /// One function, with the nodes of its own scope.
 struct Function<'t> {
     node: Node<'t>,
@@ -467,61 +550,70 @@ impl<'t> Function<'t> {
         (self.nodes.iter()).filter(|node| node.kind() == "call" && pure(node))
     }
 
-    /// Whether a call of this function around `call` has one of the texts `found`.
-    fn inside(&self, call: &Node<'_>, found: &HashSet<String>) -> bool {
-        (call.ancestors())
+    /// Whether a node of `kinds` around `node` in this function has one of the texts `found`.
+    fn inside_any(&self, node: &Node<'_>, kinds: &[&str], found: &HashSet<String>) -> bool {
+        (node.ancestors())
             .take_while(|above| above.range() != self.node.range())
-            .any(|above| above.kind() == "call" && found.contains(&one_line(&above)))
+            .any(|above| {
+                kinds.contains(&above.kind().as_ref()) && found.contains(&one_line(&above))
+            })
+    }
+
+    /// Lines of the first run of occurrences of one expression with nothing it reads written in
+    /// between and not split across mutually exclusive branch arms.
+    fn repeated_lines(&self, nodes: Vec<&Node<'t>>) -> Option<Vec<usize>> {
+        if nodes.len() < 2 {
+            return None;
+        }
+        let read = reads(nodes[0]);
+        let changed: Vec<usize> = (self.writes.iter())
+            .filter(|(name, _)| read.contains(name))
+            .map(|(_, line)| *line)
+            .collect();
+        let mut runs: Vec<Vec<&Node<'t>>> = vec![Vec::new()];
+        for node in nodes {
+            let split = runs
+                .last()
+                .and_then(|run| run.last())
+                .is_some_and(|before| {
+                    (changed.iter()).any(|at| line(before) <= *at && *at < line(node))
+                });
+            if split {
+                runs.push(Vec::new());
+            }
+            runs.last_mut().expect("runs starts with one").push(node);
+        }
+        runs.into_iter().find_map(|run| {
+            let paths: Vec<_> = run.iter().map(|node| arms(node, &self.node)).collect();
+            (0..run.len()).find_map(|first| {
+                let lines: Vec<usize> = (first..run.len())
+                    .filter(|other| !exclusive(&paths[first], &paths[*other]))
+                    .map(|other| line(run[other]))
+                    .collect();
+                (lines.len() > 1).then_some(lines)
+            })
+        })
     }
 
     /// The calls that the function computes more than once with nothing changed in between.
-    fn repeated(&self) -> Vec<Local> {
+    fn repeated(&self) -> (Vec<Local>, HashSet<String>) {
         let mut by_text: HashMap<String, Vec<&Node<'t>>> = HashMap::new();
         for call in self.calls() {
             by_text.entry(one_line(call)).or_default().push(call);
         }
         let mut found: Vec<(String, Vec<usize>)> = Vec::new();
         for (text, calls) in by_text {
-            if calls.len() < 2 {
-                continue;
+            if let Some(lines) = self.repeated_lines(calls) {
+                found.push((text, lines));
             }
-            let read = reads(calls[0]);
-            let changed: Vec<usize> = (self.writes.iter())
-                .filter(|(name, _)| read.contains(name))
-                .map(|(_, line)| *line)
-                .collect();
-            let mut runs: Vec<Vec<&Node<'t>>> = vec![Vec::new()];
-            for call in calls {
-                let split = runs
-                    .last()
-                    .and_then(|run| run.last())
-                    .is_some_and(|before| {
-                        (changed.iter()).any(|at| line(before) <= *at && *at < line(call))
-                    });
-                if split {
-                    runs.push(Vec::new());
-                }
-                runs.last_mut().expect("runs starts with one").push(call);
-            }
-            let together = runs.into_iter().find_map(|run| {
-                let paths: Vec<_> = run.iter().map(|call| arms(call, &self.node)).collect();
-                (0..run.len()).find_map(|first| {
-                    let lines: Vec<usize> = (first..run.len())
-                        .filter(|other| !exclusive(&paths[first], &paths[*other]))
-                        .map(|other| line(run[other]))
-                        .collect();
-                    (lines.len() > 1).then_some(lines)
-                })
-            });
-            found.extend(together.map(|lines| (text, lines)));
         }
         let texts: HashSet<String> = found.iter().map(|(text, _)| text.clone()).collect();
         let outermost = |text: &str| {
             (self.calls())
                 .filter(|call| one_line(call) == text)
-                .any(|call| !self.inside(call, &texts))
+                .any(|call| !self.inside_any(call, &["call"], &texts))
         };
-        (found.iter())
+        let locals = (found.iter())
             .filter(|(text, _)| outermost(text))
             .map(|(text, lines)| Local {
                 kind: Kind::RepeatedCall,
@@ -536,15 +628,96 @@ impl<'t> Function<'t> {
                 ),
                 weight: lines.len() * text.len(),
             })
+            .collect();
+        (locals, texts)
+    }
+
+    /// Boolean masks and masked subscripts computed more than once with nothing written in
+    /// between. Plain integer indexing such as `arr[i]` is left out.
+    fn repeated_masks(&self, covered_calls: &HashSet<String>) -> Vec<Local> {
+        let mut mask_vars: HashSet<String> = HashSet::new();
+        for node in &self.nodes {
+            if node.kind() == "assignment"
+                && let Some(left) = node.field("left").filter(|l| l.kind() == "identifier")
+                && let Some(right) = node.field("right")
+                && is_mask_expr(&right)
+            {
+                mask_vars.insert(left.text().into_owned());
+            }
+        }
+        let mut candidates: Vec<&Node<'t>> = Vec::new();
+        for node in &self.nodes {
+            match node.kind().as_ref() {
+                "subscript" if !is_lhs(node) => {
+                    let Some(idx) = node.field("subscript") else {
+                        continue;
+                    };
+                    let fancy = is_mask_expr(&idx)
+                        || (idx.kind() == "identifier" && mask_vars.contains(idx.text().as_ref()))
+                        || idx.kind() == "list";
+                    if fancy {
+                        candidates.push(node);
+                    }
+                }
+                "comparison_operator" => {
+                    let in_mask_use = node
+                        .ancestors()
+                        .find(|above| above.kind() != "parenthesized_expression")
+                        .is_some_and(|parent| {
+                            matches!(
+                                parent.kind().as_ref(),
+                                "subscript" | "argument_list" | "keyword_argument"
+                            )
+                        });
+                    if in_mask_use {
+                        candidates.push(node);
+                    }
+                }
+                _ => {}
+            }
+        }
+        let mut by_text: HashMap<String, Vec<&Node<'t>>> = HashMap::new();
+        for node in &candidates {
+            by_text.entry(one_line(node)).or_default().push(node);
+        }
+        let mut found: Vec<(String, Vec<usize>)> = Vec::new();
+        for (text, nodes) in by_text {
+            if let Some(lines) = self.repeated_lines(nodes) {
+                found.push((text, lines));
+            }
+        }
+        let mut covered: HashSet<String> = found.iter().map(|(text, _)| text.clone()).collect();
+        covered.extend(covered_calls.iter().cloned());
+        let kinds = ["call", "subscript", "comparison_operator"];
+        let outermost = |text: &str| {
+            (candidates.iter())
+                .filter(|node| one_line(node) == text)
+                .any(|node| !self.inside_any(node, &kinds, &covered))
+        };
+        (found.iter())
+            .filter(|(text, _)| outermost(text))
+            .map(|(text, lines)| Local {
+                kind: Kind::RepeatedMask,
+                lines: lines.clone(),
+                key: format!("{}\n{text}", self.name),
+                evidence: format!(
+                    "{} evaluates mask or masked slice `{}` {} times, on {}, and changes nothing it reads in between.",
+                    self.name,
+                    quoted(text),
+                    lines.len(),
+                    listed(lines)
+                ),
+                weight: lines.len() * text.len(),
+            })
             .collect()
     }
 
-    /// The `for` loop of this function that repeats `call`. A call in a `raise` or a `return`
-    /// ends the loop, so it runs once. A `while` loop waits for something outside it to change,
-    /// so a call in it is left out.
-    fn loop_around(&self, call: &Node<'t>) -> Option<Node<'t>> {
-        let mut below = call.clone();
-        for above in call.ancestors() {
+    /// The `for` loop or comprehension of this function that repeats `node`. A call in a `raise`
+    /// or a `return` ends the loop, so it runs once. A `while` loop waits for something outside
+    /// it to change, so a node in it is left out.
+    fn loop_around(&self, node: &Node<'t>) -> Option<Node<'t>> {
+        let mut below = node.clone();
+        for above in node.ancestors() {
             if above.range() == self.node.range() {
                 return None;
             }
@@ -554,10 +727,26 @@ impl<'t> Function<'t> {
             ) {
                 return None;
             }
-            let once = above.kind() == "for_statement"
-                && (above.field("right")).is_some_and(|right| right.range() == below.range());
             match above.kind().as_ref() {
-                "for_statement" if !once => return Some(above),
+                "for_statement" => {
+                    let once =
+                        (above.field("right")).is_some_and(|right| right.range() == below.range());
+                    if !once {
+                        return Some(above);
+                    }
+                }
+                "list_comprehension"
+                | "dictionary_comprehension"
+                | "set_comprehension"
+                | "generator_expression" => {
+                    let first_iterable = (above.children())
+                        .find(|child| child.kind() == "for_in_clause")
+                        .and_then(|clause| clause.field("right"));
+                    let in_first_iterable = first_iterable.is_some_and(|iter| within(node, &iter));
+                    if !in_first_iterable {
+                        return Some(above);
+                    }
+                }
                 "while_statement" => return None,
                 _ => {}
             }
@@ -566,9 +755,9 @@ impl<'t> Function<'t> {
         None
     }
 
-    /// The calls that a loop repeats though it changes nothing they read. A call with no
-    /// argument counts only at the end of a chain of calls, as `.mean()` after a `groupby`,
-    /// because such a call on a plain name often reads state that the loop changes.
+    /// The calls that a loop or comprehension repeats though it changes nothing they read. A call
+    /// with no argument counts only at the end of a chain of calls, as `.mean()` after a
+    /// `groupby`, because such a call on a plain name often reads state that the loop changes.
     fn invariant(&self) -> Vec<Local> {
         let mut found: Vec<(Node<'t>, usize)> = Vec::new();
         for call in self.calls() {
@@ -603,7 +792,7 @@ impl<'t> Function<'t> {
         let texts: HashSet<String> = found.iter().map(|(call, _)| one_line(call)).collect();
         let mut seen = HashSet::new();
         (found.iter())
-            .filter(|(call, _)| !self.inside(call, &texts))
+            .filter(|(call, _)| !self.inside_any(call, &["call"], &texts))
             .filter(|(call, _)| seen.insert(one_line(call)))
             .map(|(call, repeating)| {
                 let text = one_line(call);
@@ -622,93 +811,451 @@ impl<'t> Function<'t> {
             .collect()
     }
 
-    /// The first expression of the function that sets every element of one array against every
-    /// element of another, as `prices[:, None] - bids`.
-    fn outer(&self) -> Option<Node<'t>> {
+    /// Full diffs, sorts, argsorts or cumulative sums built only to read one element or a small
+    /// head/tail slice.
+    fn materialized_for_one(&self) -> Vec<Local> {
+        let mut found = Vec::new();
+        for node in &self.nodes {
+            if node.kind() == "subscript" && !is_lhs(node) {
+                let Some(value) = node.field("value") else {
+                    continue;
+                };
+                let Some(idx) = node.field("subscript") else {
+                    continue;
+                };
+                let idx_text = one_line(&idx);
+                let reason = if value.kind() == "call" {
+                    match (called(&value).as_deref(), idx_text.as_str()) {
+                        (Some("diff"), "0" | "-1") => Some(format!(
+                            "builds the full diff array only to take element {idx_text}"
+                        )),
+                        (Some("sorted" | "sort"), "0" | "-1") => Some(format!(
+                            "sorts the whole input only to take element {idx_text}, which min or max finds in one pass"
+                        )),
+                        (Some("argsort"), "0" | "-1") => Some(format!(
+                            "computes a full argsort only to take element {idx_text}, which argmin or argmax finds in one pass"
+                        )),
+                        (Some("cumsum"), "-1") => Some(
+                            "builds the full cumulative sum only to take its last element, which sum computes directly"
+                                .to_owned(),
+                        ),
+                        _ => None,
+                    }
+                } else if value.kind() == "attribute"
+                    && value
+                        .field("attribute")
+                        .is_some_and(|attr| attr.text().as_ref() == "iloc")
+                    && value.field("object").is_some_and(|obj| {
+                        obj.kind() == "call" && called(&obj).as_deref() == Some("sort_values")
+                    })
+                    && matches!(idx_text.as_str(), "0" | "-1")
+                {
+                    Some(format!(
+                        "sorts the whole frame only to take row {idx_text}, which idxmin, idxmax, nsmallest or nlargest avoids"
+                    ))
+                } else {
+                    None
+                };
+                if let Some(reason) = reason {
+                    let text = one_line(node);
+                    found.push(Local {
+                        kind: Kind::MaterializedForOne,
+                        lines: vec![line(node)],
+                        key: format!("{}\n{text}", self.name),
+                        evidence: format!("`{}` in {} {reason}.", quoted(&text), self.name),
+                        weight: text.len(),
+                    });
+                }
+            } else if node.kind() == "call"
+                && matches!(called(node).as_deref(), Some("head" | "tail"))
+                && let Some(function) = node.field("function")
+                && function.kind() == "attribute"
+                && function.field("object").is_some_and(|obj| {
+                    obj.kind() == "call" && called(&obj).as_deref() == Some("sort_values")
+                })
+                && let Some(args) = node.field("arguments")
+            {
+                let count = args
+                    .children()
+                    .find(Node::is_named)
+                    .and_then(|arg| arg.text().parse::<usize>().ok())
+                    .unwrap_or(5);
+                if count <= 20 {
+                    let text = one_line(node);
+                    found.push(Local {
+                        kind: Kind::MaterializedForOne,
+                        lines: vec![line(node)],
+                        key: format!("{}\n{text}", self.name),
+                        evidence: format!(
+                            "`{}` in {} sorts the whole frame only to keep {count} rows, which nsmallest or nlargest avoids.",
+                            quoted(&text),
+                            self.name
+                        ),
+                        weight: text.len(),
+                    });
+                }
+            }
+        }
+        found
+    }
+
+    /// O(n*m) scans inside loops: membership tests against a list, or filtering a whole frame on
+    /// every iteration instead of grouping once.
+    fn linear_scans(&self) -> Vec<Local> {
+        let mut list_vars: HashSet<String> = HashSet::new();
+        for node in &self.nodes {
+            if node.kind() == "assignment"
+                && let Some(left) = node.field("left").filter(|l| l.kind() == "identifier")
+                && let Some(right) = node.field("right")
+                && is_list_expr(&right)
+            {
+                list_vars.insert(left.text().into_owned());
+            }
+        }
+        let mut found = Vec::new();
+        let mut seen = HashSet::new();
+        for node in &self.nodes {
+            let Some(repeating) = self.loop_around(node) else {
+                continue;
+            };
+            let mut inside = vec![repeating.clone()];
+            scope(&repeating, &mut inside);
+            let changed: HashSet<String> = inside.iter().flat_map(writes).collect();
+            if node.kind() == "comparison_operator" {
+                let has_in = node
+                    .children()
+                    .any(|child| matches!(child.text().as_ref(), "in" | "not in"));
+                let rhs = node.children().filter(Node::is_named).last();
+                if has_in && let Some(rhs) = rhs {
+                    let linear_literal = rhs.kind() == "list"
+                        && rhs.children().filter(Node::is_named).count() >= LINEAR_LIST_LEN;
+                    let linear_var = rhs.kind() == "identifier"
+                        && list_vars.contains(rhs.text().as_ref())
+                        && !changed.contains(rhs.text().as_ref());
+                    if linear_literal || linear_var {
+                        let text = one_line(node);
+                        if seen.insert((line(node), text.clone())) {
+                            found.push(Local {
+                                kind: Kind::LinearScanInLoop,
+                                lines: vec![line(node)],
+                                key: format!("{}\n{text}", self.name),
+                                evidence: format!(
+                                    "The loop on line {} of {} tests `{}` against a list on every pass; a set checks membership in constant time.",
+                                    line(&repeating),
+                                    self.name,
+                                    quoted(&text)
+                                ),
+                                weight: text.len(),
+                            });
+                        }
+                    }
+                }
+            } else if node.kind() == "subscript"
+                && !is_lhs(node)
+                && let Some(value) = node.field("value")
+                && let Some(idx) = node.field("subscript")
+                && idx.kind() == "comparison_operator"
+            {
+                let frame = if value.kind() == "attribute"
+                    && value
+                        .field("attribute")
+                        .is_some_and(|attr| attr.text().as_ref() == "loc")
+                {
+                    value.field("object").unwrap_or(value)
+                } else {
+                    value
+                };
+                let Some(frame_name) = root_name(&frame) else {
+                    continue;
+                };
+                if changed.contains(&frame_name) {
+                    continue;
+                }
+                let filters_self = idx.dfs().any(|inner| {
+                    inner.kind() == "subscript"
+                        && inner
+                            .field("value")
+                            .and_then(|v| root_name(&v))
+                            .is_some_and(|name| name == frame_name)
+                });
+                let depends_on_loop = !reads(&idx).is_disjoint(&changed);
+                if filters_self && depends_on_loop {
+                    let text = one_line(node);
+                    if seen.insert((line(node), text.clone())) {
+                        found.push(Local {
+                            kind: Kind::LinearScanInLoop,
+                            lines: vec![line(node)],
+                            key: format!("{}\n{text}", self.name),
+                            evidence: format!(
+                                "The loop on line {} of {} filters `{frame_name}` with `{}` on every pass; grouping once avoids rescanning the frame.",
+                                line(&repeating),
+                                self.name,
+                                quoted(&text)
+                            ),
+                            weight: text.len() * 2,
+                        });
+                    }
+                }
+            }
+        }
+        found
+    }
+
+    /// Every outermost expression of the function that sets every element of one array against
+    /// every element of another, as `prices[:, None] - bids`.
+    fn outers(&self) -> Vec<Node<'t>> {
         let adds_axis = |subscript: &Node<'_>| {
             subscript
                 .field_children("subscript")
                 .any(|index| index.kind() == "none" || index.text().ends_with("newaxis"))
         };
-        (self.nodes.iter())
+        let mut found: Vec<Node<'t>> = Vec::new();
+        for node in self
+            .nodes
+            .iter()
             .filter(|node| node.kind() == "subscript" && adds_axis(node))
-            .find_map(|node| {
-                let mut whole = None;
-                for above in node.ancestors() {
-                    match above.kind().as_ref() {
-                        "binary_operator" | "comparison_operator" => whole = Some(above),
-                        "parenthesized_expression" | "unary_operator" => {}
-                        _ => break,
-                    }
+        {
+            let mut whole = None;
+            for above in node.ancestors() {
+                match above.kind().as_ref() {
+                    "binary_operator" | "comparison_operator" => whole = Some(above),
+                    "parenthesized_expression" | "unary_operator" => {}
+                    _ => break,
                 }
-                whole
-            })
+            }
+            if let Some(whole) = whole
+                && !found
+                    .iter()
+                    .any(|existing| existing.range() == whole.range())
+            {
+                found.push(whole);
+            }
+        }
+        found
     }
 
-    /// The calls of the function that reduce an array along an axis.
-    fn reductions(&self) -> impl Iterator<Item = &Node<'t>> {
-        (self.nodes.iter()).filter(|node| {
-            node.kind() == "call"
-                && called(node).is_some_and(|name| REDUCERS.contains(&name.as_str()))
-                && (node.field("arguments")).is_some_and(|arguments| {
-                    (arguments.children())
-                        .filter(|argument| argument.kind() == "keyword_argument")
-                        .any(|argument| {
-                            (argument.field("name")).is_some_and(|name| name.text() == "axis")
-                        })
-                })
-        })
+    /// Whether `node` reduces or contracts an array (a reduction call or `@` matrix multiply).
+    fn reduction_kind(node: &Node<'_>) -> Option<bool> {
+        match node.kind().as_ref() {
+            "binary_operator"
+                if node
+                    .field("operator")
+                    .is_some_and(|op| op.text().as_ref() == "@") =>
+            {
+                Some(true)
+            }
+            "call" => {
+                let name = called(node)?;
+                if CONTRACTORS.contains(&name.as_str()) {
+                    return Some(true);
+                }
+                if REDUCERS.contains(&name.as_str()) {
+                    let has_axis = (node.field("arguments")).is_some_and(|arguments| {
+                        (arguments.children())
+                            .filter(|argument| argument.kind() == "keyword_argument")
+                            .any(|argument| {
+                                (argument.field("name")).is_some_and(|n| n.text() == "axis")
+                            })
+                    });
+                    return Some(has_axis);
+                }
+                None
+            }
+            _ => None,
+        }
     }
 }
 
-/// A function that returns a matrix of every element against every other: its name, the line
-/// and the text of the expression.
-type Outer = (String, usize, String);
+/// A function that returns a matrix of every element against every other: its line and text.
+type Outer = (usize, String);
 
-/// The matrices that the functions build and reduce along an axis, in one function or in a
-/// caller of the function that returns the matrix.
-fn reduced(functions: &[Function<'_>]) -> Vec<Local> {
-    let finding = |function: &Function<'_>, built: usize, text: &str, at: usize, by: &str| Local {
-        kind: Kind::MatrixReduced,
-        lines: vec![built, at],
-        key: format!("{}\n{text}", function.name),
-        evidence: format!(
-            "`{}` holds one value for each pair of elements of its two sides, and line {at} of {} reduces it along an axis{by}.",
-            quoted(text),
-            function.name
-        ),
-        weight: text.len(),
-    };
-    let mut found = Vec::new();
-    let mut returned: Vec<Outer> = Vec::new();
-    for function in functions {
-        let Some(outer) = function.outer() else {
+/// Whether `text` calls the helper named `helper`, directly or as a method.
+fn calls_helper(text: &str, helper: &str) -> bool {
+    text.contains(&format!(".{helper}(")) || text.starts_with(&format!("{helper}("))
+}
+
+/// Whether `node` reads the tainted variable `name` as an array value (not as an attribute
+/// container like `solved.fun`, where `solved` is a result object).
+fn uses_array(node: &Node<'_>, name: &str) -> bool {
+    for inner in node.dfs().filter(|inner| inner.kind() == "identifier") {
+        if inner.text().as_ref() != name {
             continue;
+        }
+        let Some(parent) = inner.parent() else {
+            return true;
         };
-        let text = one_line(&outer);
-        let within = |inner: &Node<'_>, around: &Node<'_>| {
-            let (inner, around) = (inner.range(), around.range());
-            around.start <= inner.start && inner.end <= around.end
-        };
-        let reduction = function.reductions().find(|call| {
-            within(&outer, call)
-                || (line(call) > outer.end_pos().line() + 1 && !within(call, &outer))
-        });
-        if let Some(reduction) = reduction {
-            found.push(finding(function, line(&outer), &text, line(reduction), ""));
-        } else if (outer.ancestors()).any(|above| above.kind() == "return_statement") {
-            returned.push((function.name.clone(), line(&outer), text));
+        if parent.kind() == "attribute"
+            && parent
+                .field("object")
+                .is_some_and(|obj| obj.range() == inner.range())
+        {
+            let attr = parent
+                .field("attribute")
+                .map(|attr| attr.text().into_owned());
+            if attr
+                .as_deref()
+                .is_some_and(|a| REDUCERS.contains(&a) || matches!(a, "T" | "real" | "imag"))
+            {
+                return true;
+            }
+            continue;
+        }
+        if parent.kind() == "keyword_argument"
+            && parent
+                .field("name")
+                .is_some_and(|kw| kw.range() == inner.range())
+        {
+            continue;
+        }
+        return true;
+    }
+    false
+}
+
+/// Whether `rhs` transforms a tainted matrix into another matrix of the same shape (rather than
+/// passing it as an initial guess to a solver or optimizer).
+fn preserves_matrix(rhs: &Node<'_>, name: &str) -> bool {
+    if !uses_array(rhs, name) {
+        return false;
+    }
+    match rhs.kind().as_ref() {
+        "binary_operator"
+        | "unary_operator"
+        | "comparison_operator"
+        | "subscript"
+        | "parenthesized_expression" => true,
+        "call" => !called(rhs).is_some_and(|c| {
+            matches!(
+                c.as_str(),
+                "least_squares"
+                    | "minimize"
+                    | "linprog"
+                    | "solve_ivp"
+                    | "root"
+                    | "brentq"
+                    | "fit"
+                    | "fit_transform"
+            )
+        }),
+        _ => false,
+    }
+}
+
+/// Functions that return an outer-broadcast matrix, mapped to its build line and text.
+fn returned_outers(functions: &[Function<'_>]) -> HashMap<String, Outer> {
+    let mut returned: HashMap<String, Outer> = HashMap::new();
+    for function in functions {
+        let outers = function.outers();
+        if outers.is_empty() {
+            continue;
+        }
+        let mut bound: HashMap<String, Outer> = HashMap::new();
+        for node in &function.nodes {
+            if node.kind() == "assignment"
+                && let Some(left) = node.field("left").filter(|l| l.kind() == "identifier")
+                && let Some(right) = node.field("right")
+            {
+                if let Some(outer) = outers.iter().find(|o| within(o, &right)) {
+                    bound.insert(left.text().into_owned(), (line(outer), one_line(outer)));
+                } else if let Some(hit) = bound
+                    .iter()
+                    .find_map(|(name, info)| preserves_matrix(&right, name).then(|| info.clone()))
+                {
+                    bound.insert(left.text().into_owned(), hit);
+                }
+            }
+            if node.kind() == "return_statement" {
+                if let Some(outer) = outers.iter().find(|o| within(o, node)) {
+                    returned.insert(function.name.clone(), (line(outer), one_line(outer)));
+                    break;
+                }
+                if let Some(hit) = bound
+                    .iter()
+                    .find_map(|(name, info)| uses_array(node, name).then(|| info.clone()))
+                {
+                    returned.insert(function.name.clone(), hit);
+                    break;
+                }
+            }
         }
     }
-    for (name, built, text) in &returned {
-        for function in functions {
-            let calls = |reduction: &&Node<'_>| {
-                let written = reduction.text();
-                written.contains(&format!(".{name}(")) || written.starts_with(&format!("{name}("))
+    returned
+}
+
+/// The matrices that the functions build and reduce or contract, in one function or in a caller
+/// of the function that returns the matrix, tracking local variable bindings in between.
+fn reduced(functions: &[Function<'_>]) -> Vec<Local> {
+    let returned = returned_outers(functions);
+    let mut found = Vec::new();
+    let mut seen: HashSet<(String, String)> = HashSet::new();
+    for function in functions {
+        let outers = function.outers();
+        let mut tainted: HashMap<String, (usize, String, String)> = HashMap::new();
+        for node in &function.nodes {
+            if node.kind() == "assignment"
+                && let Some(left) = node.field("left").filter(|l| l.kind() == "identifier")
+                && let Some(right) = node.field("right")
+            {
+                let right_text = right.text();
+                if let Some(outer) = outers.iter().find(|o| within(o, &right)) {
+                    tainted.insert(
+                        left.text().into_owned(),
+                        (line(outer), one_line(outer), String::new()),
+                    );
+                } else if let Some((helper, (built, text))) = returned
+                    .iter()
+                    .find(|(helper, _)| calls_helper(&right_text, helper))
+                {
+                    tainted.insert(
+                        left.text().into_owned(),
+                        (*built, text.clone(), format!(", through {helper}")),
+                    );
+                } else if let Some(hit) = tainted
+                    .iter()
+                    .find_map(|(name, info)| preserves_matrix(&right, name).then(|| info.clone()))
+                {
+                    tainted.insert(left.text().into_owned(), hit);
+                }
+            }
+            let Some(explicit_sink) = Function::reduction_kind(node) else {
+                continue;
             };
-            if let Some(reduction) = function.reductions().find(calls) {
-                let by = format!(", through {name}");
-                found.push(finding(function, *built, text, line(reduction), &by));
+            let node_text = node.text();
+            let source = if let Some(outer) = outers.iter().find(|o| within(o, node)) {
+                Some((line(outer), one_line(outer), String::new()))
+            } else if let Some((helper, (built, text))) = returned
+                .iter()
+                .find(|(helper, _)| calls_helper(&node_text, helper))
+            {
+                Some((*built, text.clone(), format!(", through {helper}")))
+            } else if let Some(hit) = tainted
+                .iter()
+                .find_map(|(name, info)| uses_array(node, name).then(|| info.clone()))
+            {
+                Some(hit)
+            } else if explicit_sink && node.kind() == "call" {
+                outers
+                    .iter()
+                    .find(|outer| line(node) > outer.end_pos().line() + 1 && !within(node, outer))
+                    .map(|outer| (line(outer), one_line(outer), String::new()))
+            } else {
+                None
+            };
+            if let Some((built, text, by)) = source
+                && seen.insert((function.name.clone(), text.clone()))
+            {
+                let at = line(node);
+                found.push(Local {
+                    kind: Kind::MatrixReduced,
+                    lines: vec![built, at],
+                    key: format!("{}\n{text}", function.name),
+                    evidence: format!(
+                        "`{}` holds one value for each pair of elements of its two sides, and line {at} of {} reduces it{by}.",
+                        quoted(&text),
+                        function.name
+                    ),
+                    weight: text.len(),
+                });
             }
         }
     }
@@ -835,8 +1382,12 @@ pub(super) fn facts(path: &Path, root: &Root) -> Facts {
     let test = source::is_test(path);
     for function in &functions {
         if !test {
-            facts.local.extend(function.repeated());
+            let (repeated, covered_calls) = function.repeated();
+            facts.local.extend(repeated);
+            facts.local.extend(function.repeated_masks(&covered_calls));
             facts.local.extend(function.invariant());
+            facts.local.extend(function.materialized_for_one());
+            facts.local.extend(function.linear_scans());
         }
         facts.functions.push(function.name.clone());
     }

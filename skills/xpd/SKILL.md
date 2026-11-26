@@ -98,13 +98,14 @@ Use `xpd` whenever you write or change Python code.
   and `xpd untangle status` for the stage that comes next. The `xpd-untangle` skill holds
   the steps.
 - `xpd optimize <paths…> --format json`: the places where code does work that a shorter or
-  faster program would not do, read from the files without running anything. It lists what
-  no rule of `xpd check` reports, because each finding shows only when two places are read
-  together: near copies, calls that a function computes twice or a loop repeats, arguments
-  that pass a library default, and matrices that are built to be reduced, each with an `id`,
-  its places and evidence. Run it after `xpd check` is clean and after each round, and add
-  `--since <commit>` to see which findings are fixed. Near copies are found in every
-  language, and the rest in Python. The `xpd-optimize` skill holds the steps.
+  faster program would not do, combining rulekit checks with whole-function and cross-place
+  analysis without running code: rule issues, near copies, repeated calls and boolean masks,
+  loop-invariant calls, default arguments, pairwise matrices built to be reduced or contracted,
+  full materializations indexed for one element, and linear scans in loops, each with an `id`,
+  its places and evidence. `xpd optimize start <paths> --check "<tests>" --bench "<workload>"`
+  begins a recorded run that tracks code lines, benchmark timing and a gate for each fix, with
+  `xpd optimize status` for the stage that comes next. Near copies are found in every language,
+  and the rest in Python. The `xpd-optimize` skill holds the steps.
 - `xpd refit <contract.json>`: refit a saved scikit-learn Pipeline on its raw
   training rows and compare outputs and scores with the contract. Needs pandas
   and scikit-learn.
