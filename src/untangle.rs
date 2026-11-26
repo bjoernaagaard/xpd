@@ -11,7 +11,6 @@ mod python;
 
 use std::collections::{BTreeSet, HashMap, HashSet};
 use std::fmt::Write as _;
-use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
@@ -28,6 +27,7 @@ use crate::style::Style;
 use crate::syntax;
 use crate::workspace::Workspace;
 
+use crate::optimize::gix_source::Listing;
 use history::History;
 
 type Finding = ledger::Finding<Kind>;
@@ -169,7 +169,7 @@ impl UntangleArgs {
     pub(crate) fn run(self, default: Format) -> Result<ExitCode> {
         let survey = |paths: &[PathBuf], files: Tree<'_>, top: Option<&Path>, commit: &str| {
             let history = top.map_or_else(History::default, |top| History::read(top, commit));
-            survey(paths, files, &history)
+            survey(files, &Listing::of(paths, files, top, commit)?, &history)
         };
         self.select.print(default, survey, header)
     }
@@ -209,10 +209,11 @@ fn read(
     path: &Path,
     language: SupportLang,
     tree: Tree<'_>,
+    listing: &Listing,
     workspace: Option<&Workspace>,
 ) -> Option<Surveyed> {
-    let text = fs::read_to_string(path).ok()?;
-    let absolute = fs::canonicalize(path).ok()?;
+    let text = listing.text(path)?;
+    let absolute = listing.absolute(path)?;
     let tracked = tree.tracked(&absolute);
     let root = syntax::parse_as(&text, language);
     let mut ruled = Vec::new();
@@ -327,11 +328,11 @@ fn changed_together(
     findings
 }
 
-/// What was read and every finding of the files under `paths`, by group, kind and strength.
-/// The rules of `xpd check` take a
+/// What was read and every finding of the files that `listing` lists, by group, kind and
+/// strength. The rules of `xpd check` take a
 /// moment to compile, so they are loaded only when a Python file is read.
-fn survey(paths: &[PathBuf], tree: Tree<'_>, history: &History) -> Result<(Read, Vec<Entry>)> {
-    let files = ledger::files(paths);
+fn survey(tree: Tree<'_>, listing: &Listing, history: &History) -> Result<(Read, Vec<Entry>)> {
+    let files = &listing.files;
     let workspace = (files
         .iter()
         .any(|(_, language)| *language == SupportLang::Python))
@@ -342,7 +343,7 @@ fn survey(paths: &[PathBuf], tree: Tree<'_>, history: &History) -> Result<(Read,
             let workspace = workspace
                 .as_ref()
                 .filter(|_| *language == SupportLang::Python);
-            read(path, *language, tree, workspace)
+            read(path, *language, tree, listing, workspace)
         })
         .collect();
     let read = Read {
