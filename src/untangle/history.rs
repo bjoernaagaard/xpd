@@ -4,11 +4,12 @@
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::path::Path;
 
+#[cfg(not(feature = "ledger-incremental"))]
 use crate::git;
 
 /// How many commits are read, newest first. Older commits say little about how the code
 /// changes today.
-const COMMITS_READ: &str = "2000";
+const COMMITS_READ: usize = 2000;
 /// A commit that changes more files than this is a sweep, such as a rename or a formatter run,
 /// and says nothing about which files belong together.
 const SWEEP_FILES: usize = 25;
@@ -33,24 +34,95 @@ pub(super) struct Pair {
 }
 
 impl History {
-    /// The history that `git log` prints for `revision` in the repository at `top`. Empty when
-    /// git cannot read it.
+    /// The non-merge history for `revision` in the repository at `top`. Empty when it cannot
+    /// be read.
+    #[cfg(feature = "ledger-incremental")]
     pub(super) fn read(top: &Path, revision: &str) -> Self {
+        Self::read_gix(top, revision)
+    }
+
+    /// The non-merge history from `git log`. Empty when Git cannot read it.
+    #[cfg(not(feature = "ledger-incremental"))]
+    pub(super) fn read(top: &Path, revision: &str) -> Self {
+        let limit = COMMITS_READ.to_string();
         let args = [
             "log",
             "--no-merges",
             "--name-only",
             "--format=%x00",
             "-n",
-            COMMITS_READ,
+            &limit,
             revision,
             "--",
         ];
         git::output(top, &args).map_or_else(|_| Self::default(), |log| Self::parse(&log))
     }
 
+    #[cfg(feature = "ledger-incremental")]
+    pub(super) fn read_gix(top: &Path, revision: &str) -> Self {
+        Self::try_read_gix(top, revision).unwrap_or_default()
+    }
+
+    #[cfg(feature = "ledger-incremental")]
+    fn try_read_gix(top: &Path, revision: &str) -> gix::Result<Self> {
+        use gix::bstr::ByteSlice;
+        use gix::revision::walk::{CommitTimeOrder, Sorting};
+
+        let repo = gix::open(top)?;
+        let tip = repo
+            .rev_parse_single(revision)?
+            .object()?
+            .peel_to_commit()?;
+        let walk = repo
+            .rev_walk([tip.id])
+            .sorting(Sorting::ByCommitTime(CommitTimeOrder::NewestFirst))
+            .all()?;
+        let mut commits = Vec::new();
+        let mut remaining = COMMITS_READ;
+        for entry in walk {
+            let entry = entry?;
+            if entry.parent_ids.len() > 1 {
+                continue;
+            }
+
+            let tree = repo.find_commit(entry.id)?.tree()?;
+            let parent_tree = entry
+                .parent_ids
+                .first()
+                .map(|id| repo.find_commit(*id)?.tree())
+                .transpose()?;
+            let diff = repo.diff_tree_to_tree(parent_tree.as_ref(), &tree, None)?;
+            let mut paths: Vec<_> = diff
+                .iter()
+                .filter(|change| !change.entry_mode().is_tree())
+                .map(gix::object::tree::diff::ChangeDetached::location)
+                .collect();
+            paths.sort_unstable();
+            paths.dedup();
+            let files: Vec<_> = paths
+                .into_iter()
+                .map(|path| {
+                    gix::quote::ansi_c::quote(path)
+                        .to_str_lossy()
+                        .trim()
+                        .to_owned()
+                })
+                .filter(|path| !path.is_empty())
+                .collect();
+            if !files.is_empty() {
+                commits.push(files);
+            }
+            remaining -= 1;
+            if remaining == 0 {
+                break;
+            }
+        }
+        Ok(Self { commits })
+    }
+
     /// The commits of a log printed with `--name-only --format=%x00`: a NUL starts each commit,
     /// and each line after it names one file.
+    #[cfg(not(feature = "ledger-incremental"))]
     pub(super) fn parse(log: &str) -> Self {
         let commits = log
             .split('\0')
