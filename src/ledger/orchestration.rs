@@ -66,6 +66,9 @@ pub(crate) struct BenchState {
     pub(crate) runs: usize,
     pub(crate) baseline: Timing,
     pub(crate) current: Timing,
+    /// The class of machine that timed `baseline` and `current`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) host_fingerprint: Option<String>,
 }
 
 /// What proves a fix that names no static finding id.
@@ -300,6 +303,11 @@ pub(crate) struct GateOutput {
     pub(crate) lines_after: usize,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub(crate) timing: Option<(Timing, Timing)>,
+    /// Whether `timing` times both commits back to back, on a class of machine other than
+    /// the one that timed the run's benchmark. Such a pair judges the fix, and the run keeps
+    /// its own timings, which are on another scale.
+    #[serde(default)]
+    pub(crate) paired: bool,
 }
 
 /// What `FinishRun` surveys at the end of a run.
@@ -603,7 +611,9 @@ async fn apply_gate(
             });
             state.current = output.commit;
             state.current_lines = output.lines_after;
-            if let (Some(bench), Some((_, after))) = (&mut state.bench, output.timing) {
+            if let (Some(bench), Some((_, after)), false) =
+                (&mut state.bench, output.timing, output.paired)
+            {
                 bench.current = after;
             }
             Ok(())

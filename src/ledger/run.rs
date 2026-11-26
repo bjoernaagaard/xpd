@@ -142,6 +142,10 @@ struct Bench {
     runs: usize,
     baseline: Timing,
     current: Timing,
+    /// The class of machine that timed `baseline` and `current`, from [`host_fingerprint`].
+    /// A gate timed on another class of machine times both commits there, back to back.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    host_fingerprint: Option<String>,
 }
 
 /// What proves a fix that names no static finding id.
@@ -444,6 +448,40 @@ fn count_lines(paths: &[PathBuf]) -> usize {
 }
 
 /// Rounds a millisecond measurement to two decimal places.
+/// The class of machine this process runs on: its CPU model, OS and architecture. Two
+/// timings of a benchmark compare only when they come from the same class.
+fn host_fingerprint() -> String {
+    format!(
+        "{} / {} / {}",
+        cpu_model().unwrap_or_else(|| "unknown CPU".to_owned()),
+        std::env::consts::OS,
+        std::env::consts::ARCH
+    )
+}
+
+/// The CPU model, from `/proc/cpuinfo` on Linux and `sysctl` on macOS.
+fn cpu_model() -> Option<String> {
+    if cfg!(target_os = "macos") {
+        let output = Command::new("sysctl")
+            .args(["-n", "machdep.cpu.brand_string"])
+            .stdin(Stdio::null())
+            .output()
+            .ok()?;
+        let model = String::from_utf8_lossy(&output.stdout).trim().to_owned();
+        (output.status.success() && !model.is_empty()).then_some(model)
+    } else {
+        model_name(&fs::read_to_string("/proc/cpuinfo").ok()?).map(str::to_owned)
+    }
+}
+
+/// The value of the first `model name` line of `/proc/cpuinfo`.
+fn model_name(cpuinfo: &str) -> Option<&str> {
+    cpuinfo.lines().find_map(|line| {
+        let (key, value) = line.split_once(':')?;
+        (key.trim() == "model name").then(|| value.trim())
+    })
+}
+
 fn round_ms(ms: f64) -> f64 {
     (ms * 100.0).round() / 100.0
 }
@@ -718,6 +756,7 @@ fn start(
                 runs: timing.runs,
                 baseline: timing,
                 current: timing,
+                host_fingerprint: Some(host_fingerprint()),
             })
         })
         .transpose()?;

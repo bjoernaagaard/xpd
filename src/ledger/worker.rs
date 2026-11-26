@@ -10,6 +10,13 @@
 //!
 //! A worker runs one activity at a time, in the folder of its worktree, because the checks and
 //! the line count read the folder of the process. More workers serve more fixes at once.
+//!
+//! A benchmark is timed apart from the checks. A general worker started with `--bench-schema`
+//! sends each timing as a `LedgerBench` orchestration to that schema, under an id that the run,
+//! the commit and the commit it is timed against fix, so a retried gate finds the timing of the
+//! first try. A worker started with `--bench` serves only that schema, one timing at a time. When
+//! it runs on another class of machine than the one that timed the run's benchmark, it times
+//! the commit the run stands at and the fix back to back, and the run keeps its own timings.
 
 use std::collections::BTreeSet;
 use std::fs::{self, File};
@@ -20,9 +27,10 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::Duration;
 
 use anyhow::{Context, Result, bail};
-use duroxide::ActivityContext;
-use duroxide::runtime::registry::ActivityRegistry;
+use duroxide::providers::Provider;
+use duroxide::runtime::registry::{ActivityRegistry, OrchestrationRegistry};
 use duroxide::runtime::{Runtime, RuntimeOptions};
+use duroxide::{ActivityContext, Client, OrchestrationContext, OrchestrationStatus};
 use serde::Serialize;
 use serde::de::DeserializeOwned;
 
@@ -32,7 +40,7 @@ use super::super::orchestration::{
     ACT_FINISH_RUN, ACT_GATE_FIX, ACT_INIT_BASELINE, ACT_VALIDATE_PLAN, BaselineOutput, BenchState,
     CheckState, FinishOutput, GateOutput, RunStartInput, Snapshot, Timing, ValidatePlanOutput,
 };
-use super::super::{count_lines, measure_bench, passes};
+use super::super::{count_lines, host_fingerprint, measure_bench, passes};
 use super::{
     LedgerOrchestratorClient, PG_SCHEMA_VAR, PG_URL_VAR, REMOTE_VAR, open_postgres_store,
     orchestration_registry, run_branch,
@@ -68,6 +76,66 @@ pub(crate) struct WorkerArgs {
     /// renews the lock while it gates, so only a dead worker lets it run out.
     #[arg(long, default_value_t = 300, value_parser = clap::value_parser!(u64).range(10..=3600))]
     lock_timeout: u64,
+    /// Serve only the benchmark timings that general workers send, one at a time. Run it on the
+    /// bench host, with `--schema` set to the schema the general workers name in
+    /// `--bench-schema`.
+    #[arg(long, conflicts_with = "bench_schema")]
+    bench: bool,
+    /// The PostgreSQL schema of the bench workers. With it, this worker sends each benchmark
+    /// timing there, instead of timing it next to the checks of other runs.
+    #[arg(long, value_name = "SCHEMA")]
+    bench_schema: Option<String>,
+}
+
+/// The orchestration that carries one benchmark timing to the bench workers.
+const BENCH_ORCHESTRATION: &str = "LedgerBench";
+/// The activity that times a benchmark, which only bench workers register.
+const ACT_MEASURE_BENCH: &str = "MeasureBench";
+/// How long a gate waits for its benchmark timing, queue included.
+const BENCH_WAIT: Duration = Duration::from_secs(3600);
+
+/// One timing that a bench worker takes.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+struct BenchRequest {
+    /// The branch prefix of the run, whose branches hold both commits.
+    branch: String,
+    command: String,
+    runs: usize,
+    /// The commit to time.
+    commit: String,
+    /// The commit the run stands at, with its timing and the class of machine that took it.
+    /// `None` for the commit a run starts from.
+    against: Option<BenchAgainst>,
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+struct BenchAgainst {
+    commit: String,
+    timing: Timing,
+    host: Option<String>,
+}
+
+/// What a bench worker timed, and on which class of machine.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+struct BenchReply {
+    host: String,
+    /// The timing of `against`: the run's own when `paired` is false.
+    before: Option<Timing>,
+    after: Timing,
+    /// Whether `before` and `after` were timed back to back here, because the run's timing
+    /// comes from another class of machine.
+    paired: bool,
+}
+
+/// Whether a timing taken on `here` must be paired with a new timing of the commit the run
+/// stands at: when the run's timing comes from another class of machine, or from an unknown one.
+fn needs_pairing(recorded: Option<&str>, here: &str) -> bool {
+    recorded != Some(here)
+}
+
+/// The orchestration of one benchmark timing: one activity, on a bench worker.
+async fn ledger_bench(ctx: OrchestrationContext, input: String) -> Result<String, String> {
+    ctx.schedule_activity(ACT_MEASURE_BENCH, input).await
 }
 
 /// A variable of the environment, when it is set and not empty.
@@ -94,13 +162,7 @@ pub(crate) fn run(args: WorkerArgs) -> Result<ExitCode> {
         .trim(),
     );
     let shelf = Shelf::claim(&top, &common.join("xpd-worker"))?;
-    let worker = Arc::new(Worker {
-        top,
-        remote,
-        shelf,
-        made: AtomicUsize::new(0),
-        xpd: std::env::current_exe().context("cannot find the xpd binary")?,
-    });
+    let xpd = std::env::current_exe().context("cannot find the xpd binary")?;
     let lock = Duration::from_secs(args.lock_timeout);
     let options = RuntimeOptions {
         worker_concurrency: 1,
@@ -115,14 +177,35 @@ pub(crate) fn run(args: WorkerArgs) -> Result<ExitCode> {
         .context("cannot build the Tokio runtime of the worker")?;
     tokio.block_on(async move {
         let store = open_postgres_store(&url, schema.as_deref()).await?;
-        let activities = Arc::clone(&worker).registry();
+        let bench_store = match &args.bench_schema {
+            Some(bench_schema) => Some(open_postgres_store(&url, Some(bench_schema)).await?),
+            None => None,
+        };
+        let worker = Arc::new(Worker {
+            top,
+            remote,
+            shelf,
+            made: AtomicUsize::new(0),
+            xpd,
+            bench_store,
+        });
+        let (activities, orchestrations, serves) = if args.bench {
+            let orchestrations = OrchestrationRegistry::builder()
+                .register(BENCH_ORCHESTRATION, ledger_bench)
+                .build();
+            (worker.bench_registry(), orchestrations, "benchmark timings")
+        } else {
+            (worker.registry(), orchestration_registry(), "ledger runs")
+        };
         let runtime =
-            Runtime::start_with_options(store, activities, orchestration_registry(), options).await;
+            Runtime::start_with_options(store, activities, orchestrations, options).await;
         eprintln!(
-            "xpd ledger worker {}: serving the store with the clone {} and the remote {}",
+            "xpd ledger worker {}: serving {serves} of the schema {} with the clone {} and the remote {}, on {}",
             std::process::id(),
+            schema.as_deref().unwrap_or("public"),
             worker.top.display(),
-            worker.remote
+            worker.remote,
+            host_fingerprint()
         );
         let stopped = tokio::signal::ctrl_c().await;
         runtime.shutdown(Some(10_000)).await;
@@ -211,7 +294,6 @@ struct GateRequest {
     paths: Vec<String>,
 }
 
-#[derive(Debug)]
 struct Worker {
     /// The top of the clone.
     top: PathBuf,
@@ -221,11 +303,110 @@ struct Worker {
     made: AtomicUsize,
     /// The xpd binary, which surveys a worktree in a process of its own.
     xpd: PathBuf,
+    /// The store of the bench workers, which time each benchmark when it is set.
+    bench_store: Option<Arc<dyn Provider>>,
+}
+
+impl std::fmt::Debug for Worker {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("Worker")
+            .field("top", &self.top)
+            .field("remote", &self.remote)
+            .field("shelf", &self.shelf)
+            .field("sends_bench", &self.bench_store.is_some())
+            .finish_non_exhaustive()
+    }
 }
 
 impl Worker {
+    /// The one activity of a bench worker: a benchmark timing, off the Tokio threads.
+    fn bench_registry(self: &Arc<Self>) -> ActivityRegistry {
+        let worker = Arc::clone(self);
+        ActivityRegistry::builder()
+            .register(
+                ACT_MEASURE_BENCH,
+                move |ctx: ActivityContext, input: String| {
+                    let worker = Arc::clone(&worker);
+                    async move {
+                        let pid = std::process::id();
+                        let instance = ctx.instance_id().to_owned();
+                        eprintln!("xpd ledger worker {pid}: {ACT_MEASURE_BENCH} of {instance} starts");
+                        let timed = tokio::task::spawn_blocking(move || {
+                            worker.time_bench(&decode(&input)?).and_then(|reply| encode(&reply))
+                        })
+                        .await
+                        .map_err(|error| format!("the timing thread ended: {error}"))?;
+                        match &timed {
+                            Ok(reply) => eprintln!("xpd ledger worker {pid}: {ACT_MEASURE_BENCH} of {instance} done: {reply}"),
+                            Err(error) => eprintln!("xpd ledger worker {pid}: {ACT_MEASURE_BENCH} of {instance} failed: {error:#}"),
+                        }
+                        timed.map_err(|error| format!("{error:#}"))
+                    }
+                },
+            )
+            .build()
+    }
+
+    /// Times a benchmark on this machine. The commit the run stands at is timed again, just
+    /// before the commit of the request, when the run's timing comes from another class of
+    /// machine.
+    fn time_bench(&self, request: &BenchRequest) -> Result<BenchReply> {
+        self.fetch(&request.branch)?;
+        let host = host_fingerprint();
+        let time = |commit: &str| -> Result<Timing> {
+            let worktree = self.worktree(&self.resolve(commit)?)?;
+            let _in = InFolder::enter(&worktree)?;
+            convert(&measure_bench(&request.command, request.runs)?)
+        };
+        let (before, paired) = match &request.against {
+            None => (None, false),
+            Some(against) if needs_pairing(against.host.as_deref(), &host) => {
+                (Some(time(&against.commit)?), true)
+            }
+            Some(against) => (Some(against.timing), false),
+        };
+        let after = time(&request.commit)?;
+        Ok(BenchReply {
+            host,
+            before,
+            after,
+            paired,
+        })
+    }
+
+    /// A benchmark timing: from the bench workers when their schema is set, and on this worker
+    /// otherwise. The id of the bench orchestration comes from the request alone, so a gate
+    /// that runs again after its worker died waits for the timing it asked for before.
+    fn bench(&self, instance: &str, request: &BenchRequest) -> Result<BenchReply> {
+        let Some(store) = &self.bench_store else {
+            return self.time_bench(request);
+        };
+        let against = (request.against.as_ref()).map_or("start", |against| against.commit.as_str());
+        let id = format!("bench::{instance}::{}::{against}", request.commit);
+        let input = encode(request)?;
+        let client = Client::new(Arc::clone(store));
+        tokio::runtime::Handle::current().block_on(async {
+            if matches!(
+                client.get_orchestration_status(&id).await?,
+                OrchestrationStatus::NotFound
+            ) {
+                client
+                    .start_orchestration(&id, BENCH_ORCHESTRATION, input)
+                    .await?;
+            }
+            match client
+                .wait_for_orchestration_typed::<BenchReply>(&id, BENCH_WAIT)
+                .await?
+            {
+                Ok(reply) => Ok(reply),
+                Err(failed) => bail!("the bench worker could not time {id}: {failed}"),
+            }
+        })
+    }
+
     /// The activities of a run, each served by measuring in a worktree.
-    fn registry(self: Arc<Self>) -> ActivityRegistry {
+    fn registry(self: &Arc<Self>) -> ActivityRegistry {
         let mut builder = ActivityRegistry::builder();
         for name in [
             ACT_INIT_BASELINE,
@@ -233,7 +414,7 @@ impl Worker {
             ACT_GATE_FIX,
             ACT_FINISH_RUN,
         ] {
-            let worker = Arc::clone(&self);
+            let worker = Arc::clone(self);
             builder = builder.register(name, move |ctx: ActivityContext, input: String| {
                 Arc::clone(&worker).serve(ctx, input)
             });
@@ -289,7 +470,9 @@ impl Worker {
         self.fetch(&branch)?;
         let head = format!("refs/remotes/{}/{branch}/head", self.remote);
         match (name, snapshot) {
-            (ACT_INIT_BASELINE, _) => encode(&self.baseline(&decode(input)?, &head)?),
+            (ACT_INIT_BASELINE, _) => {
+                encode(&self.baseline(instance, &branch, &decode(input)?, &head)?)
+            }
             (ACT_VALIDATE_PLAN, _) => {
                 let paths: Vec<String> = decode(input)?;
                 let worktree = self.worktree(&head)?;
@@ -297,7 +480,7 @@ impl Worker {
                 encode(&ValidatePlanOutput { known })
             }
             (ACT_GATE_FIX, Some(snapshot)) => {
-                encode(&self.gate(command, &decode(input)?, snapshot)?)
+                encode(&self.gate(instance, &branch, command, &decode(input)?, snapshot)?)
             }
             (ACT_FINISH_RUN, Some(snapshot)) => {
                 let paths: Vec<String> = decode(input)?;
@@ -384,44 +567,64 @@ impl Worker {
     }
 
     /// The checks, benchmark, findings and lines of the commit a run starts from.
-    fn baseline(&self, start: &RunStartInput, head: &str) -> Result<BaselineOutput> {
+    fn baseline(
+        &self,
+        instance: &str,
+        branch: &str,
+        start: &RunStartInput,
+        head: &str,
+    ) -> Result<BaselineOutput> {
         let base = self.resolve(head)?;
         let worktree = self.worktree(&base)?;
-        let _in = InFolder::enter(&worktree)?;
-        let checks = (start.checks.iter())
-            .map(|command| CheckState {
-                passed: passes(command).0,
-                command: command.clone(),
-            })
-            .collect();
+        let (checks, was, was_lines) = {
+            let _in = InFolder::enter(&worktree)?;
+            let checks = (start.checks.iter())
+                .map(|command| CheckState {
+                    passed: passes(command).0,
+                    command: command.clone(),
+                })
+                .collect();
+            let was = self
+                .findings(&worktree, &start.command, &start.paths)?
+                .len();
+            let paths: Vec<PathBuf> = start.paths.iter().map(PathBuf::from).collect();
+            (checks, was, count_lines(&paths))
+        };
+        drop(worktree);
         let bench = (start.bench.as_ref())
             .map(|(command, runs)| -> Result<BenchState> {
-                let timing: Timing = convert(&measure_bench(command, *runs)?)?;
+                let request = BenchRequest {
+                    branch: branch.to_owned(),
+                    command: command.clone(),
+                    runs: *runs,
+                    commit: base.clone(),
+                    against: None,
+                };
+                let reply = self.bench(instance, &request)?;
                 Ok(BenchState {
                     command: command.clone(),
-                    runs: timing.runs,
-                    baseline: timing,
-                    current: timing,
+                    runs: reply.after.runs,
+                    baseline: reply.after,
+                    current: reply.after,
+                    host_fingerprint: Some(reply.host),
                 })
             })
             .transpose()?;
-        let was = self
-            .findings(&worktree, &start.command, &start.paths)?
-            .len();
-        let paths: Vec<PathBuf> = start.paths.iter().map(PathBuf::from).collect();
         Ok(BaselineOutput {
             base,
             paths: start.paths.clone(),
             checks,
             bench,
             was,
-            was_lines: count_lines(&paths),
+            was_lines,
         })
     }
 
     /// What a gate measures of the fix at `request.head` against the commit the run stands at.
     fn gate(
         &self,
+        instance: &str,
+        branch: &str,
         command: &str,
         request: &GateRequest,
         snapshot: &Snapshot,
@@ -429,7 +632,7 @@ impl Worker {
         let run = &snapshot.run;
         let commit = self.resolve(&request.head)?;
         let after_tree = self.worktree(&commit)?;
-        let (broken, after, lines_after, timing) = {
+        let (broken, after, lines_after) = {
             let _in = InFolder::enter(&after_tree)?;
             let broken: Vec<String> = (run.checks.iter())
                 .filter(|check| check.passed)
@@ -440,18 +643,28 @@ impl Worker {
                 .collect();
             let after = self.findings(&after_tree, command, &request.paths)?;
             let paths: Vec<PathBuf> = request.paths.iter().map(PathBuf::from).collect();
-            let lines_after = count_lines(&paths);
-            let timing = match &run.bench {
-                Some(bench) if broken.is_empty() => {
-                    let after_timing: Timing =
-                        convert(&measure_bench(&bench.command, bench.runs)?)?;
-                    Some((bench.current, after_timing))
-                }
-                _ => None,
-            };
-            (broken, after, lines_after, timing)
+            (broken, after, count_lines(&paths))
         };
         drop(after_tree);
+        let timed = match &run.bench {
+            Some(bench) if broken.is_empty() => {
+                let request = BenchRequest {
+                    branch: branch.to_owned(),
+                    command: bench.command.clone(),
+                    runs: bench.runs,
+                    commit: commit.clone(),
+                    against: Some(BenchAgainst {
+                        commit: request.current.clone(),
+                        timing: bench.current,
+                        host: bench.host_fingerprint.clone(),
+                    }),
+                };
+                Some(self.bench(instance, &request)?)
+            }
+            _ => None,
+        };
+        let paired = timed.as_ref().is_some_and(|reply| reply.paired);
+        let timing = timed.map(|reply| (reply.before.unwrap_or(reply.after), reply.after));
         let before_tree = self.worktree(&self.resolve(&request.current)?)?;
         let before = self.findings(&before_tree, command, &request.paths)?;
         Ok(GateOutput {
@@ -462,6 +675,7 @@ impl Worker {
             lines_before: run.current_lines,
             lines_after,
             timing,
+            paired,
         })
     }
 
