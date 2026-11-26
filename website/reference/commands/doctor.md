@@ -311,7 +311,7 @@ pyproject.toml records no profile yet.
 ...
 +[tool.ruff.lint]
 +select = ["ALL"]
-+ignore = ["any-type", "complex-structure", "missing-trailing-comma", "prohibited-trailing-comma", "CPY", "D1", ...]
++ignore = ["any-type", "complex-structure", "missing-trailing-comma", "prohibited-trailing-comma", "CPY", "D1", "incorrect-blank-line-before-class", "docstring-tab-indentation", "triple-single-quotes", "docstring-missing-returns", "docstring-missing-yields", "docstring-missing-exception", "indentation-with-invalid-multiple", "indentation-with-invalid-multiple-comment", "over-indented", "line-too-long", "EM", "boolean-positional-value-in-call", "single-line-implicit-string-concatenation", "multi-line-implicit-string-concatenation", "pandas-use-of-dot-pivot-or-unstack", "pandas-use-of-dot-stack", "manual-list-comprehension", "too-many-branches", "too-many-arguments", "too-many-locals", "too-many-statements", "too-many-positional-arguments", "magic-value-comparison", "Q", "unnecessary-assign", "TC", "TD", "raise-vanilla-args", "tab-indentation"]
 ...
 +[tool.ty.rules]
 +blanket-ignore-comment = "error"
