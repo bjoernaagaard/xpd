@@ -7,6 +7,10 @@ use std::hash::{DefaultHasher, Hash, Hasher};
 
 use crate::syntax::Node;
 
+#[cfg(feature = "ledger-incremental")]
+#[path = "../ledger/salsa_db.rs"]
+pub(crate) mod salsa_db;
+
 /// The fewest tokens of a near copy. A shorter stretch has the structure of another by chance.
 const TOKENS: usize = 60;
 /// The fewest lines of a near copy.
@@ -18,8 +22,8 @@ const SWAPS: usize = 4;
 const DIFFERENT_PERCENT: usize = 25;
 
 /// A stretch of one file that is long enough to be a near copy.
-#[derive(Debug, Clone)]
-pub(super) struct Block {
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub(crate) struct Block {
     /// The same for two stretches with the same kinds of tokens in the same structure.
     pub(super) shape: u64,
     /// The index of the nearest stretch around this one, in the blocks of the file.
@@ -32,14 +36,14 @@ pub(super) struct Block {
 }
 
 /// The stretches of one file, and the text of each of its tokens.
-#[derive(Debug, Default)]
-pub(super) struct Shapes {
+#[derive(Debug, Default, Clone, PartialEq, Eq, Hash)]
+pub(crate) struct Shapes {
     blocks: Vec<Block>,
     leaves: Vec<String>,
 }
 
 /// The stretches of the tree below `root` that are long enough to be a near copy.
-pub(super) fn shapes(root: &Node<'_>) -> Shapes {
+pub(crate) fn shapes(root: &Node<'_>) -> Shapes {
     let mut shapes = Shapes::default();
     visit(root, &mut shapes);
     shapes
