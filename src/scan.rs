@@ -706,6 +706,29 @@ fn unbound_names<'p>(pack: &'p Pack, imports: Option<&[Import]>) -> Vec<Unbound<
         .collect()
 }
 
+/// How often Python code imports from a module a name that the same block has imported from it
+/// already, in the same statement or in an earlier one.
+fn repeated_imports(code: &str) -> usize {
+    let root = crate::syntax::parse(code);
+    let mut seen = HashSet::new();
+    let mut repeats = 0;
+    for import in root.root().dfs() {
+        if import.kind() != "import_from_statement" {
+            continue;
+        }
+        let block = import.parent().map(|parent| parent.range().start);
+        let module = import
+            .field("module_name")
+            .map(|module| module.text().into_owned());
+        for name in import.field_children("name") {
+            if !seen.insert((block, module.clone(), name.text().into_owned())) {
+                repeats += 1;
+            }
+        }
+    }
+    repeats
+}
+
 /// The source of one file as a fix sees it.
 struct Parsed<'s> {
     src: &'s str,
@@ -714,6 +737,8 @@ struct Parsed<'s> {
     errors: usize,
     /// Whether libcst parses `src` as Python, found out for the first fix that asks.
     python: OnceCell<bool>,
+    /// How often `src` imports a name that it has imported already ([`repeated_imports`]).
+    repeats: OnceCell<usize>,
 }
 
 impl<'s> Parsed<'s> {
@@ -723,6 +748,7 @@ impl<'s> Parsed<'s> {
             language,
             errors: syntax_errors(root),
             python: OnceCell::new(),
+            repeats: OnceCell::new(),
         }
     }
 
@@ -731,9 +757,14 @@ impl<'s> Parsed<'s> {
     /// parse before the fixes gets no fix. The magic lines of a file that runs cell by cell are
     /// hidden from libcst first ([`hide_magics`]). tree-sitter recovers from errors that Python does
     /// not accept, so it is the check only for the other languages, which libcst does not read.
+    /// A fix that renames an imported name to one the file imports already would import it
+    /// twice, so Python code may not repeat more imports than it did.
     fn accepts(&self, after: &str) -> bool {
         if self.language == SupportLang::Python {
-            *self.python.get_or_init(|| parses_python_cells(self.src)) && parses_python_cells(after)
+            *self.python.get_or_init(|| parses_python_cells(self.src))
+                && parses_python_cells(after)
+                && repeated_imports(after)
+                    <= *self.repeats.get_or_init(|| repeated_imports(self.src))
         } else {
             syntax_errors(&parse_as(after, self.language)) <= self.errors
         }

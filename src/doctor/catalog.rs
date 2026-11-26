@@ -342,6 +342,24 @@ pub struct Record {
     /// The decision and its reason, as the reviewed inventory states them.
     pub reason: String,
     pub decision: Decision,
+    /// The xpd rules that this Ruff rule meets, as `pack/rule`, each with what the profile does
+    /// about it. `.github/scripts/check_rule_conflicts.py` measures the pairs and fails on one without a
+    /// stance.
+    pub xpd: BTreeMap<String, Stance>,
+}
+
+/// What the profile does where a Ruff rule meets an xpd rule. The xpd rule wins in each case.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(rename_all = "lowercase")]
+pub enum Stance {
+    /// Ruff's recommended code breaks the xpd rule, so the profile turns the Ruff rule off.
+    Ignore,
+    /// Ruff's fix writes code the xpd rule rejects, or moves code out of its sight, so the
+    /// profile lists the Ruff rule in `lint.unfixable`. Ruff still reports it.
+    Unfixable,
+    /// Reviewed: Ruff's change settles the xpd finding the way xpd would, or shows code that
+    /// xpd is right to report.
+    Agrees,
 }
 
 /// Ruff's mode, which decides the default rules and whether preview rules can run.
@@ -406,6 +424,8 @@ struct Line {
     requires: Vec<String>,
     #[serde(default)]
     satisfied: Satisfied,
+    #[serde(default)]
+    xpd: BTreeMap<String, Stance>,
 }
 
 impl Line {
@@ -462,6 +482,7 @@ impl Line {
             source: self.source,
             reason: self.reason,
             decision,
+            xpd: self.xpd,
         })
     }
 }

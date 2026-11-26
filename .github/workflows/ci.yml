@@ -24,4 +24,6 @@ jobs:
       # The formatters fix and stage files, so any change from HEAD means a file was not formatted.
       - run: git diff --exit-code HEAD
       - run: python3 .github/scripts/check_sample_marks.py
+      - run: cargo build --quiet
+      - run: python3 .github/scripts/check_rule_conflicts.py --xpd target/debug/xpd
       - run: lefthook run pre-push --force --no-auto-install

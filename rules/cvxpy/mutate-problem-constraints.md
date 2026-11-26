@@ -3,7 +3,7 @@ to that copy leaves the next solve unaware of the added constraint.
 
 ```diff lang="python"
 -problem.constraints.append(x >= 1)
-+problem = cp.Problem(problem.objective, problem.constraints + [x >= 1])
++problem = cp.Problem(problem.objective, [*problem.constraints, x >= 1])
 ```
 
 ## What the rule reports

@@ -11,6 +11,7 @@ rule:
     - pattern: "$S.map({$V: $I for $I, $V in enumerate($S.unique())})"
     - pattern: "$S.replace({$V: $I for $I, $V in enumerate($S.unique())})"
     - pattern: "$S.map(dict(zip($S.unique(), range($N))))"
+    - pattern: "$S.map(dict(zip($S.unique(), range($N), strict=$_STRICT)))"
 fix: pd.factorize($S)[0]
 metadata: { fix: unsafe }
 ---

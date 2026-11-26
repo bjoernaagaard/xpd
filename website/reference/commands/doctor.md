@@ -37,6 +37,7 @@ The profile owns `lint.select` and holds it at `["ALL"]`. A project whose select
 | `TC` | Annotation imports stay available for code that reads annotations at run time. |
 | `ANN401` | `Any` is allowed where a dynamic interface needs it. ty keeps checking the types. |
 | `EM`, `TRY003` | An exception may take its message directly, also on a standard exception class. |
+| `TRY004` | A check with `isinstance` may raise an error that is no `TypeError`, as the code that `skfolio/skfolio-unchecked-failed-portfolio` recommends does. |
 | `PLR2004` | A number that explains itself may stand in a calculation or an assertion. |
 | `PLR0913`, `PLR0917` | A clear signature may have several parameters, and positional ones are judged at the API boundary. |
 | `PLR0912`, `PLR0914`, `PLR0915`, `C901` | Branches, local variables, statements and complexity are judged in context, since a cap can reward splitting flat code into helpers or inlining a named step. |
@@ -187,6 +188,21 @@ A project that holds only some tools pins what comes with them: `ruff` with Ruff
 
 A project gets the ShellCheck and shfmt pins when it tracks a shell script: a `.sh` or `.bash` file, or a file without a suffix whose first line runs `sh`, `bash`, `dash` or `ksh`. ShellCheck does not read zsh. It gets the nbstripout pin when it tracks a notebook. A file that Git ignores does not count.
 
+### An xpd rule wins over a Ruff rule
+
+Where a Ruff rule and an xpd rule meet, the xpd rule wins, and the profile acts on it in one of two ways.
+
+| What Ruff does | What the profile does | Rules |
+| --- | --- | --- |
+| Its recommended code breaks an xpd rule | Turns the Ruff rule off in `ignore` | `PERF401`, `PD010`, `PD013`, `TRY004` |
+| Its fix writes code that an xpd rule rejects, or moves code out of an xpd rule's sight | Lists the Ruff rule in `lint.unfixable`, so Ruff reports it and never rewrites it | `E711`, `PLW0108`, `FURB192`, `FURB171`, `PLR6104`, `SIM114` |
+
+Ruff's fix for `E711` shows why. It turns `df["b"] == None` into `df["b"] is None`, which is always false for a pandas column, and `pandas/compare-to-missing` then no longer sees the line. With the rule in `lint.unfixable`, Ruff reports the line, leaves it alone, and xpd asks for `df["b"].isna()`.
+
+The profile also sets `lint.flake8-comprehensions.allow-dict-calls-with-keyword-arguments`, since Plotly code and xpd's Plotly rules pass settings as `dict(key=value)`.
+
+Each pair of a Ruff rule and an xpd rule has a stance in the Ruff rule's record: `ignore`, `unfixable`, or `agrees` where Ruff's change settles the xpd finding or shows code that xpd is right to report. `.github/scripts/check_rule_conflicts.py` measures the pairs with the pinned Ruff on the files in `samples/`, on every xpd rule page and on every Ruff rule page, and fails on a pair without a stance. Doctor refuses a profile that does not act on a stance.
+
 ## Packaging
 
 The profile packages a project with `pyproject.toml` and uv. Doctor writes two values itself and reports every other difference as a conflict, since only the owner can choose the replacement.
@@ -269,13 +285,13 @@ Doctor prints the diff, then one entry for each change. The `...` lines stand fo
 
 ```console
 $ xpd doctor --format text
-Profile revision 6, kind application, suggested because [project] has no [build-system], so uv runs it without building it
+Profile revision 7, kind application, suggested because [project] has no [build-system], so uv runs it without building it
   A program that runs from its checkout or as an installed command, locked in uv.lock.
 pyproject.toml records no profile yet.
 
 --- pyproject.toml
 +++ pyproject.toml
-@@ -10,10 +10,105 @@
+@@ -10,10 +10,109 @@
 
  [dependency-groups]
  dev = [
@@ -311,7 +327,7 @@ pyproject.toml records no profile yet.
 ...
 +[tool.ruff.lint]
 +select = ["ALL"]
-+ignore = ["any-type", "complex-structure", "missing-trailing-comma", "prohibited-trailing-comma", "CPY", "D1", "incorrect-blank-line-before-class", "docstring-tab-indentation", "triple-single-quotes", "docstring-missing-returns", "docstring-missing-yields", "docstring-missing-exception", "indentation-with-invalid-multiple", "indentation-with-invalid-multiple-comment", "over-indented", "line-too-long", "EM", "boolean-positional-value-in-call", "single-line-implicit-string-concatenation", "multi-line-implicit-string-concatenation", "pandas-use-of-dot-pivot-or-unstack", "pandas-use-of-dot-stack", "manual-list-comprehension", "too-many-branches", "too-many-arguments", "too-many-locals", "too-many-statements", "too-many-positional-arguments", "magic-value-comparison", "Q", "unnecessary-assign", "TC", "TD", "raise-vanilla-args", "tab-indentation"]
++ignore = ["any-type", "complex-structure", "missing-trailing-comma", "prohibited-trailing-comma", "CPY", "D1", "incorrect-blank-line-before-class", "docstring-tab-indentation", "triple-single-quotes", "docstring-missing-returns", "docstring-missing-yields", "docstring-missing-exception", "indentation-with-invalid-multiple", "indentation-with-invalid-multiple-comment", "over-indented", "line-too-long", "EM", "boolean-positional-value-in-call", "single-line-implicit-string-concatenation", "multi-line-implicit-string-concatenation", "pandas-use-of-dot-pivot-or-unstack", "pandas-use-of-dot-stack", "manual-list-comprehension", "too-many-branches", "too-many-arguments", "too-many-locals", "too-many-statements", "too-many-positional-arguments", "magic-value-comparison", "Q", "unnecessary-assign", "TC", "TD", "raise-vanilla-args", "type-check-without-type-error", "tab-indentation"]
 ...
 +[tool.ty.rules]
 +blanket-ignore-comment = "error"
@@ -324,7 +340,7 @@ pyproject.toml records no profile yet.
 +exclude-newer = "3 days"
 +
 +[tool.xpd.profile]
-+revision = 6
++revision = 7
 +kind = "application"
 ...
 +++ .github/workflows/ci.yml
@@ -346,7 +362,7 @@ xpd doctor --apply --kind application writes these changes.
 ...
 ```
 
-`xpd doctor --apply --kind application` writes this diff, runs `uv lock`, and records the revision and kind last. It also writes the owned files, and formats `pyproject.toml` with Tombi. A second `xpd doctor --check` then prints `The project matches profile revision 6.` and exits 0.
+`xpd doctor --apply --kind application` writes this diff, runs `uv lock`, and records the revision and kind last. It also writes the owned files, and formats `pyproject.toml` with Tombi. A second `xpd doctor --check` then prints `The project matches profile revision 7.` and exits 0.
 
 ## Kinds of project
 
@@ -367,7 +383,7 @@ A kind can add its own Ruff, ty and pytest values to the ones every kind gets, a
 
 ```toml
 [tool.xpd.profile]
-revision = 6
+revision = 7
 kind = "pipeline"
 tools = ["ruff", "ty", "pytest"]
 ```
@@ -432,7 +448,7 @@ A project records an exception in `pyproject.toml`, beside the revision and kind
 
 ```toml
 [tool.xpd.profile]
-revision = 6
+revision = 7
 kind = "application"
 
 [[tool.xpd.profile.exceptions]]

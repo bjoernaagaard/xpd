@@ -1,5 +1,5 @@
 schema = 6
-revision = 6
+revision = 7
 summary = "The setup that xpd doctor holds a Python project to. Each value is explained by the record of the same id in decisions.jsonl."
 
 [pins]
@@ -211,6 +211,7 @@ ignore = [
     "TC",
     "TD",
     "TRY003",
+    "TRY004",
     "W191",
 ]
 off = ["lint.explicit-preview-rules"]
@@ -251,11 +252,13 @@ respect-gitignore = true
 [ruff.settings.lint]
 preview = true
 future-annotations = false
+flake8-comprehensions.allow-dict-calls-with-keyword-arguments = true
 flake8-implicit-str-concat.allow-multiline = true
 flake8-tidy-imports.ban-relative-imports = "all"
 flake8-type-checking.strict = false
 flake8-type-checking.quote-annotations = false
 pydocstyle.convention = "pep257"
+unfixable = ["none-comparison", "unnecessary-lambda", "sorted-min-max", "single-item-membership-test", "non-augmented-assignment", "if-with-same-arms"]
 
 [ruff.settings.format]
 preview = true

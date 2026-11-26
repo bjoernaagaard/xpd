@@ -26,3 +26,14 @@ rule:
             - any:
                 - has: { field: name, regex: '^plotly\.express$' }
                 - all: [{ has: { field: name, regex: '^express$' } }, { inside: { kind: import_from_statement, has: { field: module_name, regex: '^plotly$' } } }]
+    - kind: identifier
+      regex: '^express$'
+      inside:
+        stopBy: end
+        kind: module
+        has:
+          stopBy: end
+          kind: import_from_statement
+          all:
+            - has: { field: module_name, regex: '^plotly$' }
+            - has: { field: name, kind: dotted_name, regex: '^express$' }

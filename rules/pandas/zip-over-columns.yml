@@ -12,7 +12,7 @@ rule:
   pattern: zip($$$ARGS)
   all:
     - has: { field: arguments, has: { matches: column } }
-    - not: { has: { field: arguments, has: { not: { any: [{ matches: column }, { regex: '^[(),]$' }] } } } }
+    - not: { has: { field: arguments, has: { not: { any: [{ matches: column }, { regex: '^[(),]$' }, { kind: keyword_argument, has: { field: name, regex: '^strict$' } }] } } } }
     - inside: { any: [{ kind: for_statement }, { kind: for_in_clause }], field: right }
 utils:
   column:

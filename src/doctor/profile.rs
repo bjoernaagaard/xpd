@@ -3,7 +3,7 @@
 //!
 //! ```toml
 //! [tool.xpd.profile]
-//! revision = 6
+//! revision = 7
 //! kind = "application"
 //! tools = ["ruff", "ty", "pytest"]
 //!
@@ -51,7 +51,7 @@ use std::collections::BTreeSet;
 use anyhow::{Context, Result, bail, ensure};
 use toml_edit::{Item, TableLike, Value};
 
-use super::catalog::{self, Catalog, Decision, Key, Kind, Level, Surface, Tool};
+use super::catalog::{self, Catalog, Decision, Key, Kind, Level, Stance, Surface, Tool};
 use crate::toml::{self, Toml};
 
 /// The packaged profile.
@@ -771,6 +771,7 @@ impl Profile {
             .iter()
             .fold(self.base.clone(), |values, kind| values.with(&kind.extra));
         Self::check_ruff(catalog, &all.ruff)?;
+        Self::check_stances(catalog, &all.ruff)?;
         for (rule, _) in &all.ty_rules {
             ensure!(
                 catalog
@@ -840,6 +841,59 @@ impl Profile {
                     .iter()
                     .any(|(name, _)| name == plugin),
                 "pytest.plugin-names lacks {plugin}, so doctor cannot find a -p that loads it"
+            );
+        }
+        Ok(())
+    }
+
+    /// An xpd rule wins over a Ruff rule, so the profile acts on every stance that a Ruff rule's
+    /// record takes to an xpd rule: the rule is off, or `lint.unfixable` lists it. Every rule that
+    /// `lint.unfixable` lists has a record that says which xpd rule it yields to.
+    fn check_stances(catalog: &Catalog, ruff: &RuffWanted) -> Result<()> {
+        let unfixable: Vec<&str> = ruff
+            .settings
+            .iter()
+            .find(|setting| setting.dotted() == "lint.unfixable")
+            .and_then(|setting| setting.value.as_array())
+            .map(|array| array.iter().filter_map(toml_edit::Value::as_str).collect())
+            .unwrap_or_default();
+        for selector in &unfixable {
+            ensure!(
+                catalog
+                    .ruff_rules()
+                    .any(|rule| rule.name.as_deref() == Some(*selector)),
+                "ruff {} has no rule named {selector}, which lint.unfixable lists",
+                catalog::RUFF_RELEASE
+            );
+        }
+        let on: BTreeSet<String> = ruff
+            .decided(catalog)
+            .into_iter()
+            .filter_map(|(code, on)| on.then_some(code))
+            .collect();
+        for rule in catalog.ruff_rules() {
+            let listed = unfixable
+                .iter()
+                .any(|selector| rule.name.as_deref() == Some(*selector));
+            for (xpd, stance) in &rule.xpd {
+                match stance {
+                    Stance::Ignore => ensure!(
+                        !on.contains(&rule.key.id),
+                        "{} yields to xpd's {xpd}, and the profile leaves it on",
+                        rule.key
+                    ),
+                    Stance::Unfixable => ensure!(
+                        listed && on.contains(&rule.key.id),
+                        "{} must not rewrite code that xpd's {xpd} reads, and lint.unfixable lacks it",
+                        rule.key
+                    ),
+                    Stance::Agrees => {}
+                }
+            }
+            ensure!(
+                !listed || rule.xpd.values().any(|stance| *stance == Stance::Unfixable),
+                "lint.unfixable lists {}, and its record names no xpd rule that it yields to",
+                rule.key
             );
         }
         Ok(())
