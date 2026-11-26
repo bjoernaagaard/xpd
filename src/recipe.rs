@@ -404,14 +404,9 @@ fn complete(code: &str) -> bool {
                 defined.insert(name.text().into_owned());
             }
         }
-        if matches!(node.kind().as_ref(), "parameters" | "lambda_parameters") {
-            for name in node.dfs().filter(|n| n.kind() == "identifier") {
-                defined.insert(name.text().into_owned());
-            }
-        }
         if matches!(
             node.kind().as_ref(),
-            "import_statement" | "import_from_statement"
+            "parameters" | "lambda_parameters" | "import_statement" | "import_from_statement"
         ) {
             for name in node.dfs().filter(|n| n.kind() == "identifier") {
                 defined.insert(name.text().into_owned());

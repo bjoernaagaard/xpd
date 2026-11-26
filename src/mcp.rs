@@ -59,14 +59,5 @@ fn start(server: &mut Command) -> ExitCode {
 /// Windows has no exec, so this process waits for the server and passes on its exit code.
 #[cfg(not(unix))]
 fn start(server: &mut Command) -> ExitCode {
-    match server.status() {
-        Ok(status) => status
-            .code()
-            .and_then(|code| u8::try_from(code).ok())
-            .map_or(ExitCode::FAILURE, ExitCode::from),
-        Err(e) => {
-            eprintln!("xpd: cannot start the MCP server: {e}");
-            ExitCode::from(NOT_STARTED)
-        }
-    }
+    crate::output::child_exit_code(server.status(), "cannot start the MCP server")
 }

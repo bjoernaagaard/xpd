@@ -254,11 +254,7 @@ fn one_line(node: &Node<'_>) -> String {
 
 /// `text` cut to the length the evidence quotes.
 fn quoted(text: &str) -> String {
-    if text.chars().count() <= QUOTED_CHARS {
-        return text.to_owned();
-    }
-    let cut: String = text.chars().take(QUOTED_CHARS).collect();
-    format!("{cut}…")
+    crate::output::truncate_chars(text, QUOTED_CHARS, "…")
 }
 
 /// `lines` as the evidence names them: `line 12`, `lines 12 and 15`, or `lines 12, 15 and 20`.
@@ -595,6 +591,38 @@ impl<'t> Function<'t> {
         })
     }
 
+    /// Local names assigned an expression matching `matches`.
+    fn assigned_matching(&self, matches: impl Fn(&Node<'_>) -> bool) -> HashSet<String> {
+        let mut names = HashSet::new();
+        for node in &self.nodes {
+            if node.kind() == "assignment"
+                && let Some(left) = node.field("left").filter(|l| l.kind() == "identifier")
+                && let Some(right) = node.field("right")
+                && matches(&right)
+            {
+                names.insert(left.text().into_owned());
+            }
+        }
+        names
+    }
+
+    /// Builds a repeated-call or repeated-mask finding for `text` across `lines`.
+    fn repeated_finding(&self, kind: Kind, action: &str, text: &str, lines: &[usize]) -> Local {
+        Local {
+            kind,
+            lines: lines.to_vec(),
+            key: format!("{}\n{text}", self.name),
+            evidence: format!(
+                "{} {action} `{}` {} times, on {}, and changes nothing it reads in between.",
+                self.name,
+                quoted(text),
+                lines.len(),
+                listed(lines)
+            ),
+            weight: lines.len() * text.len(),
+        }
+    }
+
     /// The calls that the function computes more than once with nothing changed in between.
     fn repeated(&self) -> (Vec<Local>, HashSet<String>) {
         let mut by_text: HashMap<String, Vec<&Node<'t>>> = HashMap::new();
@@ -615,19 +643,7 @@ impl<'t> Function<'t> {
         };
         let locals = (found.iter())
             .filter(|(text, _)| outermost(text))
-            .map(|(text, lines)| Local {
-                kind: Kind::RepeatedCall,
-                lines: lines.clone(),
-                key: format!("{}\n{text}", self.name),
-                evidence: format!(
-                    "{} computes `{}` {} times, on {}, and changes nothing that the call reads in between.",
-                    self.name,
-                    quoted(text),
-                    lines.len(),
-                    listed(lines)
-                ),
-                weight: lines.len() * text.len(),
-            })
+            .map(|(text, lines)| self.repeated_finding(Kind::RepeatedCall, "computes", text, lines))
             .collect();
         (locals, texts)
     }
@@ -635,16 +651,7 @@ impl<'t> Function<'t> {
     /// Boolean masks and masked subscripts computed more than once with nothing written in
     /// between. Plain integer indexing such as `arr[i]` is left out.
     fn repeated_masks(&self, covered_calls: &HashSet<String>) -> Vec<Local> {
-        let mut mask_vars: HashSet<String> = HashSet::new();
-        for node in &self.nodes {
-            if node.kind() == "assignment"
-                && let Some(left) = node.field("left").filter(|l| l.kind() == "identifier")
-                && let Some(right) = node.field("right")
-                && is_mask_expr(&right)
-            {
-                mask_vars.insert(left.text().into_owned());
-            }
-        }
+        let mask_vars = self.assigned_matching(is_mask_expr);
         let mut candidates: Vec<&Node<'t>> = Vec::new();
         for node in &self.nodes {
             match node.kind().as_ref() {
@@ -696,18 +703,13 @@ impl<'t> Function<'t> {
         };
         (found.iter())
             .filter(|(text, _)| outermost(text))
-            .map(|(text, lines)| Local {
-                kind: Kind::RepeatedMask,
-                lines: lines.clone(),
-                key: format!("{}\n{text}", self.name),
-                evidence: format!(
-                    "{} evaluates mask or masked slice `{}` {} times, on {}, and changes nothing it reads in between.",
-                    self.name,
-                    quoted(text),
-                    lines.len(),
-                    listed(lines)
-                ),
-                weight: lines.len() * text.len(),
+            .map(|(text, lines)| {
+                self.repeated_finding(
+                    Kind::RepeatedMask,
+                    "evaluates mask or masked slice",
+                    text,
+                    lines,
+                )
             })
             .collect()
     }
@@ -857,14 +859,7 @@ impl<'t> Function<'t> {
                     None
                 };
                 if let Some(reason) = reason {
-                    let text = one_line(node);
-                    found.push(Local {
-                        kind: Kind::MaterializedForOne,
-                        lines: vec![line(node)],
-                        key: format!("{}\n{text}", self.name),
-                        evidence: format!("`{}` in {} {reason}.", quoted(&text), self.name),
-                        weight: text.len(),
-                    });
+                    found.push(self.materialized_finding(node, &reason));
                 }
             } else if node.kind() == "call"
                 && matches!(called(node).as_deref(), Some("head" | "tail"))
@@ -881,37 +876,34 @@ impl<'t> Function<'t> {
                     .and_then(|arg| arg.text().parse::<usize>().ok())
                     .unwrap_or(5);
                 if count <= 20 {
-                    let text = one_line(node);
-                    found.push(Local {
-                        kind: Kind::MaterializedForOne,
-                        lines: vec![line(node)],
-                        key: format!("{}\n{text}", self.name),
-                        evidence: format!(
-                            "`{}` in {} sorts the whole frame only to keep {count} rows, which nsmallest or nlargest avoids.",
-                            quoted(&text),
-                            self.name
+                    found.push(self.materialized_finding(
+                        node,
+                        &format!(
+                            "sorts the whole frame only to keep {count} rows, which nsmallest or nlargest avoids"
                         ),
-                        weight: text.len(),
-                    });
+                    ));
                 }
             }
         }
         found
     }
 
+    /// Builds a `MaterializedForOne` finding for `node` with `reason`.
+    fn materialized_finding(&self, node: &Node<'_>, reason: &str) -> Local {
+        let text = one_line(node);
+        Local {
+            kind: Kind::MaterializedForOne,
+            lines: vec![line(node)],
+            key: format!("{}\n{text}", self.name),
+            evidence: format!("`{}` in {} {reason}.", quoted(&text), self.name),
+            weight: text.len(),
+        }
+    }
+
     /// O(n*m) scans inside loops: membership tests against a list, or filtering a whole frame on
     /// every iteration instead of grouping once.
     fn linear_scans(&self) -> Vec<Local> {
-        let mut list_vars: HashSet<String> = HashSet::new();
-        for node in &self.nodes {
-            if node.kind() == "assignment"
-                && let Some(left) = node.field("left").filter(|l| l.kind() == "identifier")
-                && let Some(right) = node.field("right")
-                && is_list_expr(&right)
-            {
-                list_vars.insert(left.text().into_owned());
-            }
-        }
+        let list_vars = self.assigned_matching(is_list_expr);
         let mut found = Vec::new();
         let mut seen = HashSet::new();
         for node in &self.nodes {

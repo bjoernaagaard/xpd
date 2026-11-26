@@ -9,7 +9,7 @@
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::path::{Path, PathBuf};
 
-use super::catalog::{self, Catalog, Decision, Key, Kind, Mode, Record, Surface, Target, Tool};
+use super::catalog::{self, Catalog, Decision, Key, Kind, Mode, Record, Surface, Tool};
 use super::evidence::Location;
 use super::placement::Destination;
 use super::probe::Checker;
@@ -53,14 +53,7 @@ pub(crate) struct Ruff {
 
 /// Ruff's analysis of the `files` under `root`.
 pub(crate) fn analyze(root: &Path, files: &[PathBuf], catalog: &Catalog, checker: Checker) -> Ruff {
-    let keys: Vec<&str> = catalog
-        .suggestions()
-        .filter(|(record, _)| record.key.tool == Tool::Ruff)
-        .filter_map(|(_, suggestion)| match &suggestion.target {
-            Target::Setting { key, .. } => Some(key.as_str()),
-            _ => None,
-        })
-        .collect();
+    let keys: Vec<&str> = catalog.setting_keys(Tool::Ruff).collect();
     let mut groups: BTreeMap<Option<PathBuf>, Vec<PathBuf>> = BTreeMap::new();
     let mut governing: HashMap<PathBuf, Option<PathBuf>> = HashMap::new();
     for file in files {

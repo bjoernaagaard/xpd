@@ -32,10 +32,8 @@ const ATTEMPTS: usize = 2;
 /// How much of the output of a failed check the journal keeps.
 const OUTPUT_KEPT: usize = 1500;
 /// Maximum allowed slowdown factor on `--bench` before a gate rejects a fix as a regression.
-#[cfg(not(feature = "ledger-durable"))]
 const MAX_SLOWDOWN: f64 = 1.15;
 /// Minimum speedup factor required for a fix whose goal is `faster` or `both`.
-#[cfg(not(feature = "ledger-durable"))]
 const MIN_SPEEDUP: f64 = 0.98;
 
 /// A stage of a run.
@@ -102,7 +100,7 @@ struct Check {
 }
 
 /// Measured wall-clock duration of one benchmark point, in milliseconds.
-#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub(super) struct Timing {
     pub(super) median_ms: f64,
     pub(super) min_ms: f64,
@@ -126,7 +124,7 @@ struct Bench {
 /// What proves a fix that names no static finding id.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
-enum Goal {
+pub(super) enum Goal {
     /// Must reduce total code lines in the measured paths.
     Shorter,
     /// Must reduce median `--bench` time by at least 2%.
@@ -512,18 +510,17 @@ pub(super) fn cited_missing(findings: &[String], before: &BTreeSet<String>) -> O
 }
 
 /// What a gate found, with no file or command in it.
-#[cfg(not(feature = "ledger-durable"))]
-#[derive(Debug)]
-struct Compared {
-    fixed: Vec<String>,
-    added: Vec<String>,
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(super) struct Compared {
+    pub(super) fixed: Vec<String>,
+    pub(super) added: Vec<String>,
 }
 
 /// Whether a fix is kept. `before` and `after` hold the ids of the findings at the commit
 /// before the fix and after it, and `broken` the checks that passed at the start and fail now.
-#[cfg(not(feature = "ledger-durable"))]
-fn judge(
-    fix: &Fix,
+pub(super) fn judge_fix(
+    findings: &[String],
+    goal: Option<Goal>,
     before: &BTreeSet<String>,
     after: &BTreeSet<String>,
     broken: &[String],
@@ -536,10 +533,10 @@ fn judge(
             broken.join("; ")
         ));
     }
-    if let Some(reason) = cited_missing(&fix.findings, before) {
+    if let Some(reason) = cited_missing(findings, before) {
         return Err(reason);
     }
-    if !fix.findings.is_empty() && !fix.findings.iter().any(|id| !after.contains(id)) {
+    if !findings.is_empty() && !findings.iter().any(|id| !after.contains(id)) {
         return Err("None of the findings the fix was to remove is gone.".to_owned());
     }
     if after.len() > before.len() {
@@ -554,7 +551,7 @@ fn judge(
                 .join(", ")
         ));
     }
-    if let Some(goal) = fix.goal {
+    if let Some(goal) = goal {
         let (lines_before, lines_after) = lines;
         if matches!(goal, Goal::Shorter | Goal::Both) && lines_after >= lines_before {
             return Err(format!(
@@ -590,6 +587,18 @@ fn judge(
         fixed: before.difference(after).cloned().collect(),
         added: after.difference(before).cloned().collect(),
     })
+}
+
+/// Runs each check that passed at the start and returns the ones that fail now.
+pub(super) fn broken_checks<'a>(checks: impl IntoIterator<Item = (&'a str, bool)>) -> Vec<String> {
+    checks
+        .into_iter()
+        .filter(|(_, passed)| *passed)
+        .filter_map(|(command, _)| {
+            let (passed, printed) = passes(command);
+            (!passed).then(|| format!("{command}\n{printed}"))
+        })
+        .collect()
 }
 
 /// The repository of a run and where its journal is.
@@ -871,13 +880,12 @@ fn measure_gate(journal: &Journal, place: &Place, found: Found<'_>) -> Result<Me
         "no commit was made since {}",
         journal.current
     );
-    let broken: Vec<String> = (journal.checks.iter())
-        .filter(|check| check.passed)
-        .filter_map(|check| {
-            let (passed, printed) = passes(&check.command);
-            (!passed).then(|| format!("{}\n{printed}", check.command))
-        })
-        .collect();
+    let broken = broken_checks(
+        journal
+            .checks
+            .iter()
+            .map(|check| (check.command.as_str(), check.passed)),
+    );
     let before = found(journal, Some(&journal.current))?;
     let after = found(journal, None)?;
     let lines_before = journal.current_lines;
@@ -907,8 +915,9 @@ fn gate(journal: &mut Journal, place: &Place, id: &str, found: Found<'_>) -> Res
     check_gate(journal, id)?;
     let measured = measure_gate(journal, place, found)?;
     let fix = journal.fix_mut(id)?;
-    match judge(
-        fix,
+    match judge_fix(
+        &fix.findings,
+        fix.goal,
         &measured.before,
         &measured.after,
         &measured.broken,

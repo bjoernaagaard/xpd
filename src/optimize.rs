@@ -229,12 +229,7 @@ fn read(
 
 /// `text` on one line, cut to the length the evidence quotes for a text that differs.
 fn swapped(text: &str) -> String {
-    let one_line = text.split_whitespace().collect::<Vec<_>>().join(" ");
-    if one_line.chars().count() <= SWAP_CHARS {
-        return one_line;
-    }
-    let cut: String = one_line.chars().take(SWAP_CHARS).collect();
-    format!("{cut}…")
+    crate::output::quote_one_line(text, SWAP_CHARS)
 }
 
 /// The near copies among the files.

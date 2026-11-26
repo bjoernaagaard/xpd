@@ -340,6 +340,63 @@ impl LedgerOrchestratorClient {
     }
 }
 
+/// What the CLI sends to a run: either starting a new run or enqueueing one command.
+enum Sent {
+    Start(Box<RunStartInput>),
+    Command(CommandEnvelope),
+}
+
+/// Runs `sent` end to end on an embedded local SQLite runtime, or forwards it to the remote store.
+fn dispatch(
+    config: &ProviderConfig,
+    instance_id: &str,
+    activities: ActivityRegistry,
+    sent: Sent,
+    timeout: Duration,
+) -> Result<(Snapshot, Receipt)> {
+    let db_path = match config {
+        ProviderConfig::Sqlite { db_path } => db_path.clone(),
+        #[cfg(feature = "ledger-distributed")]
+        ProviderConfig::Postgres { .. } => {
+            return send_remote(config, instance_id, sent, timeout);
+        }
+    };
+    let instance_id = instance_id.to_owned();
+    let mut lazy = LazyTokio::new();
+    let (snapshot, receipt) = lazy.block_on(async move {
+        let store = open_sqlite_store(&db_path).await?;
+        let runtime = start_local_runtime(Arc::clone(&store), activities).await;
+        let client = LedgerOrchestratorClient::new(store, instance_id);
+        let (command_id, missing, pushed) = match sent {
+            Sent::Command(envelope) => {
+                let res = client.enqueue_command(&envelope).await;
+                (
+                    envelope.command_id,
+                    "the run has no mirrored snapshot after its command",
+                    res,
+                )
+            }
+            Sent::Start(input) => {
+                let res = client.start_run(&input).await;
+                (
+                    input.command_id,
+                    "the run has no mirrored snapshot after its start",
+                    res,
+                )
+            }
+        };
+        let waited = match pushed {
+            Ok(()) => client.wait_receipt(&command_id, timeout).await,
+            Err(error) => Err(error),
+        };
+        runtime.shutdown(Some(1_000)).await;
+        let receipt = waited?;
+        let snapshot = client.snapshot().await?.context(missing)?;
+        Ok::<(Snapshot, Receipt), anyhow::Error>((snapshot, receipt))
+    })??;
+    Ok((snapshot, receipt))
+}
+
 /// One mutating command, end to end, on a runtime built only for it.
 ///
 /// This is the lazy boot in full: the Tokio runtime, the store and the
@@ -354,39 +411,13 @@ pub(crate) fn run_command(
     envelope: &CommandEnvelope,
     timeout: Duration,
 ) -> Result<(Snapshot, Receipt)> {
-    let db_path = match config {
-        ProviderConfig::Sqlite { db_path } => db_path.clone(),
-        #[cfg(feature = "ledger-distributed")]
-        ProviderConfig::Postgres { .. } => {
-            return send_remote(
-                config,
-                instance_id,
-                Sent::Command(envelope.clone()),
-                timeout,
-            );
-        }
-    };
-    let instance_id = instance_id.to_owned();
-    let envelope = envelope.clone();
-    let mut lazy = LazyTokio::new();
-    let (snapshot, receipt) = lazy.block_on(async move {
-        let store = open_sqlite_store(&db_path).await?;
-        let runtime = start_local_runtime(Arc::clone(&store), activities).await;
-        let client = LedgerOrchestratorClient::new(store, instance_id);
-        let sent = client.enqueue_command(&envelope).await;
-        let waited = match sent {
-            Ok(()) => client.wait_receipt(&envelope.command_id, timeout).await,
-            Err(error) => Err(error),
-        };
-        runtime.shutdown(Some(1_000)).await;
-        let receipt = waited?;
-        let snapshot = client
-            .snapshot()
-            .await?
-            .context("the run has no mirrored snapshot after its command")?;
-        Ok::<(Snapshot, Receipt), anyhow::Error>((snapshot, receipt))
-    })??;
-    Ok((snapshot, receipt))
+    dispatch(
+        config,
+        instance_id,
+        activities,
+        Sent::Command(envelope.clone()),
+        timeout,
+    )
 }
 
 /// Starts a run on a runtime built only for it, and waits for its receipt.
@@ -397,39 +428,13 @@ pub(crate) fn start_command(
     input: &RunStartInput,
     timeout: Duration,
 ) -> Result<(Snapshot, Receipt)> {
-    let db_path = match config {
-        ProviderConfig::Sqlite { db_path } => db_path.clone(),
-        #[cfg(feature = "ledger-distributed")]
-        ProviderConfig::Postgres { .. } => {
-            return send_remote(
-                config,
-                instance_id,
-                Sent::Start(Box::new(input.clone())),
-                timeout,
-            );
-        }
-    };
-    let instance_id = instance_id.to_owned();
-    let input = input.clone();
-    let mut lazy = LazyTokio::new();
-    let (snapshot, receipt) = lazy.block_on(async move {
-        let store = open_sqlite_store(&db_path).await?;
-        let runtime = start_local_runtime(Arc::clone(&store), activities).await;
-        let client = LedgerOrchestratorClient::new(store, instance_id);
-        let started = client.start_run(&input).await;
-        let waited = match started {
-            Ok(()) => client.wait_receipt(&input.command_id, timeout).await,
-            Err(error) => Err(error),
-        };
-        runtime.shutdown(Some(1_000)).await;
-        let receipt = waited?;
-        let snapshot = client
-            .snapshot()
-            .await?
-            .context("the run has no mirrored snapshot after its start")?;
-        Ok::<(Snapshot, Receipt), anyhow::Error>((snapshot, receipt))
-    })??;
-    Ok((snapshot, receipt))
+    dispatch(
+        config,
+        instance_id,
+        activities,
+        Sent::Start(Box::new(input.clone())),
+        timeout,
+    )
 }
 
 /// How long the CLI waits for the receipt of a command that workers serve, at the least. A
@@ -437,13 +442,6 @@ pub(crate) fn start_command(
 /// until the lock times out.
 #[cfg(feature = "ledger-distributed")]
 const REMOTE_WAIT: Duration = Duration::from_secs(3600);
-
-/// What the CLI sends to a run that workers serve.
-#[cfg(feature = "ledger-distributed")]
-enum Sent {
-    Start(Box<RunStartInput>),
-    Command(CommandEnvelope),
-}
 
 /// Sends a start or a command to a run in the PostgreSQL store, and waits for its receipt.
 ///

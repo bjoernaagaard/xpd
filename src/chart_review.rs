@@ -415,7 +415,7 @@ fn classify(
             }
             if ["facet_col", "facet_row"]
                 .iter()
-                .any(|key| keyword(call, key).is_some())
+                .any(|key| syntax::keyword_arg(call, key).is_some())
             {
                 found.push(("panels", "plotly"));
             }
@@ -456,7 +456,7 @@ fn classify(
                 && !modules.contains("seaborn")))
     {
         let kind = if method == "plot" {
-            keyword(call, "kind")
+            syntax::keyword_arg(call, "kind")
                 .and_then(|kind| syntax::string_literal(&kind))
                 .unwrap_or_else(|| "line".to_owned())
         } else {
@@ -473,15 +473,6 @@ fn classify(
         found.push((kind, "matplotlib"));
     }
     found
-}
-
-/// The value that `call` passes for the keyword `name`.
-fn keyword<'t>(call: &Node<'t>, name: &str) -> Option<Node<'t>> {
-    call.field("arguments")?
-        .named_children()
-        .filter(|argument| argument.kind() == "keyword_argument")
-        .find(|argument| argument.field("name").is_some_and(|key| key.text() == name))?
-        .field("value")
 }
 
 fn express_kind(function: &str) -> Option<&'static str> {
@@ -509,7 +500,8 @@ fn trace_kind(trace: &str, call: &Node<'_>) -> Option<&'static str> {
         "bar" | "barpolar" => "bar",
         "histogram" => "histogram",
         "scatter" | "scattergl" => {
-            let mode = keyword(call, "mode").and_then(|mode| syntax::string_literal(&mode));
+            let mode =
+                syntax::keyword_arg(call, "mode").and_then(|mode| syntax::string_literal(&mode));
             match mode {
                 Some(mode) if mode.contains("markers") && !mode.contains("lines") => "scatter",
                 _ => "line",
@@ -568,8 +560,10 @@ fn panel_count(call: &Node<'_>) -> u64 {
                 .collect()
         })
         .unwrap_or_default();
-    let rows = number(keyword(call, "nrows")).or_else(|| number(positional.first().cloned()));
-    let cols = number(keyword(call, "ncols")).or_else(|| number(positional.get(1).cloned()));
+    let rows =
+        number(syntax::keyword_arg(call, "nrows")).or_else(|| number(positional.first().cloned()));
+    let cols =
+        number(syntax::keyword_arg(call, "ncols")).or_else(|| number(positional.get(1).cloned()));
     rows.unwrap_or(1) * cols.unwrap_or(1)
 }
 

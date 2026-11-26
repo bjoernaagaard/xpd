@@ -370,23 +370,8 @@ impl RuffWanted {
     }
 
     fn read(table: &dyn TableLike) -> Result<Self> {
-        let per_file_ignores = optional(table, "per-file-ignores")?
-            .map(|patterns| {
-                patterns
-                    .iter()
-                    .map(|(pattern, _)| Ok((pattern.to_owned(), strings(patterns, pattern)?)))
-                    .collect::<Result<Vec<_>>>()
-            })
-            .transpose()?
-            .unwrap_or_default();
-        let banned_api = optional(table, "banned-api")?
-            .map(|bans| {
-                bans.iter()
-                    .map(|(name, _)| Ok((name.to_owned(), string(bans, name)?)))
-                    .collect::<Result<Vec<_>>>()
-            })
-            .transpose()?
-            .unwrap_or_default();
+        let per_file_ignores = optional_entries(table, "per-file-ignores", strings)?;
+        let banned_api = optional_entries(table, "banned-api", string)?;
         Ok(Self {
             select: optional_strings(table, "select")?,
             ignore: optional_strings(table, "ignore")?,
@@ -1266,6 +1251,23 @@ fn optional<'a>(parent: &'a dyn TableLike, key: &str) -> Result<Option<&'a dyn T
                 .with_context(|| format!("{key} is no table"))
         })
         .transpose()
+}
+
+/// Reads each entry of the optional subtable at `key` with `read`.
+fn optional_entries<T>(
+    parent: &dyn TableLike,
+    key: &str,
+    read: impl Fn(&dyn TableLike, &str) -> Result<T>,
+) -> Result<Vec<(String, T)>> {
+    optional(parent, key)?
+        .map(|table| {
+            table
+                .iter()
+                .map(|(name, _)| Ok((name.to_owned(), read(table, name)?)))
+                .collect::<Result<Vec<_>>>()
+        })
+        .transpose()
+        .map(Option::unwrap_or_default)
 }
 
 /// The strings at `key`, none when it is missing.

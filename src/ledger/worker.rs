@@ -44,7 +44,7 @@ use super::orchestration::{
     ACT_FINISH_RUN, ACT_GATE_FIX, ACT_INIT_BASELINE, ACT_VALIDATE_PLAN, BaselineOutput, BenchState,
     CheckState, FinishOutput, GateOutput, RunStartInput, Snapshot, Timing, ValidatePlanOutput,
 };
-use super::run::{count_lines, host_fingerprint, measure_bench, passes};
+use super::run::{broken_checks, count_lines, host_fingerprint, measure_bench, passes};
 
 /// Serve the ledger runs of a PostgreSQL store: take their orchestration turns, and gate
 /// their fixes in detached worktrees of a clone of the repository.
@@ -634,13 +634,11 @@ impl Worker {
         let after_tree = self.worktree(&commit)?;
         let (broken, after, lines_after) = {
             let _in = InFolder::enter(&after_tree)?;
-            let broken: Vec<String> = (run.checks.iter())
-                .filter(|check| check.passed)
-                .filter_map(|check| {
-                    let (passed, printed) = passes(&check.command);
-                    (!passed).then(|| format!("{}\n{printed}", check.command))
-                })
-                .collect();
+            let broken = broken_checks(
+                run.checks
+                    .iter()
+                    .map(|check| (check.command.as_str(), check.passed)),
+            );
             let after = self.findings(&after_tree, command, &request.paths)?;
             let paths: Vec<PathBuf> = request.paths.iter().map(PathBuf::from).collect();
             (broken, after, count_lines(&paths))

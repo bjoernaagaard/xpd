@@ -42,8 +42,6 @@ const EQUIV_PY: &str = include_str!("../py/equiv.py");
 
 /// Exit code when xpd itself fails, as opposed to finding issues.
 const CHECK_FAILED: u8 = 2;
-/// The shell's code for a command that could not be started.
-const PYTHON_NOT_STARTED: u8 = 127;
 
 /// xpd: fast linter for Python library habits, for humans and coding agents.
 #[derive(Debug, Parser)]
@@ -978,21 +976,14 @@ impl Drop for Committed {
 
 /// Runs `script` with the project's Python and passes on its exit code.
 fn run_py(script: &str, args: &[PathBuf]) -> ExitCode {
-    match Command::new(venv::project_python())
-        .arg("-c")
-        .arg(script)
-        .args(args)
-        .status()
-    {
-        Ok(status) => status
-            .code()
-            .and_then(|c| u8::try_from(c).ok())
-            .map_or(ExitCode::FAILURE, ExitCode::from),
-        Err(e) => {
-            eprintln!("xpd: could not start python: {e}");
-            ExitCode::from(PYTHON_NOT_STARTED)
-        }
-    }
+    output::child_exit_code(
+        Command::new(venv::project_python())
+            .arg("-c")
+            .arg(script)
+            .args(args)
+            .status(),
+        "could not start python",
+    )
 }
 
 #[derive(Clone, Copy)]

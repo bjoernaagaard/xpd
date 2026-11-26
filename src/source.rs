@@ -39,7 +39,6 @@ pub(crate) fn is_python(path: &Path) -> bool {
         .is_some_and(|x| x.eq_ignore_ascii_case("py"))
 }
 
-/// Whether the name of `path` tells its language.
 /// Whether `path` is a test file, by the names pytest collects.
 pub(crate) fn is_test(path: &Path) -> bool {
     let name = path
@@ -52,12 +51,22 @@ pub(crate) fn is_test(path: &Path) -> bool {
         || path.components().any(|part| part.as_os_str() == "tests")
 }
 
+/// Whether the name of `path` tells its language.
 pub(crate) fn names_language(path: &Path) -> bool {
     SupportLang::from_path(path).is_some()
 }
 
 pub(crate) fn cannot_read(path: &Path) -> String {
     format!("cannot read {}", path.display())
+}
+
+/// Reads `path` as UTF-8, returning `Ok(None)` when the file does not exist.
+pub(crate) fn read_optional(path: &Path) -> Result<Option<String>> {
+    match fs::read_to_string(path) {
+        Ok(text) => Ok(Some(text)),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(None),
+        Err(error) => Err(error).with_context(|| cannot_read(path)),
+    }
 }
 
 enum ReadError {

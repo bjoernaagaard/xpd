@@ -21,7 +21,7 @@ use std::collections::{HashMap, HashSet};
 use serde::Deserialize;
 
 use crate::names::{self, Binders, Binding, LibraryNames};
-use crate::syntax::{Node, Root};
+use crate::syntax::{self, Node, Root};
 
 /// The name pandas is imported by. A constructor or an annotation must start at such an import.
 const PANDAS: &str = "pandas";
@@ -421,13 +421,11 @@ impl<'t> Frames<'t> {
         if MAKERS.contains(&name) {
             return Value::Frame;
         }
-        // Beside each other, the parts of a concat always make a frame. Below each other, they
-        // make a frame when one of them is a frame.
-        let axis = keyword(call, "axis").map(|axis| axis.text().into_owned());
+        let axis = syntax::keyword_arg(call, "axis").map(|axis| axis.text().into_owned());
         if matches!(axis.as_deref(), Some("1" | "\"columns\"" | "'columns'")) {
             return Value::Frame;
         }
-        let parts = keyword(call, "objs").or_else(|| {
+        let parts = syntax::keyword_arg(call, "objs").or_else(|| {
             (call.field("arguments")?.named_children())
                 .find(|argument| !matches!(&*argument.kind(), "comment" | "keyword_argument"))
         });
@@ -574,19 +572,12 @@ fn arguments<'t>(call: &Node<'t>) -> Vec<Node<'t>> {
         .collect()
 }
 
-/// The value that `call` passes for the keyword `name`.
-fn keyword<'t>(call: &Node<'t>, name: &str) -> Option<Node<'t>> {
-    call.field("arguments")?
-        .named_children()
-        .filter(|argument| argument.kind() == "keyword_argument")
-        .find(|argument| argument.field("name").is_some_and(|key| key.text() == name))?
-        .field("value")
-}
-
 /// Whether `call` passes one of the keywords `names`, or `**options`, which can hold any of
 /// them.
 fn passes(call: &Node<'_>, names: &[&str]) -> bool {
-    names.iter().any(|name| keyword(call, name).is_some())
+    names
+        .iter()
+        .any(|name| syntax::keyword_arg(call, name).is_some())
         || call.field("arguments").is_some_and(|list| {
             list.named_children()
                 .any(|argument| argument.kind() == "dictionary_splat")

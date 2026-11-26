@@ -20,6 +20,15 @@ pub(crate) fn parse_as(src: &str, language: SupportLang) -> Root {
     language.ast_grep(src)
 }
 
+/// The value that a Python `call` node passes for the keyword `name`.
+pub(crate) fn keyword_arg<'t>(call: &Node<'t>, name: &str) -> Option<Node<'t>> {
+    call.field("arguments")?
+        .named_children()
+        .filter(|argument| argument.kind() == "keyword_argument")
+        .find(|argument| argument.field("name").is_some_and(|key| key.text() == name))?
+        .field("value")
+}
+
 /// The text of a string literal with no interpolation, without its quotes.
 pub(crate) fn string_literal(node: &Node<'_>) -> Option<String> {
     if node.kind() != "string" {

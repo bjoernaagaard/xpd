@@ -113,12 +113,7 @@ fn line(node: &Node<'_>) -> usize {
 
 /// `text` on one line, cut to the length the evidence quotes.
 fn quoted(text: &str) -> String {
-    let one_line = text.split_whitespace().collect::<Vec<_>>().join(" ");
-    if one_line.chars().count() <= QUOTED_CHARS {
-        return one_line;
-    }
-    let cut: String = one_line.chars().take(QUOTED_CHARS).collect();
-    format!("{cut}…")
+    crate::output::quote_one_line(text, QUOTED_CHARS)
 }
 
 /// The facts of the Python file at `path`, whose parsed source is `root`. In a test, a branch

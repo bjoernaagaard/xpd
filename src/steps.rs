@@ -730,11 +730,7 @@ fn repeated_formulas(bodies: &[StepBody]) -> Vec<Finding> {
 
 /// The start of a formula, for a message.
 fn quoted(text: &str) -> String {
-    if text.chars().count() <= QUOTED_CHARS {
-        return text.to_owned();
-    }
-    let short: String = text.chars().take(QUOTED_CHARS).collect();
-    format!("{short}...")
+    crate::output::truncate_chars(text, QUOTED_CHARS, "...")
 }
 
 /// Reads one step: a function, or one `.assign(...)` link of a chain.

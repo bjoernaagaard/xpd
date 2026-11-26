@@ -9,7 +9,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 
-use super::catalog::{Catalog, Key, Kind, Level, Surface, Target, Tool};
+use super::catalog::{Catalog, Key, Kind, Level, Surface, Tool};
 use super::evidence::Location;
 use super::placement::Destination;
 use super::probe::Checker;
@@ -176,14 +176,7 @@ pub(crate) fn state(catalog: &Catalog, file: &Path, prefix: &[&str], doc: Option
 
 /// The value of each setting a suggestion names, from the file or else the pinned default.
 fn settings(catalog: &Catalog, prefix: &[&str], doc: Option<&Toml>) -> BTreeMap<String, Observed> {
-    let keys: BTreeSet<&str> = catalog
-        .suggestions()
-        .filter(|(record, _)| record.key.tool == Tool::Ty)
-        .filter_map(|(_, suggestion)| match &suggestion.target {
-            Target::Setting { key, .. } => Some(key.as_str()),
-            _ => None,
-        })
-        .collect();
+    let keys: BTreeSet<&str> = catalog.setting_keys(Tool::Ty).collect();
     let mut settings = BTreeMap::new();
     for key in keys {
         let path: Vec<&str> = prefix.iter().copied().chain(key.split('.')).collect();

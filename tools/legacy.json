@@ -520,7 +520,7 @@
   "src/doctor/evidence-utils.yml": "1",
   "src/doctor/ruff.rs": "115,348",
   "src/embed.rs": "97-98,208",
-  "src/frames.rs": "424-425,491",
+  "src/frames.rs": "491",
   "src/graph.rs": "155,512",
   "src/hook.rs": "153-154,174,184-185,259-260,334,546-547,604-605,656-658,701,778,875,894,911",
   "src/imports.rs": "20,80",

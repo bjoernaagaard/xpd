@@ -11,6 +11,41 @@ pub(crate) fn print_out(text: &str) -> ExitCode {
     ExitCode::SUCCESS
 }
 
+/// The shell exit code for a child command that could not be started.
+pub(crate) const NOT_STARTED: u8 = 127;
+
+/// Translates a child process `status()` result into an [`ExitCode`], reporting `what` on error.
+pub(crate) fn child_exit_code(
+    status: std::io::Result<std::process::ExitStatus>,
+    what: &str,
+) -> ExitCode {
+    match status {
+        Ok(status) => status
+            .code()
+            .and_then(|code| u8::try_from(code).ok())
+            .map_or(ExitCode::FAILURE, ExitCode::from),
+        Err(error) => {
+            eprintln!("xpd: {what}: {error}");
+            ExitCode::from(NOT_STARTED)
+        }
+    }
+}
+
+/// `text` cut to at most `max` characters, appending `ellipsis` when truncated.
+pub(crate) fn truncate_chars(text: &str, max: usize, ellipsis: &str) -> String {
+    if text.chars().count() <= max {
+        return text.to_owned();
+    }
+    let cut: String = text.chars().take(max).collect();
+    format!("{cut}{ellipsis}")
+}
+
+/// `text` collapsed onto one line and cut to at most `max` characters with `…`.
+pub(crate) fn quote_one_line(text: &str, max: usize) -> String {
+    let one_line = text.split_whitespace().collect::<Vec<_>>().join(" ");
+    truncate_chars(&one_line, max, "…")
+}
+
 /// How `graph`, `rules`, `find`, `api`, `rules new` and `rules test` print what they found.
 #[derive(Debug, Clone, Copy, ValueEnum)]
 pub(crate) enum Format {

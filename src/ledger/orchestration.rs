@@ -15,7 +15,8 @@ use serde::{Deserialize, Serialize};
 
 use duroxide::{OrchestrationContext, RetryPolicy};
 
-use super::run::cited_missing;
+use super::run::judge_fix;
+pub(super) use super::run::{Compared, Goal, Timing};
 
 /// The name the orchestration is registered and started under.
 pub(crate) const ORCHESTRATION_NAME: &str = "LedgerRun";
@@ -23,10 +24,6 @@ pub(crate) const ORCHESTRATION_NAME: &str = "LedgerRun";
 pub(crate) const COMMAND_QUEUE: &str = "commands";
 /// How many times a fix may fail its gate before the next stage is to drop it.
 pub(crate) const ATTEMPTS: usize = 2;
-/// Maximum allowed slowdown factor on `--bench` before a gate rejects a fix.
-pub(crate) const MAX_SLOWDOWN: f64 = 1.15;
-/// Minimum speedup factor required for a fix whose goal is `faster` or `both`.
-pub(crate) const MIN_SPEEDUP: f64 = 0.98;
 
 /// The activity that measures the commit a run starts from.
 pub(crate) const ACT_INIT_BASELINE: &str = "InitBaseline";
@@ -50,15 +47,6 @@ pub(crate) struct CheckState {
     pub(crate) passed: bool,
 }
 
-/// One benchmark point, in milliseconds.
-#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
-pub(crate) struct Timing {
-    pub(crate) median_ms: f64,
-    pub(crate) min_ms: f64,
-    pub(crate) max_ms: f64,
-    pub(crate) runs: usize,
-}
-
 /// A benchmark command tracked across the run.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub(crate) struct BenchState {
@@ -69,15 +57,6 @@ pub(crate) struct BenchState {
     /// The class of machine that timed `baseline` and `current`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub(crate) host_fingerprint: Option<String>,
-}
-
-/// What proves a fix that names no static finding id.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "kebab-case")]
-pub(crate) enum Goal {
-    Shorter,
-    Faster,
-    Both,
 }
 
 /// How a fix ended. The shape matches the journal a run prints.
@@ -389,13 +368,6 @@ impl Receipt {
     }
 }
 
-/// What a gate found, with no file or command in it.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct Compared {
-    pub(crate) fixed: Vec<String>,
-    pub(crate) added: Vec<String>,
-}
-
 /// Whether a fix is kept, with the exact rules of the journal gate.
 pub(crate) fn judge(
     fix: &FixState,
@@ -405,66 +377,15 @@ pub(crate) fn judge(
     lines: (usize, usize),
     timing: Option<(Timing, Timing)>,
 ) -> Result<Compared, String> {
-    if !broken.is_empty() {
-        return Err(format!(
-            "These checks passed at the start and fail now: {}.",
-            broken.join("; ")
-        ));
-    }
-    if let Some(reason) = cited_missing(&fix.findings, before) {
-        return Err(reason);
-    }
-    if !fix.findings.is_empty() && !fix.findings.iter().any(|id| !after.contains(id)) {
-        return Err("None of the findings the fix was to remove is gone.".to_owned());
-    }
-    if after.len() > before.len() {
-        return Err(format!(
-            "The count of findings rose from {} to {}. The new ones: {}.",
-            before.len(),
-            after.len(),
-            after
-                .difference(before)
-                .cloned()
-                .collect::<Vec<_>>()
-                .join(", ")
-        ));
-    }
-    if let Some(goal) = fix.goal {
-        let (lines_before, lines_after) = lines;
-        if matches!(goal, Goal::Shorter | Goal::Both) && lines_after >= lines_before {
-            return Err(format!(
-                "The goal is shorter code, but lines went from {lines_before} to {lines_after}."
-            ));
-        }
-        if matches!(goal, Goal::Faster | Goal::Both) {
-            let Some((tb, ta)) = timing else {
-                return Err("The goal is faster code, which needs `--bench` on `start`.".to_owned());
-            };
-            if tb.median_ms > 0.0 && ta.median_ms > tb.median_ms * MIN_SPEEDUP {
-                return Err(format!(
-                    "The goal is faster code, but benchmark median went from {:.2} ms to {:.2} ms.",
-                    tb.median_ms, ta.median_ms
-                ));
-            }
-        }
-    }
-    if let Some((tb, ta)) = timing
-        && tb.median_ms > 0.0
-        && ta.median_ms > tb.median_ms * MAX_SLOWDOWN
-        && ta.median_ms - tb.median_ms > 5.0
-        && ta.min_ms > tb.max_ms
-    {
-        return Err(format!(
-            "Benchmark regressed from {:.2} ms to {:.2} ms ({:.2}x slower).",
-            tb.median_ms,
-            ta.median_ms,
-            ta.median_ms / tb.median_ms
-        ));
-    }
-    Ok(Compared {
-        fixed: before.difference(after).cloned().collect(),
-        added: after.difference(before).cloned().collect(),
-    })
+    judge_fix(
+        &fix.findings,
+        fix.goal,
+        before,
+        after,
+        broken,
+        lines,
+        timing,
+    )
 }
 
 fn publish(ctx: &OrchestrationContext, state: &JournalState, command: &str) {

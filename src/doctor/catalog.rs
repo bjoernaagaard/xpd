@@ -676,6 +676,16 @@ impl Catalog {
             })
     }
 
+    /// The setting keys that doctor's suggestions inspect for `tool`.
+    pub fn setting_keys(&self, tool: Tool) -> impl Iterator<Item = &str> {
+        self.suggestions()
+            .filter(move |(record, _)| record.key.tool == tool)
+            .filter_map(|(_, suggestion)| match &suggestion.target {
+                Target::Setting { key, .. } => Some(key.as_str()),
+                _ => None,
+            })
+    }
+
     /// The record that explains the value `profile.toml` sets for `id` of `tool`, in any release.
     pub fn profiled(&self, tool: Tool, id: &str) -> Option<&Record> {
         self.records.iter().find(|record| {

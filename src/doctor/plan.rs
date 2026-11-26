@@ -11,7 +11,6 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt::Write as _;
 use std::fs;
-use std::io::ErrorKind;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 
@@ -207,11 +206,7 @@ pub(crate) fn compute(
     request: Request<'_>,
 ) -> Result<Plan> {
     let file = root.join(PYPROJECT);
-    let before = match fs::read_to_string(&file) {
-        Ok(text) => Some(text),
-        Err(error) if error.kind() == ErrorKind::NotFound => None,
-        Err(error) => return Err(error).with_context(|| format!("cannot read {}", file.display())),
-    };
+    let before = crate::source::read_optional(&file)?;
     let original = before
         .as_ref()
         .map(|text| toml_edit::Document::parse(text.clone()))
@@ -649,13 +644,7 @@ impl Plan {
             }
             let path = PathBuf::from(&owned.path);
             let file = root.join(&path);
-            let before = match fs::read_to_string(&file) {
-                Ok(text) => Some(text),
-                Err(error) if error.kind() == ErrorKind::NotFound => None,
-                Err(error) => {
-                    return Err(error).with_context(|| format!("cannot read {}", file.display()));
-                }
-            };
+            let before = crate::source::read_optional(&file)?;
             if before.as_deref() == Some(owned.text) {
                 continue;
             }
@@ -752,13 +741,7 @@ impl Plan {
         };
         let path = PathBuf::from(PYTHON_VERSION);
         let file = root.join(&path);
-        let before = match fs::read_to_string(&file) {
-            Ok(text) => Some(text),
-            Err(error) if error.kind() == ErrorKind::NotFound => None,
-            Err(error) => {
-                return Err(error).with_context(|| format!("cannot read {}", file.display()));
-            }
-        };
+        let before = crate::source::read_optional(&file)?;
         if let Some(text) = &before {
             let named = text.lines().next().unwrap_or_default().trim();
             let admitted = named
@@ -2222,27 +2205,14 @@ impl Edits<'_> {
                     }
                     drop.push(index);
                     let shown = format!("{} = [\"{selector}\"]", dotted(&path));
-                    let exact = off.len() == 1 && off[0] == self.catalog.ruff_code(&selector);
-                    let (item, old, new, explained) = if exact {
-                        (
-                            self.rule_name(&off[0]),
-                            format!("off, by {shown}"),
-                            "on".to_owned(),
-                            self.explain(Tool::Ruff, &off[0]),
-                        )
-                    } else {
-                        (
-                            format!("ruff {selector}"),
-                            format!(
-                                "turns off {} rules of the profile, such as {}",
-                                off.len(),
-                                off[0]
-                            ),
-                            "removed".to_owned(),
-                            self.explain(Tool::Ruff, "lint.ignore"),
-                        )
-                    };
-                    self.change(("ruff", &selector), item, &path, old, new, explained);
+                    self.record_ruff_ignore_removal(
+                        &selector,
+                        &path,
+                        &off,
+                        &format!("off, by {shown}"),
+                        "",
+                        "lint.ignore",
+                    );
                 }
                 if let Some(array) = edit::existing(self.doc, table)
                     .and_then(|table| table.get_mut(key))
@@ -2271,6 +2241,39 @@ impl Edits<'_> {
                 explained,
             );
         }
+    }
+
+    /// Records the removal of a Ruff ignore selector that turned off one or more profile rules.
+    fn record_ruff_ignore_removal(
+        &mut self,
+        selector: &str,
+        path: &[&str],
+        off: &[String],
+        exact_old: &str,
+        scope_suffix: &str,
+        setting: &str,
+    ) {
+        let exact = off.len() == 1 && off[0] == self.catalog.ruff_code(selector);
+        let (item, old, new, explained) = if exact {
+            (
+                self.rule_name(&off[0]),
+                exact_old.to_owned(),
+                "on".to_owned(),
+                self.explain(Tool::Ruff, &off[0]),
+            )
+        } else {
+            (
+                format!("ruff {selector}"),
+                format!(
+                    "turns off {} rules of the profile{scope_suffix}, such as {}",
+                    off.len(),
+                    off[0]
+                ),
+                "removed".to_owned(),
+                self.explain(Tool::Ruff, setting),
+            )
+        };
+        self.change(("ruff", selector), item, path, old, new, explained);
     }
 
     /// The reason and source of the rules that the profile's ignore selector `selector` turns
@@ -2350,27 +2353,14 @@ impl Edits<'_> {
                             continue;
                         }
                         drop.push(*index);
-                        let exact = off.len() == 1 && off[0] == self.catalog.ruff_code(selector);
-                        let (item, old, new, explained) = if exact {
-                            (
-                                self.rule_name(&off[0]),
-                                format!("off for {pattern}"),
-                                "on".to_owned(),
-                                self.explain(Tool::Ruff, &off[0]),
-                            )
-                        } else {
-                            (
-                                format!("ruff {selector}"),
-                                format!(
-                                    "turns off {} rules of the profile for {pattern}, such as {}",
-                                    off.len(),
-                                    off[0]
-                                ),
-                                "removed".to_owned(),
-                                self.explain(Tool::Ruff, "lint.per-file-ignores"),
-                            )
-                        };
-                        self.change(("ruff", selector), item, &full, old, new, explained);
+                        self.record_ruff_ignore_removal(
+                            selector,
+                            &full,
+                            &off,
+                            &format!("off for {pattern}"),
+                            &format!(" for {pattern}"),
+                            "lint.per-file-ignores",
+                        );
                     }
                     if drop.is_empty() {
                         continue;
