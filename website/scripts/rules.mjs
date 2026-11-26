@@ -98,27 +98,22 @@ export function generateRules(xpd) {
     mkdirSync(folder, { recursive: true });
     const { title, body: packBody } = pages.get(pack);
     for (const rule of rules) {
-      const versions = rule.since ? `${title} ${rule.since} and later` : 'every version';
+      const versions = rule.since ? `${title} ${rule.since}+` : 'All versions';
       const body = [
-        `| Rule | ${rule.rule} |`,
-        '| --- | --- |',
-        `| Pack | [${title}](../) |`,
-        `| Severity | ${severityText(rule)} |`,
-        `| Fix | ${fixText(rule)} |`,
-        `| Library versions | ${versions} |`,
+        `| Pack | Severity | Fix | Versions |`,
+        `| --- | --- | --- | --- |`,
+        `| [${title}](../) | ${severityText(rule)} | ${fixText(rule)} | ${versions} |`,
         '',
         siteLinks(rule.doc, pack, 2),
         '',
         ...reviewQuestions(rule),
-        '## Message',
-        '',
-        'xpd prints this message with the issue. A name that starts with `$` stands for code from your file.',
+        '## Diagnostic message',
         '',
         '```text',
         rule.message,
         '```',
         '',
-        `Browse the other rules of the [${title} pack](../).`,
+        `See all rules in the [${title} pack](../).`,
       ].join('\n');
       writeFileSync(
         join(folder, `${rule.rule}.md`),
@@ -159,8 +154,19 @@ export function generateRules(xpd) {
     if (unlistedRules.length) {
       throw new Error(`rules/${pack}/pack.md does not list ${unlistedRules.join(', ')}`);
     }
-    const fixes = rules.filter((rule) => rule.fix).length;
-    const intro = `The ${title} pack has ${rules.length} ${rules.length === 1 ? 'rule' : 'rules'}, and xpd can fix ${fixes} of them.`;
+    const safe = rules.filter((rule) => rule.fix === 'safe').length;
+    const unsafe = rules.filter((rule) => rule.fix === 'unsafe').length;
+    const manual = rules.length - safe - unsafe;
+    const statsTable = [
+      '| Rules | Safe fix | Unsafe fix | Manual fix |',
+      '| ---: | ---: | ---: | ---: |',
+      `| ${rules.length} | ${safe} | ${unsafe} | ${manual} |`,
+    ].join('\n');
+    const rendered = siteLinks(lines.join('\n'), pack, 1).trim();
+    const splitAt = rendered.indexOf('\n\n');
+    const pageBody = splitAt === -1
+      ? `${rendered}\n\n${statsTable}`
+      : `${rendered.slice(0, splitAt)}\n\n${statsTable}\n\n${rendered.slice(splitAt + 2)}`;
     writeFileSync(
       join(folder, 'index.md'),
       page(
@@ -169,7 +175,7 @@ export function generateRules(xpd) {
           description: yaml(`The ${rules.length} xpd ${rules.length === 1 ? 'rule' : 'rules'} for ${title}.`),
           editUrl: yaml(editUrl(`rules/${pack}/pack.md`)),
         },
-        `${intro}\n\n${siteLinks(lines.join('\n'), pack, 1)}`,
+        pageBody,
       ),
     );
   }

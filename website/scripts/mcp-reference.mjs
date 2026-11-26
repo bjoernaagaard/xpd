@@ -70,7 +70,7 @@ const BEHAVIOR = [
 function toolPage(tool, prose) {
   const schema = tool.inputSchema;
   const required = new Set(schema.required ?? []);
-  const body = [prose.intro, '## Call', '', '```python', signature(tool), '```'];
+  const body = [prose.intro.trim(), '', '## Call', '', '```python', signature(tool), '```'];
   const annotations = tool.annotations ?? {};
   const behavior = BEHAVIOR
     .filter(([key]) => key in annotations && !(annotations.readOnlyHint && key === 'destructiveHint'))
@@ -78,26 +78,27 @@ function toolPage(tool, prose) {
   if (behavior.length) body.push('', ...behavior.map((line) => `- ${line}`));
   const tags = tool._meta?.fastmcp?.tags ?? [];
   if (tags.length) body.push('', `Tags: ${tags.map(code).join(', ')}.`);
-  body.push('', '## Description', '', 'The server gives the agent this description of the tool.', '', reflow(tool.description));
   const args = Object.entries(schema.properties ?? {});
-  body.push('', '## Arguments', '');
-  if (!args.length) body.push('It takes no arguments.');
-  for (const [name, field] of args) {
-    body.push(`### ${text(name)}`, '', `Type: ${typeOf(field)}. ${required.has(name) ? 'Required.' : `Optional, default ${code(JSON.stringify(field.default ?? null))}.`}`);
-    if (field.description) body.push('', reflow(field.description));
-    const rows = fieldRows(field, name);
-    if (rows.length) body.push('', fieldTable(rows, `The ${rows.length} fields of ${code(name)}`));
-    body.push('');
+  if (args.length) {
+    body.push('', '## Arguments', '', '| Argument | Type | Required | Default | Description |', '| --- | --- | --- | --- | --- |');
+    const nested = [];
+    for (const [name, field] of args) {
+      const def = required.has(name) ? ' ' : code(JSON.stringify(field.default ?? null));
+      body.push(`| ${code(name)} | ${cell(typeOf(field))} | ${required.has(name) ? 'yes' : 'no'} | ${def} | ${cell(field.description) || ' '} |`);
+      const rows = fieldRows(field, name);
+      if (rows.length) nested.push(fieldTable(rows, `Fields of ${code(name)} (${rows.length})`));
+    }
+    if (nested.length) body.push('', ...nested.map((block) => `${block}\n`));
   }
-  body.push('## Result', '');
+  body.push('', '## Result', '');
   if (tool.outputSchema) {
     if (tool.outputSchema.description) body.push(reflow(tool.outputSchema.description), '');
     const rows = fieldRows(tool.outputSchema, 'result').map((row) => ({ ...row, path: row.path.replace(/^result\.?/, '') }));
-    body.push(rows.length ? fieldTable(rows, `The ${rows.length} fields of the result`) : `Type: ${typeOf(tool.outputSchema)}.`);
+    body.push(rows.length ? fieldTable(rows, `Fields of the result (${rows.length})`) : `Type: ${typeOf(tool.outputSchema)}.`);
   } else {
-    body.push('The tool declares no output schema.');
+    body.push('No output schema.');
   }
-  body.push('', sectionsText(prose.sections));
+  if (prose.sections.length) body.push('', sectionsText(prose.sections));
   return body.join('\n');
 }
 

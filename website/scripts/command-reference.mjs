@@ -15,26 +15,39 @@ function syntax(arg) {
   return arg.optional_value ? `${flags}[=${value}]` : `${flags} ${value}`;
 }
 
-function argumentSection(arg) {
-  const heading = arg.positional ? `<${(arg.value_names?.[0] ?? arg.id).toUpperCase()}>` : `--${arg.long ?? arg.short}`;
-  const help = reflow(arg.long_help ?? arg.help);
-  const lines = [`### ${text(heading)}`, '', code(syntax(arg)), '', /[.!?:)]$/.test(help) ? help : `${help}.`];
-  const facts = [];
-  if (arg.aliases?.length) facts.push(`Also written ${arg.aliases.map((alias) => code(`--${alias}`)).join(', ')}.`);
-  if (arg.required) facts.push('Required.');
-  if (arg.takes_value && arg.defaults.length) facts.push(`Default: ${arg.defaults.map(code).join(', ')}.`);
-  if (arg.multiple && !arg.positional) facts.push('Give it more than once to pass several values.');
-  if (arg.optional_value) facts.push(`The value is optional. Give it as ${code(`--${arg.long}=<VALUE>`)}.`);
-  if (arg.trailing) facts.push('Every argument after it goes to it, flags included.');
-  if (arg.conflicts_with.length) facts.push(`Cannot be combined with ${arg.conflicts_with.map(code).join(', ')}.`);
-  if (facts.length) lines.push('', facts.join(' '));
+function describeArg(arg) {
+  const help = cell(arg.long_help ?? arg.help);
+  const base = help ? (/[.!?:)]$/.test(help) ? help : `${help}.`) : '';
+  const notes = [];
+  if (arg.aliases?.length) notes.push(`Aliases: ${arg.aliases.map((alias) => code(`--${alias}`)).join(', ')}.`);
+  if (arg.required) notes.push('Required.');
+  if (arg.multiple && !arg.positional) notes.push('Repeatable.');
+  if (arg.optional_value) notes.push(`Optional value via ${code(`--${arg.long}=<VALUE>`)}.`);
+  if (arg.trailing) notes.push('Captures all following arguments.');
+  if (arg.conflicts_with.length) notes.push(`Conflicts with ${arg.conflicts_with.map(code).join(', ')}.`);
   const values = arg.possible_values;
   if (values.length && values.some((value) => value.help)) {
-    lines.push('', '| Value | Meaning |', '| --- | --- |', ...values.map((value) => `| ${code(value.name)} | ${cell(value.help) || ' '} |`));
+    const described = values
+      .map((value) => (value.help ? `${code(value.name)} (${cell(value.help)})` : code(value.name)))
+      .join(', ');
+    notes.push(`Values: ${described}.`);
   } else if (values.length) {
-    lines.push('', `Values: ${values.map((value) => code(value.name)).join(', ')}.`);
+    notes.push(`Values: ${values.map((value) => code(value.name)).join(', ')}.`);
   }
-  return lines.join('\n');
+  return [base, ...notes].filter(Boolean).join(' ');
+}
+
+function argumentTable(args) {
+  const rows = args.map((arg) => `| ${code(syntax(arg))} | ${describeArg(arg)} |`);
+  return ['| Argument | What it does |', '| --- | --- |', ...rows].join('\n');
+}
+
+function optionTable(options) {
+  const rows = options.map((arg) => {
+    const def = arg.takes_value && arg.defaults.length ? arg.defaults.map(code).join(', ') : ' ';
+    return `| ${code(syntax(arg))} | ${def} | ${describeArg(arg)} |`;
+  });
+  return ['| Option | Default | What it does |', '| --- | --- | --- |', ...rows].join('\n');
 }
 
 export async function generateCommandReference(commands, { repository, commandFolder, commandsOut, serverHelp, version, checkExample }) {
@@ -51,14 +64,14 @@ export async function generateCommandReference(commands, { repository, commandFo
     }
     await checkExample(source, prose.source, command.name);
 
-    const body = [text(command.about), prose.intro, '## Usage', '', '```sh', command.usage, '```'];
+    const lead = prose.intro.trim() || text(command.about);
+    const body = [lead, '', '## Usage', '', '```sh', command.usage, '```'];
     if (command.aliases.length) {
-      body.push('', `Also called ${command.aliases.map((alias) => code(command.name.replace(/\S+$/, alias))).join(', ')}.`);
+      body.push('', `Aliases: ${command.aliases.map((alias) => code(command.name.replace(/\S+$/, alias))).join(', ')}.`);
     }
-    if (command.subcommand_required) body.push('', 'It needs one of the commands below.');
-    if (command.after_help) body.push('', `${code(`${command.name} --help`)} ends with these lines.`, '', '```text', command.after_help.trim(), '```');
+    if (command.subcommand_required) body.push('', 'Pass one of the subcommands below.');
     if (command.subcommands.length) {
-      body.push('', '## Commands', '', '| Command | What it does |', '| --- | --- |');
+      body.push('', '## Subcommands', '', '| Subcommand | What it does |', '| --- | --- |');
       for (const name of command.subcommands) {
         const sub = bySlug.get(`${slug}/${name}`);
         body.push(`| [${code(sub.name)}](./${pagePath(`${slug}/${name}`).split('/').pop()}/) | ${cell(sub.about)} |`);
@@ -66,17 +79,16 @@ export async function generateCommandReference(commands, { repository, commandFo
     }
     const positional = command.arguments.filter((arg) => arg.positional);
     const options = command.arguments.filter((arg) => !arg.positional);
-    if (positional.length) body.push('', '## Arguments', '', ...positional.map((arg) => `${argumentSection(arg)}\n`));
-    if (options.length) body.push('', '## Options', '', ...options.map((arg) => `${argumentSection(arg)}\n`));
+    if (positional.length) body.push('', '## Arguments', '', argumentTable(positional));
+    if (options.length) body.push('', '## Options', '', optionTable(options));
     for (const group of command.groups) {
       const members = group.args.map((id) => command.arguments.find((arg) => arg.id === id)).filter(Boolean);
-      body.push('', `Give exactly one of ${members.map((arg) => code(`--${arg.long}`)).join(' and ')}.`);
+      body.push('', `Pass exactly one of ${members.map((arg) => code(`--${arg.long}`)).join(' and ')}.`);
     }
     if (command.name === 'xpd mcp') {
-      body.push('', '## Server options', '', `${code('xpd mcp')} passes its arguments to the server, whose help lists these flags.`, '', '```text', serverHelp.trim(), '```');
+      body.push('', '## Server options', '', '```text', serverHelp.trim(), '```');
     }
-    if (!options.length && !positional.length && !command.subcommands.length) body.push('', 'It takes no arguments.');
-    body.push('', sectionsText(prose.sections));
+    if (prose.sections.length) body.push('', sectionsText(prose.sections));
 
     const hasChildren = command.subcommands.length > 0;
     const file = join(commandsOut, hasChildren ? `${pagePath(slug)}/index.md` : `${pagePath(slug)}.md`);

@@ -27,8 +27,8 @@ function rulesFragments(docs) {
   return {
     ...fragments,
     'write-a-rule': 'guides/write-a-rule/',
-    'when-a-rule-has-a-fix': 'guides/write-a-rule/#when-a-rule-gets-a-fix',
-    'index-a-new-pack': 'guides/write-a-rule/#index-the-library-of-a-new-pack',
+    'when-a-rule-has-a-fix': 'guides/write-a-rule/#contribute-a-rule-to-xpd',
+    'index-a-new-pack': 'guides/write-a-rule/#index-a-new-library-pack',
   };
 }
 
@@ -46,20 +46,20 @@ function commandsFragments(docs) {
   const indexPage = commands.index;
   return {
     ...commands,
-    fixes: 'commands/check/#fixes',
+    fixes: 'commands/check/#fix-modes',
     'output-and-exit-codes': 'commands/check/#exit-status',
-    'select-rules': 'commands/check/#--rule',
+    'select-rules': 'commands/check/#options',
     'project-rules': 'commands/check/#project-rules',
     'suppress-an-issue': 'commands/check/#suppress-an-issue',
     'step-code': 'commands/graph/',
     'method-chains': 'commands/graph/',
     'hamilton-modules': 'commands/graph/',
     'output-and-exit-code': 'commands/graph/#exit-status',
-    ranking: 'commands/find/#ranking',
+    ranking: 'commands/find/#hybrid-ranking-and-offline-cache',
     'index-file': `${indexPage}#index-file`,
     'public-names': indexPage,
     recipes: `${indexPage}#recipes`,
-    'discovery-questions': 'commands/find/#discovery-questions',
+    'discovery-questions': 'commands/find/#playbooks',
   };
 }
 
@@ -71,42 +71,42 @@ const claudeCodeFragments = {
 };
 
 const mcpFragments = {
-  install: 'guides/mcp/#add-the-server-to-a-client',
-  'how-a-call-runs': 'guides/mcp/#what-the-server-adds-to-the-commands',
+  install: 'guides/mcp/#connect-a-client',
+  'how-a-call-runs': 'mcp/#how-a-call-runs',
   tools: 'mcp/#tools',
   'confirmation-of-unsafe-fixes': 'commands/check/',
-  'background-tasks': 'mcp/#background-tasks',
+  'background-tasks': 'mcp/#errors-and-background-tasks',
   resources: 'mcp/resources/',
   prompts: 'mcp/prompts/',
-  settings: 'guides/mcp/#settings',
-  http: 'guides/mcp/#serve-several-clients-over-http',
-  'other-ways-to-run-it': 'guides/mcp/#call-the-server-from-a-terminal',
+  settings: 'guides/mcp/#project-root-and-security',
+  http: 'guides/mcp/#serve-over-http-or-test-from-a-shell',
+  'other-ways-to-run-it': 'guides/mcp/#serve-over-http-or-test-from-a-shell',
   'library-discovery': 'commands/find/',
-  'the-discovery-record': 'guides/gates/#discovery-before-the-run',
+  'the-discovery-record': 'guides/gates/#pipeline-contract-stages',
   'the-discovery-gate': 'mcp/tools/discovery_gate/',
 };
 
 const codeModeFragments = {
-  'the-run-in-order': 'guides/gates/#run-the-gates-in-one-call',
-  'discovery-before-execution': 'guides/gates/#discovery-before-the-run',
-  'the-stages': 'guides/gates/#the-stages',
-  'the-gates': 'guides/gates/#the-gates',
-  'a-run-from-raw-rows-to-a-saved-model': 'guides/gates/#before-you-start',
-  'the-prediction-script': 'guides/gates/#the-stages',
-  'a-leaky-script-stops-at-check': 'guides/gates/#a-leak-fails-a-gate',
-  'limits-that-no-gate-checks': 'guides/gates/#what-the-gates-dont-check',
+  'the-run-in-order': 'guides/gates/#run-the-sample-pipeline',
+  'discovery-before-execution': 'guides/gates/#pipeline-contract-stages',
+  'the-stages': 'guides/gates/#pipeline-contract-stages',
+  'the-gates': 'guides/gates/#pipeline-contract-stages',
+  'a-run-from-raw-rows-to-a-saved-model': 'guides/gates/#run-the-sample-pipeline',
+  'the-prediction-script': 'guides/gates/#pipeline-contract-stages',
+  'a-leaky-script-stops-at-check': 'guides/gates/#run-the-sample-pipeline',
+  'limits-that-no-gate-checks': 'guides/gates/#known-limits',
 };
 
 const lspFragments = {
-  'what-the-editor-gets': 'guides/editors/#what-the-editor-shows',
-  diagnostics: 'guides/editors/#what-the-editor-shows',
-  'code-actions': 'guides/editors/#fixes-as-code-actions',
-  hover: 'guides/editors/#rule-help-on-hover',
-  'chained-assignment': 'guides/editors/#rule-help-on-hover',
-  'the-project-and-its-venv': 'guides/editors/#the-project-its-rules-and-its-virtual-environment',
-  'project-rules': 'guides/editors/#the-project-its-rules-and-its-virtual-environment',
-  settings: 'guides/editors/#settings',
-  'what-the-server-leaves-out': 'guides/editors/#what-the-server-leaves-out',
+  'what-the-editor-gets': 'guides/editors/#code-actions-hover-and-cell-files',
+  diagnostics: 'guides/editors/#code-actions-hover-and-cell-files',
+  'code-actions': 'guides/editors/#code-actions-hover-and-cell-files',
+  hover: 'guides/editors/#code-actions-hover-and-cell-files',
+  'chained-assignment': 'guides/editors/#code-actions-hover-and-cell-files',
+  'the-project-and-its-venv': 'guides/editors/#workspace-resolution-and-scope',
+  'project-rules': 'guides/editors/#workspace-resolution-and-scope',
+  settings: 'guides/editors/#workspace-resolution-and-scope',
+  'what-the-server-leaves-out': 'guides/editors/#workspace-resolution-and-scope',
   'set-up-an-editor': 'guides/editors/#set-up-an-editor',
   neovim: 'guides/editors/#neovim',
   helix: 'guides/editors/#helix',
