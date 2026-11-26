@@ -40,9 +40,9 @@ pub(crate) fn any_loaded(path: &Path, root: &Root, found: impl Fn(&Root) -> bool
 /// The folder that the absolute imports of a module in `package` start from: the folder that
 /// holds the outermost package. A file in no package is a script, and Python starts from the
 /// script's own folder.
-fn import_root(package: &Path) -> &Path {
+fn import_root(package: &Path, is_file: impl Fn(&Path) -> bool) -> &Path {
     let mut top = package;
-    while top.join(INIT).is_file() {
+    while is_file(&top.join(INIT)) {
         let Some(above) = top.parent() else {
             break;
         };
@@ -74,7 +74,7 @@ fn from_module<'p>(
 /// and each module it imports unconditionally at module level that is in the same project.
 fn loaded_by(path: &Path, root: &Root) -> Vec<PathBuf> {
     let package = path.parent().unwrap_or(Path::new(""));
-    let top = import_root(package);
+    let top = import_root(package, Path::is_file);
     let mut loaded: Vec<PathBuf> = (package.ancestors())
         .take_while(|folder| *folder != top)
         .map(|folder| folder.join(INIT))
@@ -124,8 +124,18 @@ pub(crate) struct Import {
 /// from the package itself.
 pub(crate) fn imported(path: &Path, root: &Root) -> Vec<Import> {
     let path = std::path::absolute(path).unwrap_or_else(|_| path.to_path_buf());
+    imported_with(&path, root, Path::is_file)
+}
+
+/// Every import of a module of the same project in the file at `path`, resolving module
+/// existence with `is_file` so callers can pass an in-memory file set instead of reading disk.
+pub(crate) fn imported_with(
+    path: &Path,
+    root: &Root,
+    is_file: impl Fn(&Path) -> bool,
+) -> Vec<Import> {
     let package = path.parent().unwrap_or(Path::new(""));
-    let top = import_root(package);
+    let top = import_root(package, &is_file);
     let mut imports = Vec::new();
     for import in root.root().dfs() {
         let line = import.start_pos().line() + 1;
@@ -133,7 +143,7 @@ pub(crate) fn imported(path: &Path, root: &Root) -> Vec<Import> {
             "import_statement" => {
                 for name in import.field_children("name") {
                     let dotted = parts(&name);
-                    let Some(module) = module_file(top, &dotted) else {
+                    let Some(module) = module_file(top, &dotted, &is_file) else {
                         continue;
                     };
                     imports.push(Import {
@@ -149,9 +159,9 @@ pub(crate) fn imported(path: &Path, root: &Root) -> Vec<Import> {
                     continue;
                 };
                 let package_file = if module.is_empty() {
-                    Some(base.join(INIT)).filter(|init| init.is_file())
+                    Some(base.join(INIT)).filter(|init| is_file(init))
                 } else {
-                    module_file(base, &module)
+                    module_file(base, &module, &is_file)
                 };
                 let Some(package_file) = package_file else {
                     continue;
@@ -159,7 +169,7 @@ pub(crate) fn imported(path: &Path, root: &Root) -> Vec<Import> {
                 for name in import.field_children("name") {
                     let taken = parts(&name);
                     module.extend(taken.iter().cloned());
-                    let found = module_file(base, &module);
+                    let found = module_file(base, &module, &is_file);
                     module.truncate(module.len() - taken.len());
                     let bound = bound_name(&name).unwrap_or_else(|| taken.join("."));
                     imports.push(match found {
@@ -186,7 +196,7 @@ pub(crate) fn imported(path: &Path, root: &Root) -> Vec<Import> {
 
 /// The file of the module `parts` below the folder `base`: the `__init__.py` of a package, or
 /// the file of a module. `None` for a module that is not below `base`.
-fn module_file(base: &Path, parts: &[String]) -> Option<PathBuf> {
+fn module_file(base: &Path, parts: &[String], is_file: impl Fn(&Path) -> bool) -> Option<PathBuf> {
     let (last, packages) = parts.split_last()?;
     let folder = packages
         .iter()
@@ -196,7 +206,7 @@ fn module_file(base: &Path, parts: &[String]) -> Option<PathBuf> {
         folder.join(format!("{last}.py")),
     ]
     .into_iter()
-    .find(|file| file.is_file())
+    .find(|file| is_file(file))
 }
 
 /// The name after `as` in `a.b as c`.
