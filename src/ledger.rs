@@ -6,15 +6,17 @@ use std::collections::{HashMap, HashSet};
 use std::ffi::OsStr;
 use std::fmt::Write as _;
 use std::fs;
-use std::hash::{DefaultHasher, Hash, Hasher};
+use std::hash::{Hash, Hasher as _};
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
+use std::sync::Arc;
 
 use anyhow::{Context, Result};
 use ast_grep_core::Language;
 use ast_grep_language::SupportLang;
 use clap::ValueEnum;
 use serde::Serialize;
+use siphasher::sip::SipHasher13;
 
 use crate::git;
 
@@ -165,15 +167,57 @@ pub(crate) fn named<K: Kind>(mut findings: Vec<Finding<K>>) -> Vec<Entry<K>> {
                 .entry((finding.kind, finding.key.clone()))
                 .or_default();
             *nth += 1;
-            let mut hasher = DefaultHasher::new();
-            (finding.kind.name(), &finding.key, *nth).hash(&mut hasher);
             Entry {
-                id: format!("{:08x}", hasher.finish() & 0xffff_ffff),
+                id: id(&finding.kind.name(), &finding.key, *nth),
                 fresh: None,
                 finding,
             }
         })
         .collect()
+}
+
+/// The key of the id hash. It is fixed, so that every build gives a finding the same id.
+const ID_KEY: [u8; 16] = *b"xpd ledger id v1";
+
+/// The id of the `nth` finding of `kind` with `key`: SipHash-1-3 under `ID_KEY`, cut to 32 bits.
+/// Each part goes in as its length and its bytes, in little-endian order, so that the id is the
+/// same on every target and does not depend on how `Hash` writes a value.
+fn id(kind: &str, key: &str, nth: usize) -> String {
+    let mut hasher = SipHasher13::new_with_key(&ID_KEY);
+    for part in [kind.as_bytes(), key.as_bytes()] {
+        hasher.write(&u64::try_from(part.len()).unwrap_or(u64::MAX).to_le_bytes());
+        hasher.write(part);
+    }
+    hasher.write(&u64::try_from(nth).unwrap_or(u64::MAX).to_le_bytes());
+    format!("{:08x}", hasher.finish() & 0xffff_ffff)
+}
+
+/// A read-only view of the files of a repository at a commit, or of its working tree.
+/// `GixSource` implements it over the git object database, and `FsSource` over the files on
+/// disk. Paths are relative to the top of the repository, and object ids are full hex ids in
+/// the object format of the repository.
+#[expect(
+    dead_code,
+    reason = "the sources that implement it come in the next slice"
+)]
+pub(crate) trait ContentSource: std::fmt::Debug + Send + Sync {
+    /// The full id of the commit that `rev`, such as `HEAD`, `main` or a hash, names.
+    fn resolve_commit(&self, rev: &str) -> Result<String>;
+
+    /// The code files under `paths` at `commit`, or in the working tree when it is `None`,
+    /// each as its path, the id of its blob and its language.
+    fn list_code_files(
+        &self,
+        paths: &[PathBuf],
+        commit: Option<&str>,
+    ) -> Result<Vec<(String, String, SupportLang)>>;
+
+    /// The text of the blob `blob_oid`, which is the file at `rel_path`.
+    fn read_blob(&self, rel_path: &str, blob_oid: &str) -> Result<Arc<str>>;
+
+    /// The paths that each of the last `max_commits` commits without a merge changed, from
+    /// `commit` back, newest first.
+    fn commit_history(&self, commit: &str, max_commits: usize) -> Result<Vec<Vec<String>>>;
 }
 
 /// How many findings of one kind there are.
