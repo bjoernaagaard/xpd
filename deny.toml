@@ -9,6 +9,8 @@ unused-ignored-advisory = "deny"
 ignore = [
     { id = "RUSTSEC-2021-0139", reason = "ast-grep terminal colors; unmaintained-only advisory" },
     { id = "RUSTSEC-2024-0436", reason = "libcst compile-time macro; unmaintained-only advisory" },
+    { id = "RUSTSEC-2026-0459", reason = "SQLite in libsqlite3-sys 0.30 via duroxide 0.2 and sqlx 0.8, only in the opt-in ledger features; xpd opens only .git/xpd-ledger.sqlite of the user's own repository. Remove when duroxide supports sqlx 0.9" },
+    { id = "RUSTSEC-2026-0543", reason = "chrono via duroxide-pg 0.2 and sqlx 0.8, only in the opt-in ledger features; unmaintained-only advisory" },
 ]
 
 [licenses]
