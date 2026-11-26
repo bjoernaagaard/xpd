@@ -480,6 +480,22 @@ fn measure_bench(command: &str, runs: usize) -> Result<Timing> {
     })
 }
 
+/// Why a gate cannot judge a fix that cites `findings`, when the commit before the fix lacks
+/// any of them. Such an id cannot be gone after the fix either, so without this rule the gate
+/// would count it as removed and keep a fix that removed nothing.
+fn cited_missing(findings: &[String], before: &BTreeSet<String>) -> Option<String> {
+    let missing: Vec<&str> = (findings.iter())
+        .filter(|id| !before.contains(*id))
+        .map(String::as_str)
+        .collect();
+    (!missing.is_empty()).then(|| {
+        format!(
+            "The commit before the fix has no finding {}, so the gate cannot tell whether the fix removed it. Drop the fix, and plan it again with the ids that the ledger prints now.",
+            missing.join(", ")
+        )
+    })
+}
+
 /// What a gate found, with no file or command in it.
 #[cfg(not(feature = "ledger-durable"))]
 #[derive(Debug)]
@@ -504,6 +520,9 @@ fn judge(
             "These checks passed at the start and fail now: {}.",
             broken.join("; ")
         ));
+    }
+    if let Some(reason) = cited_missing(&fix.findings, before) {
+        return Err(reason);
     }
     if !fix.findings.is_empty() && !fix.findings.iter().any(|id| !after.contains(id)) {
         return Err("None of the findings the fix was to remove is gone.".to_owned());
@@ -657,6 +676,11 @@ fn passes(command: &str) -> (bool, String) {
 
 /// The ids of the findings of a run at a commit, or of the files of today for `None`.
 type Found<'f> = &'f dyn Fn(&Journal, Option<&str>) -> Result<BTreeSet<String>>;
+
+/// The findings at a commit, or in the working tree for `None`, as a map from the id that
+/// xpd 0.55.0 gave each one to its id of today.
+#[cfg(feature = "ledger-durable")]
+type Renamed<'r> = &'r dyn Fn(&Journal, Option<&str>) -> Result<BTreeMap<String, String>>;
 
 /// A new journal for the paths, which are given from the folder `here`.
 fn start(
@@ -1062,6 +1086,7 @@ fn act_journal(
 /// A lock file in the git folder of the worktree makes one process at a time its writer.
 #[cfg(feature = "ledger-durable")]
 mod durable_run {
+    use std::collections::{BTreeMap, BTreeSet};
     use std::fs::{self, File, TryLockError};
     use std::hash::Hasher as _;
     use std::path::{Path, PathBuf};
@@ -1085,8 +1110,8 @@ mod durable_run {
         ReceiptOutcome, RunStartInput, Snapshot, ValidatePlanOutput,
     };
     use super::{
-        Action, Found, Journal, Place, check_gate, measure_finish, measure_gate, plan_text,
-        read_plan, report_finish, report_unexplained, start, unexplained,
+        Action, Found, Journal, Outcome, Place, Renamed, check_gate, measure_finish, measure_gate,
+        plan_text, read_plan, report_finish, report_unexplained, start, unexplained,
     };
 
     /// How long a command waits for the receipt of the run. Every measurement is taken before
@@ -1450,21 +1475,89 @@ mod durable_run {
         Ok((latest.generation, journal_of(&snapshot.run)?))
     }
 
+    /// The commits whose findings a journal cites: the start, each kept fix and the current
+    /// commit. `None` stands for the working tree, which a plan is checked against.
+    fn cited_commits(journal: &Journal) -> BTreeSet<Option<&str>> {
+        let kept = journal.fixes().filter_map(|fix| match &fix.outcome {
+            Some(Outcome::Kept { commit, .. }) => Some(commit.as_str()),
+            _ => None,
+        });
+        ([journal.base.as_str(), journal.current.as_str()].into_iter())
+            .chain(kept)
+            .map(Some)
+            .chain([None])
+            .collect()
+    }
+
+    /// Rewrites each finding id that `journal` cites to the id of today. `renamed` maps the id
+    /// that xpd 0.55.0 gave a finding to its id of today. An id that is already an id of today,
+    /// because a newer xpd wrote the journal, stays. Fails, and names them, when some ids
+    /// match neither.
+    fn rewrite_ids(journal: &mut Journal, renamed: &BTreeMap<String, String>) -> Result<()> {
+        let today: BTreeSet<&String> = renamed.values().collect();
+        let mut unmatched = BTreeSet::new();
+        let mut rewrite = |id: &mut String| {
+            if let Some(new) = renamed.get(id.as_str()) {
+                new.clone_into(id);
+            } else if !today.contains(id) {
+                unmatched.insert(id.clone());
+            }
+        };
+        for fix in journal.rounds.iter_mut().flatten() {
+            fix.findings.iter_mut().for_each(&mut rewrite);
+            if let Some(Outcome::Kept { fixed, added, .. }) = &mut fix.outcome {
+                fixed
+                    .iter_mut()
+                    .chain(added.iter_mut())
+                    .for_each(&mut rewrite);
+            }
+        }
+        journal.accepted = std::mem::take(&mut journal.accepted)
+            .into_iter()
+            .map(|(mut id, reason)| {
+                rewrite(&mut id);
+                (id, reason)
+            })
+            .collect();
+        ensure!(
+            unmatched.is_empty(),
+            "the run cites findings that none of its commits has: {}",
+            unmatched.into_iter().collect::<Vec<_>>().join(", ")
+        );
+        Ok(())
+    }
+
     /// Moves the JSON journal of this worktree into the store, once.
     ///
     /// The lock of the worktree makes this process the only one that imports it. The import is
     /// started under a command id that the journal text fixes, so a retry after a crash finds
     /// the generation of the first try by its receipt. The file is renamed only when the
     /// store mirrors exactly the run that the file holds.
-    fn migrate(store: &Store, place: &Place) -> Result<()> {
+    ///
+    /// An older xpd named findings with another hash, so before the import every id the run
+    /// cites is rewritten to the id of today, found by surveying each commit of the run. The
+    /// import is refused when an id matches no finding of those commits.
+    fn migrate(store: &Store, place: &Place, renamed: Renamed<'_>) -> Result<()> {
         if !place.journal.is_file() {
             return Ok(());
         }
         let shown = place.journal.display();
         let text =
             fs::read_to_string(&place.journal).with_context(|| format!("cannot read {shown}"))?;
-        let state: JournalState =
+        let read: JournalState =
             serde_json::from_str(&text).with_context(|| format!("cannot read {shown}"))?;
+        let mut journal = journal_of(&read)?;
+        let mut ids = BTreeMap::new();
+        for commit in cited_commits(&journal) {
+            ids.extend(renamed(&journal, commit)?);
+        }
+        rewrite_ids(&mut journal, &ids).with_context(|| {
+            format!(
+                "{shown} stays. Finish its run with the xpd that wrote it, or replace it with `xpd {} start --restart`",
+                store.command
+            )
+        })?;
+        let state: JournalState = convert(&journal)?;
         let id = import_id(&text);
         let latest = store.latest()?;
         let generation = match &latest {
@@ -1517,6 +1610,7 @@ mod durable_run {
         here: &Path,
         command: &'static str,
         found: Found<'_>,
+        renamed: Renamed<'_>,
     ) -> Result<(Journal, bool)> {
         quiet_runtime_logs();
         let store = Store::open(place, command)?;
@@ -1526,7 +1620,7 @@ mod durable_run {
             _ => Some(store.lock_writer(place)?),
         };
         if !matches!(action, Action::Start { restart: true, .. }) {
-            migrate(&store, place)?;
+            migrate(&store, place, renamed)?;
         }
         let latest = store.latest()?;
         if let Action::Start {
@@ -1779,7 +1873,7 @@ pub(super) fn act<K: Kind, R>(
     let command = K::COMMAND;
     let here = std::env::current_dir()?;
     let place = Place::find(command)?;
-    let found = |journal: &Journal, commit: Option<&str>| -> Result<BTreeSet<String>> {
+    let surveyed = |journal: &Journal, commit: Option<&str>| -> Result<Vec<Entry<K>>> {
         let top = Some(place.top.as_path());
         let entries = match commit {
             None => {
@@ -1794,12 +1888,23 @@ pub(super) fn act<K: Kind, R>(
             })?
             .unwrap_or_default(),
         };
-        Ok(entries.into_iter().map(|entry| entry.id).collect())
+        Ok(entries)
+    };
+    let found = |journal: &Journal, commit: Option<&str>| -> Result<BTreeSet<String>> {
+        Ok((surveyed(journal, commit)?.into_iter())
+            .map(|entry| entry.id)
+            .collect())
     };
     #[cfg(not(feature = "ledger-durable"))]
     let (journal, kept) = act_journal(action, &place, &here, command, &found)?;
     #[cfg(feature = "ledger-durable")]
-    let (journal, kept) = durable_run::act(action, &place, &here, command, &found)?;
+    let renamed = |journal: &Journal, commit: Option<&str>| -> Result<BTreeMap<String, String>> {
+        Ok((surveyed(journal, commit)?.into_iter())
+            .map(|entry| (entry.legacy_id, entry.id))
+            .collect())
+    };
+    #[cfg(feature = "ledger-durable")]
+    let (journal, kept) = durable_run::act(action, &place, &here, command, &found, &renamed)?;
     match format {
         Format::Json => println!(
             "{}",

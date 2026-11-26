@@ -15,6 +15,8 @@ use serde::{Deserialize, Serialize};
 
 use duroxide::{OrchestrationContext, RetryPolicy};
 
+use super::cited_missing;
+
 /// The name the orchestration is registered and started under.
 pub(crate) const ORCHESTRATION_NAME: &str = "LedgerRun";
 /// The durable queue that every mutating command arrives on, in order.
@@ -400,6 +402,9 @@ pub(crate) fn judge(
             "These checks passed at the start and fail now: {}.",
             broken.join("; ")
         ));
+    }
+    if let Some(reason) = cited_missing(&fix.findings, before) {
+        return Err(reason);
     }
     if !fix.findings.is_empty() && !fix.findings.iter().any(|id| !after.contains(id)) {
         return Err("None of the findings the fix was to remove is gone.".to_owned());

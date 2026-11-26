@@ -117,6 +117,14 @@ pub(crate) struct Entry<K> {
     /// their paths. Of two findings that are alike in one file, the first in the file has the
     /// first id.
     pub(crate) id: String,
+    /// The id that xpd 0.55.0 and older gave this finding, from [`legacy_id`]. A run that one
+    /// of them recorded cites these ids, and its import rewrites each one to `id`.
+    #[serde(skip)]
+    #[cfg_attr(
+        not(feature = "ledger-durable"),
+        expect(dead_code, reason = "only the import of a JSON journal reads it")
+    )]
+    pub(crate) legacy_id: String,
     /// With `--since`: whether the commit had no finding of this id.
     #[serde(rename = "new", skip_serializing_if = "Option::is_none")]
     fresh: Option<bool>,
@@ -169,6 +177,7 @@ pub(crate) fn named<K: Kind>(mut findings: Vec<Finding<K>>) -> Vec<Entry<K>> {
             *nth += 1;
             Entry {
                 id: id(&finding.kind.name(), &finding.key, *nth),
+                legacy_id: legacy_id(&finding.kind.name(), &finding.key, *nth),
                 fresh: None,
                 finding,
             }
@@ -189,6 +198,15 @@ fn id(kind: &str, key: &str, nth: usize) -> String {
         hasher.write(part);
     }
     hasher.write(&u64::try_from(nth).unwrap_or(u64::MAX).to_le_bytes());
+    format!("{:08x}", hasher.finish() & 0xffff_ffff)
+}
+
+/// The id that xpd 0.55.0 and older gave the `nth` finding of `kind` with `key`: the standard
+/// library's `DefaultHasher` over the three, cut to 32 bits. The standard library may change
+/// that hash in another Rust release, so only the import of an old journal uses it.
+fn legacy_id(kind: &str, key: &str, nth: usize) -> String {
+    let mut hasher = std::hash::DefaultHasher::new();
+    (kind, key, nth).hash(&mut hasher);
     format!("{:08x}", hasher.finish() & 0xffff_ffff)
 }
 
