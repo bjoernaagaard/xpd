@@ -7,6 +7,8 @@
 //! indexed for one element are read from Python, with defaults from the index that `xpd api`
 //! reads.
 
+#[path = "ledger/gix_source.rs"]
+pub(crate) mod gix_source;
 mod python;
 mod twins;
 
@@ -30,6 +32,7 @@ use crate::style::Style;
 use crate::syntax;
 use crate::workspace::Workspace;
 
+use gix_source::Listing;
 use python::{Callee, Keyword};
 
 type Finding = ledger::Finding<Kind>;
@@ -174,7 +177,13 @@ impl OptimizeArgs {
                 ledger.count()
             )
         };
-        (self.select).print(default, |paths, files, _, _| survey(paths, files), header)
+        (self.select).print(
+            default,
+            |paths, files, top, commit| {
+                survey(paths, files, &Listing::of(paths, files, top, commit)?)
+            },
+            header,
+        )
     }
 }
 
@@ -195,10 +204,11 @@ fn read(
     path: &Path,
     language: SupportLang,
     tree: Tree<'_>,
+    listing: &Listing,
     workspace: Option<&Workspace>,
 ) -> Option<Surveyed> {
-    let text = fs::read_to_string(path).ok()?;
-    let absolute = fs::canonicalize(path).ok()?;
+    let text = listing.text(path)?;
+    let absolute = listing.absolute(path)?;
     let root = syntax::parse_as(&text, language);
     let shown = tree.shown(path);
     let mut rules = Vec::new();
@@ -454,9 +464,9 @@ fn rules_workspace(paths: &[PathBuf], tree: Tree<'_>) -> Result<Workspace> {
     Workspace::open(root, None, &filters).or_else(|_| Workspace::bundled(Style::Default))
 }
 
-/// What was read and every finding of the files under `paths`.
-fn survey(paths: &[PathBuf], tree: Tree<'_>) -> Result<(Read, Vec<Entry>)> {
-    let files = ledger::files(paths);
+/// What was read and every finding of the files under `paths`, which `listing` lists and reads.
+fn survey(paths: &[PathBuf], tree: Tree<'_>, listing: &Listing) -> Result<(Read, Vec<Entry>)> {
+    let files = &listing.files;
     let workspace = (files
         .iter()
         .any(|(_, language)| *language == SupportLang::Python))
@@ -467,7 +477,7 @@ fn survey(paths: &[PathBuf], tree: Tree<'_>) -> Result<(Read, Vec<Entry>)> {
             let ws = workspace
                 .as_ref()
                 .filter(|ws| *language == SupportLang::Python || ws.catalog.project.is_some());
-            read(path, *language, tree, ws)
+            read(path, *language, tree, listing, ws)
         })
         .collect();
     let read = Read {
