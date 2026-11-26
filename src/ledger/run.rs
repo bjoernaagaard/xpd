@@ -4,6 +4,12 @@
 //! session and belongs to no agent tool. The agent judges, designs and edits. xpd keeps what
 //! was decided, says which stage comes next, and gates each fix itself: it runs the checks of
 //! the project and compares the findings by their ids, so no stage grades its own work.
+//!
+//! Without the `ledger-durable` feature the journal is the JSON file `xpd-<command>.json` in the
+//! git folder of the worktree. With it, the run is a `duroxide` orchestration in
+//! `<git-common-dir>/xpd-ledger.sqlite`, and the CLI measures as before and hands each
+//! measurement to the orchestration as an activity result. A JSON journal that an older xpd left
+//! is imported once, by the worktree that owns it, and renamed with the `.migrated` suffix.
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt::Write as _;
@@ -21,13 +27,38 @@ use crate::output::Format;
 
 use super::{Entry, Kind, Tree, at_commit, files, repository};
 
+#[cfg(feature = "ledger-durable")]
+#[path = "durable.rs"]
+#[expect(
+    clippy::allow_attributes,
+    reason = "rustc cannot expect unfulfilled_lint_expectations, so only allow silences it"
+)]
+#[allow(
+    unfulfilled_lint_expectations,
+    reason = "durable.rs marks the items this module now calls as dead code awaiting this wiring"
+)]
+mod durable;
+#[cfg(feature = "ledger-durable")]
+#[path = "orchestration.rs"]
+#[expect(
+    clippy::allow_attributes,
+    reason = "rustc cannot expect unfulfilled_lint_expectations, so only allow silences it"
+)]
+#[allow(
+    unfulfilled_lint_expectations,
+    reason = "orchestration.rs marks ledger_run as dead code awaiting this wiring"
+)]
+mod orchestration;
+
 /// How many times a fix may fail its gate before the next stage is to drop it.
 const ATTEMPTS: usize = 2;
 /// How much of the output of a failed check the journal keeps.
 const OUTPUT_KEPT: usize = 1500;
 /// Maximum allowed slowdown factor on `--bench` before a gate rejects a fix as a regression.
+#[cfg(not(feature = "ledger-durable"))]
 const MAX_SLOWDOWN: f64 = 1.15;
 /// Minimum speedup factor required for a fix whose goal is `faster` or `both`.
+#[cfg(not(feature = "ledger-durable"))]
 const MIN_SPEEDUP: f64 = 0.98;
 
 /// A stage of a run.
@@ -171,7 +202,7 @@ struct Fix {
 }
 
 /// A finding that is right as it is.
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 struct Accepted {
     finding: String,
     reason: String,
@@ -450,6 +481,7 @@ fn measure_bench(command: &str, runs: usize) -> Result<Timing> {
 }
 
 /// What a gate found, with no file or command in it.
+#[cfg(not(feature = "ledger-durable"))]
 #[derive(Debug)]
 struct Compared {
     fixed: Vec<String>,
@@ -458,6 +490,7 @@ struct Compared {
 
 /// Whether a fix is kept. `before` and `after` hold the ids of the findings at the commit
 /// before the fix and after it, and `broken` the checks that passed at the start and fail now.
+#[cfg(not(feature = "ledger-durable"))]
 fn judge(
     fix: &Fix,
     before: &BTreeSet<String>,
@@ -539,14 +572,17 @@ impl Place {
             .context("this folder is in no git repository, which a run needs")?;
         std::env::set_current_dir(&top)
             .with_context(|| format!("cannot enter {}", top.display()))?;
-        let name = format!("xpd-{command}.json");
-        let journal = git::output(&top, &["rev-parse", "--git-path", &name])?;
-        Ok(Self {
-            journal: top.join(journal.trim()),
-            top,
-        })
+        let journal = git_path(&top, &format!("xpd-{command}.json"))?;
+        Ok(Self { top, journal })
     }
 
+    /// The path of `name` in the git folder of the worktree.
+    #[cfg(feature = "ledger-durable")]
+    fn git_path(&self, name: &str) -> Result<PathBuf> {
+        git_path(&self.top, name)
+    }
+
+    #[cfg(not(feature = "ledger-durable"))]
     fn read(&self, command: &str) -> Result<Journal> {
         ensure!(
             self.journal.is_file(),
@@ -558,6 +594,7 @@ impl Place {
             .with_context(|| format!("cannot read {}", self.journal.display()))
     }
 
+    #[cfg(not(feature = "ledger-durable"))]
     fn write(&self, journal: &Journal) -> Result<()> {
         fs::write(&self.journal, serde_json::to_string_pretty(journal)?)
             .with_context(|| format!("cannot write {}", self.journal.display()))
@@ -581,6 +618,13 @@ impl Place {
         );
         Ok(())
     }
+}
+
+/// The path of `name` in the git folder of the worktree at `top`, which differs between linked
+/// worktrees of one repository.
+fn git_path(top: &Path, name: &str) -> Result<PathBuf> {
+    let path = git::output(top, &["rev-parse", "--git-path", name])?;
+    Ok(top.join(path.trim()))
 }
 
 /// Whether `command` exits 0 in the working folder, with the end of what it printed.
@@ -673,8 +717,20 @@ fn start(
     Ok(journal)
 }
 
-/// Adds the plan in `text` to the journal, after checking it against the ledger of today.
-fn plan(journal: &mut Journal, text: &str, command: &str, found: Found<'_>) -> Result<()> {
+/// Reads the plan file, or stdin for `-`. `file` is given from the folder `here`.
+fn plan_text(here: &Path, file: &Path) -> Result<String> {
+    if file == Path::new("-") {
+        let mut text = String::new();
+        std::io::stdin().read_to_string(&mut text)?;
+        Ok(text)
+    } else {
+        fs::read_to_string(here.join(file))
+            .with_context(|| format!("cannot read {}", file.display()))
+    }
+}
+
+/// Reads the plan in `text`, when the run is at a stage that takes a plan.
+fn read_plan(journal: &Journal, text: &str, command: &str) -> Result<Plan> {
     ensure!(!journal.finished, "the run is finished");
     if let Some(open) = journal.open() {
         bail!(
@@ -682,10 +738,13 @@ fn plan(journal: &mut Journal, text: &str, command: &str, found: Found<'_>) -> R
             open.id
         );
     }
-    let plan: Plan = serde_json::from_str(text).with_context(|| {
-        format!("the plan is not the JSON that `xpd {command} plan --help` shows")
-    })?;
-    let known = found(journal, None)?;
+    serde_json::from_str(text)
+        .with_context(|| format!("the plan is not the JSON that `xpd {command} plan --help` shows"))
+}
+
+/// Adds `plan` to the journal, after checking it against `known`, the ids of the ledger of today.
+#[cfg(not(feature = "ledger-durable"))]
+fn plan(journal: &mut Journal, plan: Plan, known: &BTreeSet<String>) -> Result<()> {
     let mut named: BTreeSet<&str> = journal.fixes().map(|fix| fix.id.as_str()).collect();
     for fix in &plan.fixes {
         ensure!(named.insert(&fix.id), "two fixes are named {}", fix.id);
@@ -729,8 +788,8 @@ fn plan(journal: &mut Journal, text: &str, command: &str, found: Found<'_>) -> R
     Ok(())
 }
 
-/// Gates the fix `id` at the commit that is checked out. Returns whether the fix is kept.
-fn gate(journal: &mut Journal, place: &Place, id: &str, found: Found<'_>) -> Result<bool> {
+/// Fails unless `id` is the open fix, and the user said yes to it when it changes an interface.
+fn check_gate(journal: &Journal, id: &str) -> Result<()> {
     let open = journal.open().map(|open| open.id.clone());
     ensure!(
         open.as_deref() == Some(id),
@@ -744,6 +803,27 @@ fn gate(journal: &mut Journal, place: &Place, id: &str, found: Found<'_>) -> Res
         !asked,
         "the fix {id} changes what callers or users see, and the user has not said yes. Ask the user first"
     );
+    Ok(())
+}
+
+/// What a gate measures of the commit that is checked out. The fields have the names of the
+/// gate output of the orchestration.
+#[derive(Debug, Serialize)]
+struct Measured {
+    commit: String,
+    /// The checks that passed at the start and fail now, each with the end of its output.
+    broken: Vec<String>,
+    /// The ids of the findings at the commit the run stands at.
+    before: BTreeSet<String>,
+    /// The ids of the findings of today.
+    after: BTreeSet<String>,
+    lines_before: usize,
+    lines_after: usize,
+    timing: Option<(Timing, Timing)>,
+}
+
+/// Measures the commit that is checked out against the commit the run stands at.
+fn measure_gate(journal: &Journal, place: &Place, found: Found<'_>) -> Result<Measured> {
     place.clean()?;
     let commit = place.head()?;
     ensure!(
@@ -770,28 +850,44 @@ fn gate(journal: &mut Journal, place: &Place, id: &str, found: Found<'_>) -> Res
     } else {
         None
     };
+    Ok(Measured {
+        commit,
+        broken,
+        before,
+        after,
+        lines_before,
+        lines_after,
+        timing,
+    })
+}
+
+/// Gates the fix `id` at the commit that is checked out. Returns whether the fix is kept.
+#[cfg(not(feature = "ledger-durable"))]
+fn gate(journal: &mut Journal, place: &Place, id: &str, found: Found<'_>) -> Result<bool> {
+    check_gate(journal, id)?;
+    let measured = measure_gate(journal, place, found)?;
     let fix = journal.fix_mut(id)?;
     match judge(
         fix,
-        &before,
-        &after,
-        &broken,
-        (lines_before, lines_after),
-        timing,
+        &measured.before,
+        &measured.after,
+        &measured.broken,
+        (measured.lines_before, measured.lines_after),
+        measured.timing,
     ) {
         Ok(Compared { fixed, added }) => {
             fix.outcome = Some(Outcome::Kept {
-                commit: commit.clone(),
+                commit: measured.commit.clone(),
                 fixed,
                 added,
-                lines_before,
-                lines_after,
-                timing_before: timing.map(|(before, _)| before),
-                timing_after: timing.map(|(_, after)| after),
+                lines_before: measured.lines_before,
+                lines_after: measured.lines_after,
+                timing_before: measured.timing.map(|(before, _)| before),
+                timing_after: measured.timing.map(|(_, after)| after),
             });
-            journal.current = commit;
-            journal.current_lines = lines_after;
-            if let (Some(bench), Some((_, after_timing))) = (&mut journal.bench, timing) {
+            journal.current = measured.commit;
+            journal.current_lines = measured.lines_after;
+            if let (Some(bench), Some((_, after_timing))) = (&mut journal.bench, measured.timing) {
                 bench.current = after_timing;
             }
             Ok(true)
@@ -804,43 +900,873 @@ fn gate(journal: &mut Journal, place: &Place, id: &str, found: Found<'_>) -> Res
     }
 }
 
-/// Ends the run when no fix is open and each finding that is new since the start has a
-/// reason. Returns whether the run ended.
-fn finish(journal: &mut Journal, place: &Place, found: Found<'_>) -> Result<bool> {
+/// What `finish` measures. The fields have the names of the finish output of the
+/// orchestration.
+#[derive(Debug, Serialize)]
+struct Surveyed {
+    /// The ids of the findings at the commit the run started from.
+    before: BTreeSet<String>,
+    /// The ids of the findings of today.
+    after: BTreeSet<String>,
+    /// The lines of code of today in the paths of the run.
+    current_lines: usize,
+}
+
+/// Measures the files of today against the commit the run started from.
+fn measure_finish(journal: &Journal, place: &Place, found: Found<'_>) -> Result<Surveyed> {
     if let Some(open) = journal.open() {
         bail!("the fix {} is still open", open.id);
     }
     place.clean()?;
-    let before = found(journal, Some(&journal.base))?;
-    let after = found(journal, None)?;
-    let explained = |id: &&String| journal.accepted.contains_key(*id);
-    let unexplained: Vec<&str> = (after.difference(&before))
-        .filter(|id| !explained(id))
+    Ok(Surveyed {
+        before: found(journal, Some(&journal.base))?,
+        after: found(journal, None)?,
+        current_lines: count_lines(&journal.paths),
+    })
+}
+
+/// The findings that are new since the start and have no reason.
+fn unexplained<'s>(journal: &Journal, surveyed: &'s Surveyed) -> Vec<&'s str> {
+    (surveyed.after.difference(&surveyed.before))
+        .filter(|id| !journal.accepted.contains_key(*id))
         .map(String::as_str)
-        .collect();
-    if !unexplained.is_empty() {
-        eprintln!(
-            "xpd: these findings are new since the start and have no reason: {}. Remove them, or accept them in a plan",
-            unexplained.join(", ")
-        );
-        return Ok(false);
-    }
-    let lines_now = count_lines(&journal.paths);
-    journal.current_lines = lines_now;
+        .collect()
+}
+
+fn report_unexplained(unexplained: &[&str]) {
+    eprintln!(
+        "xpd: these findings are new since the start and have no reason: {}. Remove them, or accept them in a plan",
+        unexplained.join(", ")
+    );
+}
+
+/// Prints what a finished run changed, from the start commit to the files of today.
+fn report_finish(journal: &Journal, surveyed: &Surveyed) {
+    let Surveyed {
+        before,
+        after,
+        current_lines,
+    } = surveyed;
     let bench_summary = journal.bench.as_ref().map_or_else(String::new, |bench| {
         format!(", bench {}", format_speedup(bench.baseline, bench.current))
     });
     eprintln!(
-        "xpd: {} findings at the start, {} now: {} fixed, {} added, {} left without a reason; lines {} -> {lines_now}{bench_summary}",
+        "xpd: {} findings at the start, {} now: {} fixed, {} added, {} left without a reason; lines {} -> {current_lines}{bench_summary}",
         before.len(),
         after.len(),
-        before.difference(&after).count(),
-        after.difference(&before).count(),
-        after.iter().filter(|id| !explained(id)).count(),
+        before.difference(after).count(),
+        after.difference(before).count(),
+        after
+            .iter()
+            .filter(|id| !journal.accepted.contains_key(*id))
+            .count(),
         journal.was_lines,
     );
+}
+
+/// Ends the run when no fix is open and each finding that is new since the start has a
+/// reason. Returns whether the run ended.
+#[cfg(not(feature = "ledger-durable"))]
+fn finish(journal: &mut Journal, place: &Place, found: Found<'_>) -> Result<bool> {
+    let surveyed = measure_finish(journal, place, found)?;
+    let unexplained = unexplained(journal, &surveyed);
+    if !unexplained.is_empty() {
+        report_unexplained(&unexplained);
+        return Ok(false);
+    }
+    journal.current_lines = surveyed.current_lines;
+    report_finish(journal, &surveyed);
     journal.finished = true;
     Ok(true)
+}
+
+/// Runs one stage on the JSON journal of the worktree. Returns the run and whether the stage
+/// kept what it measured.
+#[cfg(not(feature = "ledger-durable"))]
+fn act_journal(
+    action: Action,
+    place: &Place,
+    here: &Path,
+    command: &str,
+    found: Found<'_>,
+) -> Result<(Journal, bool)> {
+    let mut kept = true;
+    let journal = match action {
+        Action::Start {
+            paths,
+            checks,
+            bench,
+            bench_runs,
+            restart,
+        } => {
+            if let Ok(old) = place.read(command) {
+                ensure!(
+                    old.finished || restart,
+                    "a run is open. Go on with `xpd {command} status`, or replace it with --restart"
+                );
+            }
+            start(
+                place,
+                here,
+                &paths,
+                checks,
+                bench.map(|cmd| (cmd, bench_runs)),
+                found,
+            )?
+        }
+        Action::Plan { file } => {
+            let mut journal = place.read(command)?;
+            let text = plan_text(here, &file)?;
+            let read = read_plan(&journal, &text, command)?;
+            let known = found(&journal, None)?;
+            plan(&mut journal, read, &known)?;
+            journal
+        }
+        Action::Approve { fix } => {
+            let mut journal = place.read(command)?;
+            journal.fix_mut(&fix)?.approved = true;
+            journal
+        }
+        Action::Drop { fix, reason } => {
+            let mut journal = place.read(command)?;
+            ensure!(
+                place.head()? == journal.current,
+                "the commit is not {}, where the run stands. Restore it with `git reset --hard {}`",
+                journal.current,
+                journal.current
+            );
+            journal.fix_mut(&fix)?.outcome = Some(Outcome::Dropped { reason });
+            journal
+        }
+        Action::Gate { fix } => {
+            let mut journal = place.read(command)?;
+            kept = gate(&mut journal, place, &fix, found)?;
+            journal
+        }
+        Action::Status => place.read(command)?,
+        Action::Finish => {
+            let mut journal = place.read(command)?;
+            kept = finish(&mut journal, place, found)?;
+            journal
+        }
+    };
+    place.write(&journal)?;
+    Ok((journal, kept))
+}
+
+/// A run as a `duroxide` orchestration in the ledger store of the repository.
+///
+/// Each worktree has its own namespace in the shared store, and each start of a run takes the
+/// next generation of that namespace, so the instance of a run is
+/// `wt-<worktree>::<command>::<generation>` and the run that counts is the highest generation.
+/// A lock file in the git folder of the worktree makes one process at a time its writer.
+#[cfg(feature = "ledger-durable")]
+mod durable_run {
+    use std::fs::{self, File, TryLockError};
+    use std::hash::Hasher as _;
+    use std::path::{Path, PathBuf};
+    use std::sync::Arc;
+    use std::time::{Duration, SystemTime, UNIX_EPOCH};
+
+    use anyhow::{Context, Result, bail, ensure};
+    use duroxide::runtime::registry::ActivityRegistry;
+    use duroxide::{ActivityContext, OrchestrationStatus};
+    use serde::Serialize;
+    use serde::de::DeserializeOwned;
+    use siphasher::sip::SipHasher13;
+
+    use super::durable::{
+        LazyTokio, LedgerOrchestratorClient, ProviderConfig, instance_id, open_sqlite_store,
+        run_command, start_command,
+    };
+    use super::orchestration::{
+        ACT_FINISH_RUN, ACT_GATE_FIX, ACT_INIT_BASELINE, ACT_VALIDATE_PLAN, BaselineOutput,
+        Command as RunCommand, CommandEnvelope, FinishOutput, GateOutput, JournalState, Receipt,
+        ReceiptOutcome, RunStartInput, Snapshot, ValidatePlanOutput,
+    };
+    use super::{
+        Action, Found, Journal, Place, check_gate, measure_finish, measure_gate, plan_text,
+        read_plan, report_finish, report_unexplained, start, unexplained,
+    };
+
+    /// How long a command waits for the receipt of the run. Every measurement is taken before
+    /// the command is queued, so a turn takes milliseconds, not the time of the checks.
+    const WAIT: Duration = Duration::from_secs(120);
+    /// The key of the hash that names the import of a JSON journal. It never changes, so a
+    /// retried import finds the receipt of the first try.
+    const IMPORT_KEY: [u8; 16] = *b"xpd-ledger-impor";
+
+    /// The ledger store of one command in one worktree.
+    struct Store {
+        config: ProviderConfig,
+        namespace: String,
+        command: &'static str,
+    }
+
+    /// Where the highest generation of a worktree's run stands.
+    enum Standing {
+        Running(Option<Snapshot>),
+        Completed(Option<Snapshot>),
+        Failed(String),
+    }
+
+    /// The highest generation of a worktree's run.
+    struct Latest {
+        generation: u64,
+        standing: Standing,
+    }
+
+    impl Store {
+        fn open(place: &Place, command: &'static str) -> Result<Self> {
+            let git_dir = git_folder(place, "--absolute-git-dir")?;
+            let common = git_folder(place, "--git-common-dir")?;
+            let namespace = if git_dir == common {
+                "wt-main".to_owned()
+            } else {
+                let below = git_dir.strip_prefix(&common).unwrap_or(&git_dir);
+                format!("wt-{}", below.display())
+            };
+            Ok(Self {
+                config: ProviderConfig::sqlite_in(&common),
+                namespace,
+                command,
+            })
+        }
+
+        #[cfg_attr(
+            not(feature = "ledger-distributed"),
+            expect(
+                clippy::unnecessary_wraps,
+                reason = "the PostgreSQL store, compiled with ledger-distributed, has no file"
+            )
+        )]
+        fn db_path(&self) -> Result<PathBuf> {
+            match &self.config {
+                ProviderConfig::Sqlite { db_path } => Ok(db_path.clone()),
+                #[cfg(feature = "ledger-distributed")]
+                ProviderConfig::Postgres { .. } => {
+                    bail!("only the local SQLite store serves a run of the CLI")
+                }
+            }
+        }
+
+        fn instance(&self, generation: u64) -> String {
+            instance_id(&self.namespace, self.command, generation)
+        }
+
+        /// Measurements for the run of `generation`, with none taken yet.
+        fn measurements(&self, generation: u64) -> Measurements {
+            Measurements {
+                instance: self.instance(generation),
+                ..Measurements::default()
+            }
+        }
+
+        /// The lock file of this command's runs in the worktree, and its path.
+        fn lock_file(&self, place: &Place) -> Result<(File, PathBuf)> {
+            let path = place.git_path(&format!("xpd-{}.lock", self.command))?;
+            let file = File::options()
+                .create(true)
+                .write(true)
+                .truncate(false)
+                .open(&path)
+                .with_context(|| format!("cannot open {}", path.display()))?;
+            Ok((file, path))
+        }
+
+        /// Takes the lock for a command that changes the run. It fails at once while another
+        /// process holds it, so two commands never change one run at the same time.
+        fn lock_writer(&self, place: &Place) -> Result<File> {
+            let (file, path) = self.lock_file(place)?;
+            match file.try_lock() {
+                Ok(()) => Ok(file),
+                Err(TryLockError::WouldBlock) => bail!(
+                    "another `xpd {}` command is changing the run of this worktree. Run this one when it is done",
+                    self.command
+                ),
+                Err(TryLockError::Error(error)) => {
+                    Err(error).with_context(|| format!("cannot lock {}", path.display()))
+                }
+            }
+        }
+
+        /// Takes the lock for `status` when it has a JSON journal to import, waiting its turn.
+        fn lock_reader(&self, place: &Place) -> Result<File> {
+            let (file, path) = self.lock_file(place)?;
+            file.lock()
+                .with_context(|| format!("cannot lock {}", path.display()))?;
+            Ok(file)
+        }
+
+        /// The highest generation of the run, read through a client alone.
+        fn latest(&self) -> Result<Option<Latest>> {
+            let db_path = self.db_path()?;
+            let namespace = self.namespace.clone();
+            let command = self.command;
+            LazyTokio::new().block_on(async move {
+                let store = open_sqlite_store(&db_path).await?;
+                let client = |generation| {
+                    LedgerOrchestratorClient::new(
+                        Arc::clone(&store),
+                        instance_id(&namespace, command, generation),
+                    )
+                };
+                let mut highest = None;
+                for generation in 0_u64.. {
+                    match client(generation).status().await? {
+                        OrchestrationStatus::NotFound => break,
+                        status => highest = Some((generation, status)),
+                    }
+                }
+                let Some((generation, status)) = highest else {
+                    return Ok(None);
+                };
+                let standing = match status {
+                    OrchestrationStatus::Failed { details, .. } => {
+                        Standing::Failed(format!("{details:?}"))
+                    }
+                    OrchestrationStatus::Completed { .. } => {
+                        Standing::Completed(client(generation).snapshot().await?)
+                    }
+                    _ => Standing::Running(client(generation).snapshot().await?),
+                };
+                Ok::<_, anyhow::Error>(Some(Latest {
+                    generation,
+                    standing,
+                }))
+            })?
+        }
+
+        /// Whether the run of `generation` filed a receipt for `command_id`.
+        fn has_receipt(&self, generation: u64, command_id: &str) -> Result<bool> {
+            let db_path = self.db_path()?;
+            let instance = self.instance(generation);
+            let command_id = command_id.to_owned();
+            LazyTokio::new().block_on(async move {
+                let store = open_sqlite_store(&db_path).await?;
+                let client = LedgerOrchestratorClient::new(store, instance);
+                Ok::<_, anyhow::Error>(client.receipt(&command_id).await?.is_some())
+            })?
+        }
+
+        /// Asks the run of `generation` to stop, as a restart does with the run it replaces.
+        fn cancel(&self, generation: u64) -> Result<()> {
+            let db_path = self.db_path()?;
+            let instance = self.instance(generation);
+            LazyTokio::new().block_on(async move {
+                let store = open_sqlite_store(&db_path).await?;
+                LedgerOrchestratorClient::new(store, instance)
+                    .cancel("restart")
+                    .await
+            })?
+        }
+
+        /// Queues one command behind the commands before it, and waits for its receipt.
+        fn send(
+            &self,
+            generation: u64,
+            measurements: Measurements,
+            kind: &str,
+            command: RunCommand,
+        ) -> Result<(Journal, Receipt)> {
+            let envelope = CommandEnvelope {
+                command_id: command_id(kind),
+                command,
+            };
+            let (snapshot, receipt) = run_command(
+                &self.config,
+                &self.instance(generation),
+                measurements.registry(),
+                &envelope,
+                WAIT,
+            )?;
+            Ok((journal_of(&snapshot.run)?, receipt))
+        }
+    }
+
+    /// A git folder of the worktree, as an absolute path.
+    fn git_folder(place: &Place, flag: &str) -> Result<PathBuf> {
+        let folder = crate::git::output(&place.top, &["rev-parse", flag])?;
+        let folder = place.top.join(folder.trim());
+        fs::canonicalize(&folder).with_context(|| format!("cannot read {}", folder.display()))
+    }
+
+    /// The measurements this process took, which the activities of its own run return.
+    ///
+    /// The CLI measures before it queues a command, as the journal did, so an activity only
+    /// hands back what was measured. An activity of another instance, which a runtime in this
+    /// process can pick up from the shared store, gets an error and never this run's numbers.
+    #[derive(Debug, Default)]
+    struct Measurements {
+        instance: String,
+        baseline: Option<(String, BaselineOutput)>,
+        known: Option<ValidatePlanOutput>,
+        gate: Option<(String, GateOutput)>,
+        finish: Option<FinishOutput>,
+    }
+
+    impl Measurements {
+        fn serve(&self, ctx: &ActivityContext, input: &str) -> Result<String, String> {
+            let name = ctx.activity_name();
+            if ctx.instance_id() != self.instance {
+                return Err(format!(
+                    "this xpd process serves {}, not {}. Run the command again in the worktree of that run",
+                    self.instance,
+                    ctx.instance_id()
+                ));
+            }
+            let encode = |output: &dyn erased::Encode| output.encode();
+            let served = match name {
+                ACT_INIT_BASELINE => self
+                    .baseline
+                    .as_ref()
+                    .filter(|(id, _)| {
+                        serde_json::from_str::<RunStartInput>(input)
+                            .is_ok_and(|start| start.command_id == *id)
+                    })
+                    .map(|(_, output)| encode(output)),
+                ACT_VALIDATE_PLAN => self.known.as_ref().map(|output| encode(output)),
+                ACT_GATE_FIX => self
+                    .gate
+                    .as_ref()
+                    .filter(|(fix, output)| {
+                        serde_json::from_str::<serde_json::Value>(input).is_ok_and(|asked| {
+                            asked["fix"] == fix.as_str() && asked["head"] == output.commit.as_str()
+                        })
+                    })
+                    .map(|(_, output)| encode(output)),
+                ACT_FINISH_RUN => self.finish.as_ref().map(|output| encode(output)),
+                _ => None,
+            };
+            served.unwrap_or_else(|| {
+                Err(format!(
+                    "this xpd process took no measurement for {name}. Run the command again"
+                ))
+            })
+        }
+
+        /// The activities of a run, each a static entry that returns what was measured.
+        fn registry(self) -> ActivityRegistry {
+            let this = Arc::new(self);
+            let mut builder = ActivityRegistry::builder();
+            for name in [
+                ACT_INIT_BASELINE,
+                ACT_VALIDATE_PLAN,
+                ACT_GATE_FIX,
+                ACT_FINISH_RUN,
+            ] {
+                let this = Arc::clone(&this);
+                builder = builder.register(name, move |ctx: ActivityContext, input: String| {
+                    let served = this.serve(&ctx, &input);
+                    async move { served }
+                });
+            }
+            builder.build()
+        }
+    }
+
+    /// Encoding of an activity output, behind one object type.
+    mod erased {
+        pub(super) trait Encode {
+            fn encode(&self) -> Result<String, String>;
+        }
+
+        impl<T: serde::Serialize> Encode for T {
+            fn encode(&self) -> Result<String, String> {
+                serde_json::to_string(self).map_err(|error| error.to_string())
+            }
+        }
+    }
+
+    /// One value as another type of the same JSON shape.
+    fn convert<T: DeserializeOwned>(value: &impl Serialize) -> Result<T> {
+        serde_json::from_value(serde_json::to_value(value)?)
+            .context("the run and the ledger store disagree on the shape of a run")
+    }
+
+    /// The journal of a mirrored run. It prints with the texts of this module.
+    fn journal_of(state: &JournalState) -> Result<Journal> {
+        convert(state)
+    }
+
+    /// A command id that no other command of any process takes.
+    fn command_id(kind: &str) -> String {
+        let nanos = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map_or(0, |since| since.as_nanos());
+        format!("{kind}-{}-{nanos}", std::process::id())
+    }
+
+    /// The command id of the import of the JSON journal `text`. A retry of the same import
+    /// gets the same id, so it finds the receipt of the first try.
+    fn import_id(text: &str) -> String {
+        let mut hasher = SipHasher13::new_with_key(&IMPORT_KEY);
+        hasher.write(text.as_bytes());
+        format!("import-{:016x}", hasher.finish())
+    }
+
+    /// Where a JSON journal goes once the store holds its run.
+    fn migrated(journal: &Path) -> PathBuf {
+        let mut name = journal.as_os_str().to_owned();
+        name.push(".migrated");
+        PathBuf::from(name)
+    }
+
+    fn remove_if_present(path: &Path) -> Result<()> {
+        match fs::remove_file(path) {
+            Err(error) if error.kind() != std::io::ErrorKind::NotFound => {
+                Err(error).with_context(|| format!("cannot remove {}", path.display()))
+            }
+            _ => Ok(()),
+        }
+    }
+
+    fn applied(receipt: &Receipt) -> Result<()> {
+        match receipt.outcome {
+            ReceiptOutcome::Applied => Ok(()),
+            ReceiptOutcome::Rejected => bail!(
+                "{}",
+                receipt
+                    .detail
+                    .as_deref()
+                    .unwrap_or("the run turned the command away")
+            ),
+        }
+    }
+
+    /// The run that is open, as a journal, with its generation.
+    fn open_run(latest: Option<&Latest>, command: &str) -> Result<(u64, Journal)> {
+        let Some(latest) = latest else {
+            bail!("no run is open. Start one with `xpd {command} start`");
+        };
+        let snapshot = match &latest.standing {
+            Standing::Failed(details) => bail!(
+                "the run failed in the ledger store: {details}. Replace it with `xpd {command} start --restart`"
+            ),
+            Standing::Running(snapshot) | Standing::Completed(snapshot) => snapshot
+                .as_ref()
+                .context("the run has not published its state yet. Run the command again")?,
+        };
+        Ok((latest.generation, journal_of(&snapshot.run)?))
+    }
+
+    /// Moves the JSON journal of this worktree into the store, once.
+    ///
+    /// The lock of the worktree makes this process the only one that imports it. The import is
+    /// started under a command id that the journal text fixes, so a retry after a crash finds
+    /// the generation of the first try by its receipt. The file is renamed only when the
+    /// store mirrors exactly the run that the file holds.
+    fn migrate(store: &Store, place: &Place) -> Result<()> {
+        if !place.journal.is_file() {
+            return Ok(());
+        }
+        let shown = place.journal.display();
+        let text =
+            fs::read_to_string(&place.journal).with_context(|| format!("cannot read {shown}"))?;
+        let state: JournalState =
+            serde_json::from_str(&text).with_context(|| format!("cannot read {shown}"))?;
+        let id = import_id(&text);
+        let latest = store.latest()?;
+        let generation = match &latest {
+            None => 0,
+            Some(latest) if store.has_receipt(latest.generation, &id)? => latest.generation,
+            Some(Latest {
+                standing: Standing::Running(_),
+                ..
+            }) => bail!(
+                "{shown} holds a run, and the ledger store holds another open run of this worktree. Replace both with `xpd {} start --restart`",
+                store.command
+            ),
+            Some(latest) => latest.generation + 1,
+        };
+        let input = RunStartInput {
+            command_id: id,
+            command: store.command.to_owned(),
+            paths: state.paths.clone(),
+            checks: (state.checks.iter())
+                .map(|check| check.command.clone())
+                .collect(),
+            bench: (state.bench.as_ref()).map(|bench| (bench.command.clone(), bench.runs)),
+            initial_state: Some(state.clone()),
+        };
+        let (snapshot, receipt) = start_command(
+            &store.config,
+            &store.instance(generation),
+            store.measurements(generation).registry(),
+            &input,
+            WAIT,
+        )?;
+        ensure!(
+            receipt.outcome == ReceiptOutcome::Applied && snapshot.run == state,
+            "the ledger store did not take the run of {shown} as it is, so the file stays"
+        );
+        let target = migrated(&place.journal);
+        fs::rename(&place.journal, &target).with_context(|| format!("cannot rename {shown}"))?;
+        eprintln!(
+            "xpd: the run of {shown} is in the ledger store now, and the file is {}",
+            target.display()
+        );
+        Ok(())
+    }
+
+    /// Runs one stage on the run in the ledger store. Returns the run and whether the stage
+    /// kept what it measured.
+    pub(super) fn act(
+        action: Action,
+        place: &Place,
+        here: &Path,
+        command: &'static str,
+        found: Found<'_>,
+    ) -> Result<(Journal, bool)> {
+        quiet_runtime_logs();
+        let store = Store::open(place, command)?;
+        let _lock = match action {
+            Action::Status if !place.journal.is_file() => None,
+            Action::Status => Some(store.lock_reader(place)?),
+            _ => Some(store.lock_writer(place)?),
+        };
+        if !matches!(action, Action::Start { restart: true, .. }) {
+            migrate(&store, place)?;
+        }
+        let latest = store.latest()?;
+        if let Action::Start {
+            paths,
+            checks,
+            bench,
+            bench_runs,
+            restart,
+        } = action
+        {
+            let bench = bench.map(|cmd| (cmd, bench_runs));
+            let started = Started {
+                paths: &paths,
+                checks,
+                bench,
+                restart,
+            };
+            return start_run(&store, place, here, latest.as_ref(), started, found);
+        }
+        let (generation, journal) = open_run(latest.as_ref(), command)?;
+        let at = At {
+            store: &store,
+            place,
+            generation,
+            journal,
+        };
+        match action {
+            Action::Start { .. } => unreachable!("a start returned above"),
+            Action::Status => Ok((at.journal, true)),
+            Action::Plan { file } => plan_run(&at, &plan_text(here, &file)?, found),
+            Action::Approve { fix } => approve_run(at, fix),
+            Action::Drop { fix, reason } => drop_run(at, fix, reason),
+            Action::Gate { fix } => gate_run(&at, &fix, found),
+            Action::Finish => finish_run(&at, found),
+        }
+    }
+
+    /// Keeps the log lines of the embedded runtime off stdout, where the run is printed.
+    ///
+    /// A booting duroxide runtime installs a log subscriber that writes to stdout, filtered by
+    /// `RUST_LOG` or else at `warn`, so a retried SQLite lock would put a line into the JSON
+    /// of the run. Nothing else in xpd reads `RUST_LOG`, and a rejected command reaches the
+    /// user through its receipt, not a log line. `set_var` is unsound only while another
+    /// thread reads or writes the environment, and this runs at the start of a ledger stage,
+    /// which `main` reaches on one thread, before any Tokio runtime, SQLite connection or survey
+    /// thread pool exists.
+    fn quiet_runtime_logs() {
+        // SAFETY: no other thread exists yet, as the doc comment above explains.
+        unsafe { std::env::set_var("RUST_LOG", "off") };
+    }
+
+    /// What `start` was given.
+    struct Started<'a> {
+        paths: &'a [PathBuf],
+        checks: Vec<String>,
+        bench: Option<(String, usize)>,
+        restart: bool,
+    }
+
+    /// The open run that a stage works on.
+    struct At<'a> {
+        store: &'a Store,
+        place: &'a Place,
+        generation: u64,
+        journal: Journal,
+    }
+
+    impl At<'_> {
+        /// Measurements for this run, with none taken yet.
+        fn measurements(&self) -> Measurements {
+            self.store.measurements(self.generation)
+        }
+
+        /// Queues `command` on this run and waits for its receipt.
+        fn send(
+            &self,
+            measurements: Measurements,
+            kind: &str,
+            command: RunCommand,
+        ) -> Result<(Journal, Receipt)> {
+            self.store
+                .send(self.generation, measurements, kind, command)
+        }
+    }
+
+    /// Starts a run at the next generation, after cancelling an open one on `--restart`.
+    fn start_run(
+        store: &Store,
+        place: &Place,
+        here: &Path,
+        latest: Option<&Latest>,
+        started: Started<'_>,
+        found: Found<'_>,
+    ) -> Result<(Journal, bool)> {
+        let command = store.command;
+        let open = latest.and_then(|latest| {
+            matches!(latest.standing, Standing::Running(_)).then_some(latest.generation)
+        });
+        ensure!(
+            open.is_none() || started.restart,
+            "a run is open. Go on with `xpd {command} status`, or replace it with --restart"
+        );
+        let journal = start(
+            place,
+            here,
+            started.paths,
+            started.checks,
+            started.bench,
+            found,
+        )?;
+        if let Some(open) = open {
+            store.cancel(open)?;
+        }
+        let generation = latest.map_or(0, |latest| latest.generation + 1);
+        let id = command_id("start");
+        let input = RunStartInput {
+            command_id: id.clone(),
+            command: command.to_owned(),
+            paths: convert(&journal.paths)?,
+            checks: (journal.checks.iter())
+                .map(|check| check.command.clone())
+                .collect(),
+            bench: (journal.bench.as_ref()).map(|bench| (bench.command.clone(), bench.runs)),
+            initial_state: None,
+        };
+        let measurements = Measurements {
+            baseline: Some((id, convert(&journal)?)),
+            ..store.measurements(generation)
+        };
+        let (snapshot, receipt) = start_command(
+            &store.config,
+            &store.instance(generation),
+            measurements.registry(),
+            &input,
+            WAIT,
+        )?;
+        applied(&receipt)?;
+        if started.restart {
+            remove_if_present(&place.journal)?;
+        }
+        remove_if_present(&migrated(&place.journal))?;
+        Ok((journal_of(&snapshot.run)?, true))
+    }
+
+    fn plan_run(at: &At<'_>, text: &str, found: Found<'_>) -> Result<(Journal, bool)> {
+        let plan = read_plan(&at.journal, text, at.store.command)?;
+        let known = found(&at.journal, None)?;
+        let measurements = Measurements {
+            known: Some(ValidatePlanOutput { known }),
+            ..at.measurements()
+        };
+        let planned = RunCommand::Plan {
+            fixes: convert(&plan.fixes)?,
+            accepted: convert(&plan.accepted)?,
+        };
+        let (journal, receipt) = at.send(measurements, "plan", planned)?;
+        applied(&receipt)?;
+        Ok((journal, true))
+    }
+
+    fn approve_run(mut at: At<'_>, fix: String) -> Result<(Journal, bool)> {
+        at.journal.fix_mut(&fix)?;
+        let (journal, receipt) =
+            at.send(at.measurements(), "approve", RunCommand::Approve { fix })?;
+        applied(&receipt)?;
+        Ok((journal, true))
+    }
+
+    fn drop_run(mut at: At<'_>, fix: String, reason: String) -> Result<(Journal, bool)> {
+        let head = at.place.head()?;
+        let current = &at.journal.current;
+        ensure!(
+            head == *current,
+            "the commit is not {current}, where the run stands. Restore it with `git reset --hard {current}`"
+        );
+        at.journal.fix_mut(&fix)?;
+        let dropped = RunCommand::Drop { fix, reason, head };
+        let (journal, receipt) = at.send(at.measurements(), "drop", dropped)?;
+        applied(&receipt)?;
+        Ok((journal, true))
+    }
+
+    /// Gates the fix `fix`. A gate that the run judged and did not keep returns `false`, as
+    /// the journal did, and any other rejection is an error.
+    fn gate_run(at: &At<'_>, fix: &str, found: Found<'_>) -> Result<(Journal, bool)> {
+        check_gate(&at.journal, fix)?;
+        let failed_before = attempts(&at.journal, fix);
+        let measured = measure_gate(&at.journal, at.place, found)?;
+        let head = measured.commit.clone();
+        let measurements = Measurements {
+            gate: Some((fix.to_owned(), convert(&measured)?)),
+            ..at.measurements()
+        };
+        let gated = RunCommand::Gate {
+            fix: fix.to_owned(),
+            head,
+        };
+        let (journal, receipt) = at.send(measurements, "gate", gated)?;
+        if receipt.outcome == ReceiptOutcome::Applied {
+            return Ok((journal, true));
+        }
+        let reason = receipt.detail.unwrap_or_default();
+        ensure!(attempts(&journal, fix) > failed_before, "{reason}");
+        eprintln!("xpd: the gate did not keep {fix}. {reason}");
+        Ok((journal, false))
+    }
+
+    fn finish_run(at: &At<'_>, found: Found<'_>) -> Result<(Journal, bool)> {
+        ensure!(
+            !at.journal.finished,
+            "the run is finished. `xpd {} start` starts another.",
+            at.store.command
+        );
+        let surveyed = measure_finish(&at.journal, at.place, found)?;
+        let measurements = Measurements {
+            finish: Some(convert(&surveyed)?),
+            ..at.measurements()
+        };
+        let (journal, receipt) = at.send(measurements, "finish", RunCommand::Finish)?;
+        if receipt.outcome == ReceiptOutcome::Applied {
+            report_finish(&journal, &surveyed);
+            remove_if_present(&migrated(&at.place.journal))?;
+            return Ok((journal, true));
+        }
+        let unexplained = unexplained(&journal, &surveyed);
+        ensure!(
+            !unexplained.is_empty(),
+            "{}",
+            receipt.detail.unwrap_or_default()
+        );
+        report_unexplained(&unexplained);
+        Ok((journal, false))
+    }
+
+    /// How many gates of the fix `id` failed.
+    fn attempts(journal: &Journal, id: &str) -> usize {
+        (journal.fixes())
+            .find(|fix| fix.id == id)
+            .map_or(0, |fix| fix.attempts.len())
+    }
 }
 
 /// Runs one stage of a run of `K`'s command, and prints the run with the stage that comes
@@ -870,72 +1796,10 @@ pub(super) fn act<K: Kind, R>(
         };
         Ok(entries.into_iter().map(|entry| entry.id).collect())
     };
-    let mut kept = true;
-    let journal = match action {
-        Action::Start {
-            paths,
-            checks,
-            bench,
-            bench_runs,
-            restart,
-        } => {
-            if let Ok(old) = place.read(command) {
-                ensure!(
-                    old.finished || restart,
-                    "a run is open. Go on with `xpd {command} status`, or replace it with --restart"
-                );
-            }
-            start(
-                &place,
-                &here,
-                &paths,
-                checks,
-                bench.map(|cmd| (cmd, bench_runs)),
-                &found,
-            )?
-        }
-        Action::Plan { file } => {
-            let mut journal = place.read(command)?;
-            let text = if file == Path::new("-") {
-                let mut text = String::new();
-                std::io::stdin().read_to_string(&mut text)?;
-                text
-            } else {
-                fs::read_to_string(here.join(&file))
-                    .with_context(|| format!("cannot read {}", file.display()))?
-            };
-            plan(&mut journal, &text, command, &found)?;
-            journal
-        }
-        Action::Approve { fix } => {
-            let mut journal = place.read(command)?;
-            journal.fix_mut(&fix)?.approved = true;
-            journal
-        }
-        Action::Drop { fix, reason } => {
-            let mut journal = place.read(command)?;
-            ensure!(
-                place.head()? == journal.current,
-                "the commit is not {}, where the run stands. Restore it with `git reset --hard {}`",
-                journal.current,
-                journal.current
-            );
-            journal.fix_mut(&fix)?.outcome = Some(Outcome::Dropped { reason });
-            journal
-        }
-        Action::Gate { fix } => {
-            let mut journal = place.read(command)?;
-            kept = gate(&mut journal, &place, &fix, &found)?;
-            journal
-        }
-        Action::Status => place.read(command)?,
-        Action::Finish => {
-            let mut journal = place.read(command)?;
-            kept = finish(&mut journal, &place, &found)?;
-            journal
-        }
-    };
-    place.write(&journal)?;
+    #[cfg(not(feature = "ledger-durable"))]
+    let (journal, kept) = act_journal(action, &place, &here, command, &found)?;
+    #[cfg(feature = "ledger-durable")]
+    let (journal, kept) = durable_run::act(action, &place, &here, command, &found)?;
     match format {
         Format::Json => println!(
             "{}",
