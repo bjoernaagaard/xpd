@@ -1,6 +1,6 @@
 # HierarchicalForecast
 
-[HierarchicalForecast](https://nixtlaverse.nixtla.io/hierarchicalforecast/index.html) reconciles forecasts so their totals agree across levels. This pack applies when a file imports `hierarchicalforecast`.
+The HierarchicalForecast pack checks hierarchical reconciliation calls on files that import [HierarchicalForecast](https://nixtlaverse.nixtla.io/hierarchicalforecast/index.html).
 
 ## Reconciliation
 

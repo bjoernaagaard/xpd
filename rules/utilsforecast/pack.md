@@ -1,6 +1,6 @@
 # UtilsForecast
 
-[UtilsForecast](https://nixtlaverse.nixtla.io/utilsforecast/index.html) prepares, plots and scores forecast data. This pack applies when a file imports `utilsforecast`.
+The UtilsForecast pack checks forecast evaluation calls on files that import [UtilsForecast](https://nixtlaverse.nixtla.io/utilsforecast/index.html).
 
 ## Evaluation
 

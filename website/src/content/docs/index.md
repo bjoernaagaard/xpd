@@ -1,28 +1,29 @@
 ---
 title: Get started
-description: Install xpd, check a small pandas file, and choose which of its fixes to apply.
+description: Install xpd, check a small pandas file, and choose which fixes to apply.
 ---
 
-Run `uvx xpd check .` in a Python project to find the lines that are slow or give a wrong result.
-On this page you check a small file, read what xpd reports, and decide which fixes it may write.
-xpd checks code that uses pandas, Polars, NumPy, SciPy, scikit-learn, scikit-lego, MAPIE, Category
-Encoders, linearmodels, arch, skfolio, pymoo, plotly or Apache Hamilton.
+Run `uvx xpd check .` in any Python project to find slow or broken library calls without importing or running your code. `xpd` parses each file once, detects imported libraries, and runs only the matching rule packs plus the Python pack.
+
+```mermaid
+flowchart LR
+    A["xpd check ."] --> B["Parse each .py file once"]
+    B --> C["Detect imported libraries"]
+    C --> D["Run matching library packs and Python pack"]
+    D --> E["Report issues and apply optional fixes"]
+```
 
 ## Install
 
-xpd requires Python 3.13 or newer. Install it with [uv](https://docs.astral.sh/uv/getting-started/installation/).
+`xpd` requires Python 3.13 or newer. Install it once with [uv](https://docs.astral.sh/uv/getting-started/installation/), or replace `xpd` with `uvx xpd` in any command to run without installing.
 
 ```sh
 uv tool install --python '>=3.13' xpd
 ```
 
-You can also run xpd once without installing it, with `uvx xpd` in place of `xpd` in each command
-on this page.
-
 ## Check a sample file
 
-Make an empty directory and save the following code in it as `bad.py`. xpd reads the code and
-doesn't run it, so you don't need pandas or the file `x.csv`.
+Save `bad.py` in an empty folder. You do not need pandas installed because `xpd` never executes your script.
 
 ```python title="bad.py" showLineNumbers
 import pandas as pd
@@ -38,16 +39,10 @@ for f in ["x.csv"]:
     out = pd.concat([out, pd.read_csv(f)])
 ```
 
-Run xpd on the file from the same directory.
+Run `xpd check bad.py`. Terminal runs print text, and piped runs print JSON (pass `--format text` in scripts when you want text).
 
-```sh
-xpd check bad.py
-```
-
-xpd prints one line for each issue it finds, and a summary at the end. It exits with status 1,
-because one of the issues is an error.
-
-```text
+```console
+$ xpd check bad.py --format text
 bad.py:5:15: warning [pandas/row-loop] iterrows() builds a Series for every row. Compute on whole columns instead, such as df["a"] * df["w"]. When each row has to become a Python object, loop over itertuples() or to_dict("records").
 bad.py:6:5: error [pandas/chained-assignment] Chained assignment writes to a copy under copy-on-write, so the frame keeps its old values. Assign to df.loc[i, "a"] instead.
 bad.py:7:1: info [pandas/no-inplace] inplace=True gives no speedup and blocks chaining. Reassign instead.
@@ -56,67 +51,23 @@ bad.py:11:5: warning [pandas/concat-in-loop] out grows by one concat per pass, a
 xpd: 5 issues, 2 more with --fix --unsafe-fixes
 ```
 
-xpd prints text in a terminal and JSON when another program reads its output. Add
-`--format text` to get the lines above in a script or a log.
+## Read diagnostics and apply fixes
 
-## Read an issue
+Each diagnostic line names the location, severity, rule identifier, and replacement guidance.
 
-Fix every error, and fix a warning unless you can say why the code is right in that place. Each
-line names the place in the file, the severity, the rule and what to write instead. The table
-splits the line for line 6 of `bad.py` into its parts.
-
-| Part | Example | Meaning |
+| Severity | Meaning | Exit code |
 | --- | --- | --- |
-| Place | `bad.py:6:5` | The file, the line and the column |
-| Severity | `error` | How serious the issue is, from the table below |
-| Rule | `pandas/chained-assignment` | The pack and the rule, which `xpd rules` describes |
-| Message | `Chained assignment writes to a copy ...` | What goes wrong, and what to write instead |
+| `error` | Code produces a wrong result or raises an exception | `1` |
+| `warning` | Code is slow or fragile | `0` |
+| `info` | A shorter or cleaner idiom exists | `0` |
 
-| Severity | Meaning |
-| --- | --- |
-| `error` | The code gives a wrong result or raises an exception. |
-| `warning` | The code is slow or easy to get wrong. |
-| `info` | A shorter or newer form exists. |
+Safe fixes (`--fix`) preserve runtime behavior. Unsafe fixes (`--fix --unsafe-fixes`) can change behavior, so review the diff after applying them.
 
-The summary line `2 more with --fix --unsafe-fixes` means that xpd can rewrite two of the five
-lines, but only when you allow fixes that may change what the code does.
-
-## Apply the safe fixes
-
-`--fix` writes each fix that keeps what the code does. None of the five issues in `bad.py` has
-such a fix, so xpd leaves the file as it was.
-
-```sh
-xpd check bad.py --fix
-```
-
-xpd prints the same five lines and the same summary, and it exits with status 1 again.
-
-```text
-xpd: 5 issues, 2 more with --fix --unsafe-fixes
-```
-
-## Choose the fixes that may change what the code does
-
-Add `--unsafe-fixes` only when you accept that a fix may change what the code does, and read the
-diff afterwards. Keep the file under version control, or keep a copy, so you can compare it and
-undo a fix.
-
-```sh
-xpd check bad.py --fix --unsafe-fixes
-```
-
-xpd rewrites lines 6 and 7 and reports the three issues it has no fix for. It exits with status
-0, because no error is left.
-
-```text
-bad.py:5:15: warning [pandas/row-loop] iterrows() builds a Series for every row. Compute on whole columns instead, such as df["a"] * df["w"]. When each row has to become a Python object, loop over itertuples() or to_dict("records").
-bad.py:8:5: warning [pandas/merge-without-validate] merge without validate= can silently duplicate rows.
-bad.py:11:5: warning [pandas/concat-in-loop] out grows by one concat per pass, and each concat copies every earlier row. Collect the frames in a list and concat once after the loop.
+```console
+$ xpd check bad.py --fix --unsafe-fixes --format text
+...
 xpd: fixed 2, 3 issues
 ```
-
-The diff shows the two lines that xpd rewrote.
 
 ```diff lang="python"
  for i, row in df.iterrows():
@@ -126,40 +77,18 @@ The diff shows the two lines that xpd rewrote.
 +df = df.dropna()
 ```
 
-Both fixes change what the code does, which is why they need your consent. Under pandas
-copy-on-write, the old line 6 left `df` unchanged, and the new line writes the doubled values into
-`df`. On line 7, `df = df.dropna()` makes a new frame, so another name that still refers to the
-old frame no longer sees the dropped rows.
-
-## Check your own project
-
-Run xpd on the directory of your project.
-
-```sh
-xpd check .
-```
-
-xpd reads the files and starts no Python, so you can run it after every edit. The diagram shows
-what one run does.
-
-```mermaid
-flowchart TD
-    A["xpd check ."] --> B["Parse each .py file once"]
-    B --> C["Read which libraries the file imports"]
-    C --> D["Run the pack of each imported library and the Python pack"]
-    D --> E["Print one line per issue and a summary"]
-```
+Line 6 now mutates `df` in place under pandas copy-on-write, and line 7 returns a new DataFrame instead of mutating shared references. No errors remain, so `xpd check` exits with `0`.
 
 ## Where to go next
 
-Pick the page for what you want to do next.
-
-| You want to | Page |
+| Goal | Page |
 | --- | --- |
-| Read what a rule reports and how to fix it | [Rules](rules/) |
-| Show a coding agent the issues of each file it edits | [Claude Code and other agents](guides/claude-code/) |
-| Give an agent xpd's tools, rules and prompts | [Connect an agent with MCP](guides/mcp/) |
-| Take a data file to a saved scikit-learn model with checks that xpd runs | [Train a model with gates](guides/gates/) |
-| See issues, fixes and rule help in an editor | [Use xpd in an editor](guides/editors/) |
-| Report a pattern of your own project | [Write a rule](guides/write-a-rule/) |
-| Look up a command, its options and its exit status | [Commands](commands/) |
+| Browse every rule pack and fix level | [Rules](rules/) |
+| Wire xpd into Claude Code or Codex | [Claude Code and other agents](guides/claude-code/) |
+| Expose visual tools, gates, and animations over MCP | [Connect an agent with MCP](guides/mcp/) |
+| Validate a scikit-learn pipeline end to end | [Train a model with gates](guides/gates/) |
+| Get live diagnostics and quick fixes in your editor | [Use xpd in an editor](guides/editors/) |
+| Audit charts against Tufte's principles | [Review a chart against Tufte's book](guides/chart-review/) |
+| Render editable Manim concept animations | [Animate a concept with Manim](guides/animate/) |
+| Author custom project rules or a library pack | [Write a rule](guides/write-a-rule/) |
+| Look up flags and exit codes for any command | [Commands](commands/) |

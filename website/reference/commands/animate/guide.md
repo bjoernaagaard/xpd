@@ -1,4 +1,4 @@
-Read the offline workflow or print the editable Python for one recipe. This command requires no renderer.
+Read the offline animation workflow or print the editable Python starter code for one recipe without needing Podman or a renderer.
 
 Follow the [animation guide](../../../guides/animate/) for a complete example.
 

@@ -1,6 +1,6 @@
 # CoreForecast
 
-[CoreForecast](https://nixtlaverse.nixtla.io/coreforecast) provides grouped time series arrays and transformations. This pack applies when a file imports `coreforecast`.
+The CoreForecast pack checks grouped time series array code on files that import [CoreForecast](https://nixtlaverse.nixtla.io/coreforecast).
 
 ## Grouped arrays
 

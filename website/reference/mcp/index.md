@@ -1,10 +1,4 @@
-`xpd mcp` starts a [Model Context Protocol](https://modelcontextprotocol.io) server with the tools
-that a shell command cannot be: the views that draw results, the gates of a model run and the
-animation tools. An agent runs the other parts of xpd as commands in its shell. The server is built on
-[FastMCP](https://gofastmcp.com) 4.2 and gets every rule and result from the xpd binary, so it
-matches the installed version. This page and the pages below list what the server registers, as
-the site's build read it from the running server. [`xpd mcp`](../commands/mcp/) lists the
-server's flags.
+Start `xpd mcp` to expose xpd's visual views, model training gates, and Manim animation tools over the [Model Context Protocol](https://modelcontextprotocol.io) (FastMCP 4.2). Every tool delegates to the matching `xpd` binary, and agents continue to run lint and search commands in their shell. See [`xpd mcp`](../commands/mcp/) for server flags.
 
 ```sh
 claude mcp add xpd -- uvx xpd mcp
@@ -12,10 +6,7 @@ claude mcp add xpd -- uvx xpd mcp
 
 ## How a call runs
 
-A tool checks that each path is inside the project root, runs the xpd binary there and returns
-the binary's JSON as a typed result. `discovery_gate` parses the files in Python and asks the
-binary's `api` for each call, `contract` reads a JSON file, and `gates` runs five commands and
-judges what they print.
+Each tool validates that every file path stays inside the project root (`--root`, `XPD_MCP_ROOT`, client MCP roots when `PLUGIN_ROOT` is set, or the working directory), executes the matching `xpd` command, and returns typed JSON plus optional UI views.
 
 ```mermaid
 sequenceDiagram
@@ -23,26 +14,12 @@ sequenceDiagram
     participant Server as xpd mcp
     participant Binary as xpd binary
     Agent->>Server: show_issues(paths=["samples/bad.py"])
-    Server->>Server: check that the path is inside the project root
+    Server->>Server: Verify path stays inside project root
     Server->>Binary: xpd check --format json -- samples/bad.py
-    Binary-->>Server: {"fixed": 0, "fixable": 0, "issues": [...]}
-    Server-->>Agent: the issues as a table, and the same JSON as text
+    Binary-->>Server: JSON diagnostics
+    Server-->>Agent: Rendered table and structured JSON
 ```
 
-The project root is `--root` or `XPD_MCP_ROOT` when one is set. A client that starts the server
-in a plugin's folder sets `PLUGIN_ROOT`, and then the root is the first root of the client that is
-a folder on the machine. Otherwise it is the server's working folder.
+## Errors and background tasks
 
-## Errors
-
-A tool that cannot finish returns a tool error with a message, and the agent sees it as the
-result of the call. A path outside the project root fails before xpd runs. When the binary
-exits with a code that carries no result, the error names the command and its message, such as
-`xpd api -- no.such.name exited with 2: xpd: no entry named no.such.name`. Issues, problems in
-a dataflow and failed gates are results, not errors.
-
-## Background tasks
-
-A client can run `gates` and `animate_render` as background tasks, so it gets a task at once and
-fetches the result when the tool is done. `gates` reports progress and logs each xpd command it
-runs.
+Paths outside the project root and non-result binary failures return MCP tool errors with the command message. Lint issues, dataflow findings, and failing gates return as normal structured results. Clients can run `gates` and `animate_render` as background tasks with progress updates.

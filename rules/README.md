@@ -1,37 +1,19 @@
 # Rules
 
-Each rule has a page that says what goes wrong, what to write instead, and whether xpd can make
-the edit for you. Open a rule from the link in an issue, or search for its id, such as
-`pandas/chained-assignment`.
+Open any rule by its bracketed ID (such as `pandas/chained-assignment`) to read what goes wrong, what to write instead, and whether `xpd` can fix it automatically. Every library pack runs only on files that import that library, while the Python and xpd packs run on every file.
 
-xpd names the rule in each issue it prints. The id in brackets is the address of the rule's page.
-
-```text
-bad.py:6:5: error [pandas/chained-assignment] Chained assignment writes to a copy under copy-on-write, so the frame keeps its old values. Assign to df.loc[i, "a"] instead.
+```mermaid
+flowchart LR
+    Doc["rules/<pack>/<id>.md"] --> CLI["xpd rules --format json"]
+    Doc --> LSP["Editor hover (xpd lsp)"]
+    Doc --> MCP["MCP resource (xpd://rules/<pack>/<id>)"]
+    Doc --> Site["Documentation site"]
 ```
 
-The same text reaches you in four places. `xpd rules --format json` prints it as the `doc` field of
-each rule, the editor shows it when you hover over an issue, the MCP server returns it as the
-resource `xpd://rules/<pack>/<rule>`, and this site shows it as the rule's page.
-
-A rule's fix tells you how much xpd changes on its own.
-
-| Fix | What the edit does | How to apply it |
+| Fix level | Meaning | Command |
 | --- | --- | --- |
-| safe | keeps what the code does | `xpd check --fix` |
-| unsafe | can change what the code does, so read the edit | `xpd check --fix --unsafe-fixes` |
-| none | xpd shows the change as advice | edit the code by hand |
+| `safe` | Preserves runtime behavior | `xpd check --fix` |
+| `unsafe` | May change runtime behavior, review the diff | `xpd check --fix --unsafe-fixes` |
+| `none` | Requires a manual edit | Edit by hand |
 
-Some rules state a preference of the house style about code that works, and their pages say so
-in the severity. Such a rule is `info`, and it is a warning in a project with `style = "strict"`
-in its settings, which [`xpd check`](https://bjoernaagaard.github.io/xpd/commands/check/#house-style)
-describes.
-
-A pack holds the rules for one library. xpd runs a pack on the files that import its library,
-and the Python and xpd packs on every file.
-
-To see which library a rule covers, read the `package` field in `xpd rules --format json`.
-For example, `linearmodels/statsmodels-result-name` checks a linearmodels result. Its name
-mentions statsmodels because that is where the mistaken attribute comes from.
-When writing a rule that compares libraries, name the library being checked in both the
-message and the opening sentence of its page. Agents may see either one on its own.
+House style rules report as `info` by default and become `warning` when `style = "strict"` is set in `[tool.xpd]` of `pyproject.toml` or `~/.config/xpd/config.toml`. See [`xpd check`](https://bjoernaagaard.github.io/xpd/commands/check/#house-style).

@@ -1,6 +1,6 @@
 # StatsForecast
 
-[StatsForecast](https://nixtlaverse.nixtla.io/statsforecast/index.html) forecasts time series with statistical models. This pack applies when a file imports `statsforecast`.
+The StatsForecast pack checks fitted value access on files that import [StatsForecast](https://nixtlaverse.nixtla.io/statsforecast/index.html).
 
 ## Fitted values
 

@@ -1,20 +1,23 @@
 ---
 title: Write a rule
-description: Add a rule for your own project with xpd rules new and xpd rules test, or add a rule to one of xpd's packs.
+description: Create and test a custom ast-grep rule for your project, or contribute a rule to one of xpd's built-in packs.
 sidebar:
   order: 5
 ---
 
-Run `xpd rules new rule` in your project to make a rule from a code pattern, and `xpd check` reports the
-pattern from then on, in the terminal, in the editor and in the agent hook. A rule is an
-[ast-grep rule](https://ast-grep.github.io/guide/rule-config.html) in a YAML file, with a Markdown
-file beside it that explains the rule. The second half of this page shows how to add a rule to one
-of the packs that ship with xpd.
+Run `xpd rules new project` and `xpd rules new rule` to turn any code pattern into a tested lint rule that runs in `xpd check`, `xpd lsp`, and `xpd hook`. Every rule is an [ast-grep](https://ast-grep.github.io/guide/rule-config.html) YAML file paired with a Markdown explanation.
 
-## Add a rule to your project
+```mermaid
+flowchart LR
+    A["xpd rules new project"] --> B["xpd rules new rule <id>"]
+    B --> C["Add valid and invalid cases"]
+    C --> D["xpd rules test --update-all"]
+    D --> E["xpd check reports local/<id>"]
+```
 
-The example adds a rule that reports `print` calls, in an empty folder. First, create the rule
-project.
+## Create and test a project rule
+
+Initialize the rule folders, scaffold a `no-print` rule, and check `app.py`.
 
 ```console
 $ xpd rules new project --yes
@@ -24,12 +27,6 @@ Created project
   created  /tmp/project/rules/.gitkeep
   created  /tmp/project/rule-tests/.gitkeep
   created  /tmp/project/utils/.gitkeep
-```
-
-xpd writes `sgconfig.yml` and `xpd.yml`, and the folders `rules/`, `rule-tests/` and `utils/`.
-Second, create the rule from a pattern, where `$X` matches any one argument.
-
-```console
 $ xpd rules new rule no-print --language python --pattern 'print($X)' --message 'Use the logger, so the output has a level and a time.' --with-test --yes
 Created rule no-print
   created  /tmp/project/rules/no-print.yml
@@ -37,28 +34,14 @@ Created rule no-print
   created  /tmp/project/rule-tests/no-print-test.yml
 ```
 
-xpd writes the rule, its Markdown and an empty test file.
-
 ```text
 .
 ├── sgconfig.yml                  ruleDirs: rules, utilDirs: utils, testConfigs: rule-tests
-├── xpd.yml                       the project's packs, none yet
-├── rules/no-print.yml            the rule
-├── rules/no-print.md             what the rule reports and what to write instead
-└── rule-tests/no-print-test.yml  id: no-print, valid: [], invalid: []
+├── xpd.yml                       project packs
+├── rules/no-print.yml            ast-grep rule definition
+├── rules/no-print.md             explanation shown on editor hover and in xpd rules
+└── rule-tests/no-print-test.yml  valid and invalid test cases
 ```
-
-```console
-$ cat rules/no-print.yml
-id: no-print
-language: python
-severity: warning
-message: Use the logger, so the output has a level and a time.
-rule:
-  pattern: print($X)
-```
-
-Third, check a file. Save the following as `app.py` and run `xpd check app.py`.
 
 ```python title="app.py"
 import logging
@@ -73,12 +56,7 @@ app.py:3:1: warning [local/no-print] Use the logger, so the output has a level a
 xpd: 1 issue
 ```
 
-xpd names a project rule `local/<id>`, and it exits with 0, because the issue is a warning. Edit
-`rules/no-print.md` to explain the rule, because the editor shows that text on hover.
-
-## Test the rule
-
-Give the rule code that it must leave alone and code that it must report, in its test file.
+Add `valid` and `invalid` examples to `rule-tests/no-print-test.yml`, write snapshots with `--update-all`, and verify with `xpd rules test`.
 
 ```yaml title="rule-tests/no-print-test.yml"
 id: no-print
@@ -87,9 +65,6 @@ valid:
 invalid:
   - print("loaded")
 ```
-
-The first run of `xpd rules test --update-all` writes a snapshot of each report, and later runs of
-`xpd rules test` compare the reports with the snapshot.
 
 ```console
 $ xpd rules test --update-all
@@ -102,13 +77,9 @@ no-print: passed
 2 cases, 0 failed
 ```
 
-`xpd rules test` exits with 1 when a case fails, for example when the rule misses an invalid case or
-its report differs from the snapshot. Commit the `rule-tests/__snapshots__/` folder with the rule.
+## Scope rules to one library pack
 
-## Rules for one library
-
-A rule about a library should run only on the files that import it. Put such rules in a pack,
-named after the module that the rules are about.
+Pass `--pack <module>` so a rule runs only on files that import that library, and add `--fix` and `--fix-safety` for automatic rewrites. See [`xpd rules new rule`](../../commands/rules/new/rule/) and [`xpd check`](../../commands/check/#project-rules).
 
 ```console
 $ xpd rules new rule old-api --pack mylib --pattern 'mylib.old($X)' --fix 'mylib.new($X)' --fix-safety safe --message 'old() was removed in 2.0.' --yes
@@ -118,18 +89,7 @@ Created rule mylib/old-api
   modified /tmp/project/xpd.yml
 ```
 
-`--pack` adds the pack to `xpd.yml` and writes the rule to `rules/mylib/`. The rule then runs on
-files that import `mylib`, and `--fix` gives `xpd check --fix` the rewrite. `--since` and
-`--until` limit the rule to library versions, which xpd reads from the project's virtual
-environment. [`xpd rules new rule`](../../commands/rules/new/rule/) lists every option, and
-[`xpd check`](../../commands/check/#project-rules) says how xpd finds the project's rules.
-
-## Set a pack's categories
-
-Use `xpd rules new project --pack mylib --category features` to record a default when you
-create a project. You can also pass `--category` to `xpd rules new rule` when it creates a pack.
-In `xpd.yml`, add module prefixes under the pack entry. Built-in packs use the same
-fields at the top level of `rules/<module>/pack.yml`.
+Assign categories on a pack with `--category` or in `xpd.yml` (`pack.yml` for built-in packs). The longest dotted module prefix wins, falling back to `defaultCategory` and then `workflow`.
 
 ```yaml
 defaultCategory: features
@@ -138,120 +98,38 @@ categoryPrefixes:
   mylib.datasets.metrics: evaluation
 ```
 
-The longest matching dotted prefix wins. A project prefix overrides the same bundled
-prefix. If several project entries share an import name, the first entry supplies the
-project's API policy. Each entry supplies the default for the rules it owns.
-A module with no matching prefix uses the pack default, or `workflow` if no default
-is declared. Class members use the category of their public class's module.
+## Contribute a rule to xpd
 
-`xpd index --category-report` shows the source of each assignment. Use `--category`
-with `xpd find` or `xpd rules` to filter, and `--categories` with `xpd api` or
-`xpd rules` to show labels. A rule can belong to several categories through its
-shipped symbol links. Rules without those links and package checks use their pack
-default. `xpd check --category-summary` counts each remaining issue in each of its
-categories and prints the counts on stderr.
+Built-in packs live under `rules/<module>/` and compile into the binary at build time. Add a new pack folder to `website/src/packs.mjs` so the site lists it, mark expected sample lines with `# xpd: <rule-id>` under `samples/<module>/`, and verify with `cargo build` and `python3 .github/scripts/check_sample_marks.py`.
 
-## Add a rule to xpd
-
-A rule that helps every user of a library belongs in one of xpd's packs. Each pack is a folder
-under `rules/` in the repository, named after the module you import, and Cargo compiles the rules
-and their Markdown into the binary.
-
-```text
-rules/pandas/
-├── pack.yml        import aliases and package checks. A pack may leave it out
-├── pack.md         the pack's introduction, with each rule id listed once under a heading
-├── row-loop.yml    one file per rule, named after the rule id
-├── row-loop.md     what the rule reports and how to fix it
-└── ...
+```mermaid
+flowchart TD
+    Q1{"Message names one rewrite\nwith all inputs in matched code?"} -->|No| M["Manual fix (no fix:)"]
+    Q1 -->|Yes| Q2{"Fixed code produces an equal value\nof the same type in all cases?"}
+    Q2 -->|Yes| S["Safe fix (metadata.fix: safe)"]
+    Q2 -->|No| U["Unsafe fix (metadata.fix: unsafe)"]
 ```
 
-The build fails when a rule has no Markdown file, when a Markdown file names no rule, and when
-`pack.md` doesn't list each rule once. `xpd rules`, `xpd find`, the editor hover, the MCP server
-and the rule's page on this site all show the Markdown, so write it for a reader who has just
-seen the issue.
+`xpd` re-parses every rewritten file with [LibCST](https://github.com/Instagram/LibCST) and drops any fix that produces invalid Python syntax.
 
-```text
-rules/<pack>/<id>.md
-  first paragraph     what goes wrong, and what to write instead
-  a diff              the reported code and the fixed code
-  ## What the rule reports    the forms the rule finds, and the forms it leaves alone
-  ## How to fix it            the fix, and what an unsafe fix can change
-```
-
-Build xpd and run it on the samples. Each pack has a folder of samples under `samples/<module>/`,
-and a sample marks each line that a rule must report with a comment that names the rule.
-
-```sh
-cargo build
-target/debug/xpd check samples/bad.py --format text
-```
-
-```python
-old.setup(problem, ("n_gen", 7), seed=1)  # xpd: setup-positional-termination
-```
-
-A new folder under `rules/` is a new pack, and it needs no Rust change. Add it to
-`website/src/packs.mjs` as well, so the site lists it.
-
-### Settings of a rule and a pack
-
-| Setting | What it does |
+| Rule or pack setting | Effect |
 | --- | --- |
-| `fix:` | One ast-grep rewrite for the rule. The rule must then say whether the fix keeps what the code does, with `metadata: { fix: safe }` or `metadata: { fix: unsafe }` |
-| `aliases` in `pack.yml` | A fix may write an alias that the pack lists, such as `pd.`, and xpd applies the fix only in a file that imports the module under that alias |
-| `members` in `pack.yml` | A fix may write a bare name that the pack lists with its module, such as `assert_allclose: numpy.testing`, and xpd applies the fix only where the file imports it |
-| `metadata: { since: "3.1" }` | xpd skips the rule when the project's virtual environment holds an older version of the library |
-| `metadata: { until: "0.6.1.6" }` | The rule's advice holds only before a release, and a second document with `since: "0.6.1.6"` gives the newer advice |
-| [`files` and `ignores`](https://ast-grep.github.io/reference/yaml.html#files) | Globs that limit the files a rule runs on. Start a glob with `**/` to match at any depth |
-| `kind: module` | A rule about the file itself, reported on line 1 |
-| `everyFile: true` in `pack.yml` | The pack's rules run on every file, as for `rules/python/` |
-| `packages` in `pack.yml` | Package checks, which warn when the virtual environment has the library and lacks a package, such as pyarrow for pandas |
+| `fix:` with `metadata.fix` | Declares an ast-grep rewrite as `safe` or `unsafe` |
+| `aliases` and `members` in `pack.yml` | Limits fixes writing aliases like `pd.` or bare imports to files that bind them |
+| `metadata.since` and `metadata.until` | Gates the rule by the library version in the project's virtual environment |
+| `files` and `ignores` | Restricts matching paths with globs (`**/` matches at any depth) |
+| `everyFile: true` in `pack.yml` | Runs the pack on every file without checking imports |
+| `packages` in `pack.yml` | Warns when the virtual environment has the library but lacks a companion package |
 
-### When a rule gets a fix
+## Index a new library pack
 
-Give a rule a fix when its message names one rewrite of the code it matches, and mark the fix safe
-only when the result can't differ.
-
-```text
-on(a rule document)
-  if the message names one rewrite, and the matched code holds everything the rewrite needs
-    if the fixed code gives the same object, or an equal value of the same type
-      fix, with metadata: { fix: safe }
-    else
-      fix, with metadata: { fix: unsafe }     # a comment above the document says what can differ
-  else
-    no fix                                    # a comment above the document names what is missing
-```
-
-A rewrite that needs a value the file doesn't hold, such as a seed, a unit or a column name, gets
-no fix, and so does advice to use another design. xpd parses each fixed file again with
-[LibCST](https://github.com/Instagram/LibCST), and it drops a fix, and keeps the report, when the
-fixed file no longer parses.
-
-### Index the library of a new pack
-
-Give a pack backed by a library a source index, so `xpd find` and `xpd api` know the library's
-names. Install the library without its dependencies in an empty folder outside the repository, and
-index it with Griffe 2.4.1. Use the Python version folder that uv created.
+Generate `indexes/<package>.json` with Griffe 2.4.1 against an isolated library install, then rebuild vectors and verify `indexes/questions.json`.
 
 ```sh
 uv venv /var/tmp/xpd-source/venv
 uv pip install --python /var/tmp/xpd-source/venv/bin/python --no-deps scikit-lego
 uv run --with griffe==2.4.1 xpd index /var/tmp/xpd-source/venv/lib/python3.15/site-packages --package sklego
+cargo build
+target/debug/xpd find --write-vectors indexes/vectors.bin
+cargo run --quiet -- find --check indexes/questions.json
 ```
-
-The command writes `indexes/sklego.json`, which you commit and never edit by hand.
-[`xpd index`](../../commands/xpd-index/) shows how to add recipes from the library's
-documentation. After you add or change a record, embed it and check that real questions still find
-their entries.
-
-```text
-on(add or change records)
-  cargo build                                                 # new and changed records get no vector
-  target/debug/xpd find --write-vectors indexes/vectors.bin   # embeds only those records
-  cargo run --quiet -- find --check indexes/questions.json    # builds again and checks
-```
-
-Add questions for the new pack to `indexes/questions.json`. When a question fails, keep it and
-improve the ranking for the general pattern of words.

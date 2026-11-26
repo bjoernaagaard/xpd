@@ -1,6 +1,6 @@
 # MLForecast
 
-[MLForecast](https://nixtlaverse.nixtla.io/mlforecast/index.html) trains machine learning models for time series. This pack applies when a file imports `mlforecast`.
+The MLForecast pack checks prediction interval configuration on files that import [MLForecast](https://nixtlaverse.nixtla.io/mlforecast/index.html).
 
 ## Prediction intervals
 
