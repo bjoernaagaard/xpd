@@ -1115,12 +1115,13 @@ checksum = "92773504d58c093f6de2459af4af33faa518c13451eb8f2b5698ed3d36e7c813"
 
 [[package]]
 name = "duroxide"
-version = "0.2.0"
+version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "231794852c1e34a7b924f6fe82509b4778c134c95ec6101d606195c82e628d68"
+checksum = "af9acf22082cd0a22b54b54e9c7a61a8073859251210460f53476930978629c2"
 dependencies = [
  "async-trait",
  "futures",
+ "futures-util",
  "libsqlite3-sys",
  "metrics",
  "semver",
