@@ -38,6 +38,8 @@ use super::{Entry, Kind, Tree, at_commit, files, repository};
     reason = "durable.rs marks the items this module now calls as dead code awaiting this wiring"
 )]
 mod durable;
+#[cfg(feature = "ledger-distributed")]
+pub(crate) use durable::worker;
 #[cfg(feature = "ledger-durable")]
 #[path = "orchestration.rs"]
 #[expect(
@@ -1101,8 +1103,8 @@ mod durable_run {
     use siphasher::sip::SipHasher13;
 
     use super::durable::{
-        LazyTokio, LedgerOrchestratorClient, ProviderConfig, instance_id, open_sqlite_store,
-        run_command, start_command,
+        LazyTokio, LedgerOrchestratorClient, ProviderConfig, instance_id, open_store, run_command,
+        start_command,
     };
     use super::orchestration::{
         ACT_FINISH_RUN, ACT_GATE_FIX, ACT_INIT_BASELINE, ACT_VALIDATE_PLAN, BaselineOutput,
@@ -1152,27 +1154,10 @@ mod durable_run {
                 format!("wt-{}", below.display())
             };
             Ok(Self {
-                config: ProviderConfig::sqlite_in(&common),
+                config: ProviderConfig::for_repository(&common),
                 namespace,
                 command,
             })
-        }
-
-        #[cfg_attr(
-            not(feature = "ledger-distributed"),
-            expect(
-                clippy::unnecessary_wraps,
-                reason = "the PostgreSQL store, compiled with ledger-distributed, has no file"
-            )
-        )]
-        fn db_path(&self) -> Result<PathBuf> {
-            match &self.config {
-                ProviderConfig::Sqlite { db_path } => Ok(db_path.clone()),
-                #[cfg(feature = "ledger-distributed")]
-                ProviderConfig::Postgres { .. } => {
-                    bail!("only the local SQLite store serves a run of the CLI")
-                }
-            }
         }
 
         fn instance(&self, generation: u64) -> String {
@@ -1225,11 +1210,11 @@ mod durable_run {
 
         /// The highest generation of the run, read through a client alone.
         fn latest(&self) -> Result<Option<Latest>> {
-            let db_path = self.db_path()?;
+            let config = self.config.clone();
             let namespace = self.namespace.clone();
             let command = self.command;
             LazyTokio::new().block_on(async move {
-                let store = open_sqlite_store(&db_path).await?;
+                let store = open_store(&config).await?;
                 let client = |generation| {
                     LedgerOrchestratorClient::new(
                         Arc::clone(&store),
@@ -1264,11 +1249,11 @@ mod durable_run {
 
         /// Whether the run of `generation` filed a receipt for `command_id`.
         fn has_receipt(&self, generation: u64, command_id: &str) -> Result<bool> {
-            let db_path = self.db_path()?;
+            let config = self.config.clone();
             let instance = self.instance(generation);
             let command_id = command_id.to_owned();
             LazyTokio::new().block_on(async move {
-                let store = open_sqlite_store(&db_path).await?;
+                let store = open_store(&config).await?;
                 let client = LedgerOrchestratorClient::new(store, instance);
                 Ok::<_, anyhow::Error>(client.receipt(&command_id).await?.is_some())
             })?
@@ -1276,10 +1261,10 @@ mod durable_run {
 
         /// Asks the run of `generation` to stop, as a restart does with the run it replaces.
         fn cancel(&self, generation: u64) -> Result<()> {
-            let db_path = self.db_path()?;
+            let config = self.config.clone();
             let instance = self.instance(generation);
             LazyTokio::new().block_on(async move {
-                let store = open_sqlite_store(&db_path).await?;
+                let store = open_store(&config).await?;
                 LedgerOrchestratorClient::new(store, instance)
                     .cancel("restart")
                     .await

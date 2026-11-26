@@ -22,6 +22,8 @@ use crate::git;
 
 mod run;
 use crate::output::Format;
+#[cfg(feature = "ledger-distributed")]
+pub(crate) use run::worker;
 
 /// How many places of a finding the text shows. The JSON holds every place.
 const PLACES_SHOWN: usize = 3;

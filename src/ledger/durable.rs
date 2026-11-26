@@ -3,7 +3,10 @@
 //! Everything `duroxide` knows about lives behind this module and
 //! [`super::orchestration`]. A caller opens one SQLite store in the common git
 //! folder, boots one embedded runtime for a mutating command, and reads
-//! `status` back through a client alone. No runtime, and no Tokio runtime,
+//! `status` back through a client alone. With `ledger-distributed` and
+//! `XPD_LEDGER_PG_URL` set, the store is PostgreSQL instead: the CLI boots no
+//! runtime, publishes its commits to the run's branches on a git remote, and
+//! `xpd ledger worker` processes measure and gate in their own clones. No runtime, and no Tokio runtime,
 //! exists until a caller asks for one: [`LazyTokio`] holds the runtime it
 //! builds on first use and nothing else in this module builds one, so a hot
 //! path that never names this module pays nothing for it.
@@ -14,38 +17,105 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use anyhow::{Context, Result};
+use duroxide::providers::Provider;
 use duroxide::providers::sqlite::SqliteProvider;
 use duroxide::runtime::Runtime;
 use duroxide::runtime::registry::{ActivityRegistry, OrchestrationRegistry};
 use duroxide::{Client, OrchestrationStatus};
 
+#[cfg(feature = "ledger-distributed")]
+use super::orchestration::Command;
 use super::orchestration::{
     COMMAND_QUEUE, CommandEnvelope, ORCHESTRATION_NAME, Receipt, RunStartInput, Snapshot,
     ledger_run, receipt_key,
 };
 
+#[cfg(feature = "ledger-distributed")]
+#[path = "worker.rs"]
+pub(crate) mod worker;
+
+/// The variable that names the PostgreSQL store of horizontal mode.
+#[cfg(feature = "ledger-distributed")]
+pub(crate) const PG_URL_VAR: &str = "XPD_LEDGER_PG_URL";
+/// The variable that names the PostgreSQL schema of a repository in horizontal mode.
+#[cfg(feature = "ledger-distributed")]
+pub(crate) const PG_SCHEMA_VAR: &str = "XPD_LEDGER_PG_SCHEMA";
+/// The variable that names the git remote that holds the branches of each run.
+#[cfg(feature = "ledger-distributed")]
+pub(crate) const REMOTE_VAR: &str = "XPD_LEDGER_REMOTE";
+
 /// The store a run lives in, chosen by the caller.
 #[derive(Debug, Clone, PartialEq, Eq)]
-#[expect(dead_code, reason = "wired into run::act in the next slice")]
 pub(crate) enum ProviderConfig {
     /// Local default: `<git-common-dir>/xpd-ledger.sqlite`, shared by worktrees.
     Sqlite { db_path: PathBuf },
-    /// Horizontal mode, compiled only with `ledger-distributed`.
+    /// Horizontal mode, compiled only with `ledger-distributed`. `remote` is the git remote
+    /// that the CLI publishes each run's commits to, and that every worker fetches from.
     #[cfg(feature = "ledger-distributed")]
     Postgres {
         connection_url: String,
         schema: Option<String>,
+        remote: String,
     },
 }
 
 impl ProviderConfig {
-    /// The local store inside `git_common_dir`.
-    #[expect(dead_code, reason = "wired into run::act in the next slice")]
-    pub(crate) fn sqlite_in(git_common_dir: &Path) -> Self {
+    /// The store of the repository whose common git folder is `git_common_dir`: PostgreSQL
+    /// when `XPD_LEDGER_PG_URL` is set in a build with `ledger-distributed`, and otherwise the
+    /// SQLite file in that folder.
+    pub(crate) fn for_repository(git_common_dir: &Path) -> Self {
+        #[cfg(feature = "ledger-distributed")]
+        if let Some(connection_url) = std::env::var(PG_URL_VAR).ok().filter(|url| !url.is_empty()) {
+            return Self::Postgres {
+                connection_url,
+                schema: std::env::var(PG_SCHEMA_VAR)
+                    .ok()
+                    .filter(|name| !name.is_empty()),
+                remote: std::env::var(REMOTE_VAR)
+                    .ok()
+                    .filter(|name| !name.is_empty())
+                    .unwrap_or_else(|| "origin".to_owned()),
+            };
+        }
         Self::Sqlite {
             db_path: git_common_dir.join("xpd-ledger.sqlite"),
         }
     }
+}
+
+/// Opens the store of `config`: the SQLite file, or the PostgreSQL schema, whose migrations
+/// run on this first open.
+pub(crate) async fn open_store(config: &ProviderConfig) -> Result<Arc<dyn Provider>> {
+    match config {
+        ProviderConfig::Sqlite { db_path } => Ok(open_sqlite_store(db_path).await?),
+        #[cfg(feature = "ledger-distributed")]
+        ProviderConfig::Postgres {
+            connection_url,
+            schema,
+            ..
+        } => open_postgres_store(connection_url, schema.as_deref()).await,
+    }
+}
+
+/// Opens a PostgreSQL store, in `schema` when one is given.
+#[cfg(feature = "ledger-distributed")]
+pub(crate) async fn open_postgres_store(
+    connection_url: &str,
+    schema: Option<&str>,
+) -> Result<Arc<dyn Provider>> {
+    let provider = duroxide_pg::PostgresProvider::new_with_schema(connection_url, schema)
+        .await
+        .context("cannot open the PostgreSQL ledger store")?;
+    Ok(Arc::new(provider))
+}
+
+/// The branch prefix of a run on the git remote, `xpd/<namespace>/<command>/<generation>`.
+/// Its `base` branch holds the commit the run started from, `head` the commit of the last
+/// command, and `fix/<id>` the commit each fix was gated at, so that every commit the run
+/// names stays on the remote.
+#[cfg(feature = "ledger-distributed")]
+pub(crate) fn run_branch(instance_id: &str) -> String {
+    format!("xpd/{}", instance_id.replace("::", "/"))
 }
 
 /// The `sqlite:` URL of a store file, created when it is missing.
@@ -56,7 +126,6 @@ pub(crate) fn sqlite_url(db_path: &Path) -> String {
 /// The instance of one run. A generation keeps a restarted run apart from the
 /// run it replaced, and a namespace keeps one worktree's runs apart from
 /// another's in the shared store.
-#[expect(dead_code, reason = "wired into run::act in the next slice")]
 pub(crate) fn instance_id(namespace: &str, command: &str, generation: u64) -> String {
     let clean = |part: &str| {
         part.chars()
@@ -178,9 +247,15 @@ impl fmt::Debug for LedgerOrchestratorClient {
 
 #[expect(dead_code, reason = "wired into run::act in the next slice")]
 impl LedgerOrchestratorClient {
-    pub(crate) fn new(store: Arc<SqliteProvider>, instance_id: String) -> Self {
+    pub(crate) fn new(store: Arc<dyn Provider>, instance_id: String) -> Self {
+        Self::of(Client::new(store), instance_id)
+    }
+
+    /// The control plane of `instance_id` through a client that already exists, such as the
+    /// one an activity gets from its context.
+    pub(crate) fn of(client: Client, instance_id: String) -> Self {
         Self {
-            client: Client::new(store),
+            client,
             instance_id,
         }
     }
@@ -321,7 +396,12 @@ pub(crate) fn run_command(
         ProviderConfig::Sqlite { db_path } => db_path.clone(),
         #[cfg(feature = "ledger-distributed")]
         ProviderConfig::Postgres { .. } => {
-            anyhow::bail!("only the local SQLite store serves this call")
+            return send_remote(
+                config,
+                instance_id,
+                Sent::Command(envelope.clone()),
+                timeout,
+            );
         }
     };
     let instance_id = instance_id.to_owned();
@@ -360,7 +440,12 @@ pub(crate) fn start_command(
         ProviderConfig::Sqlite { db_path } => db_path.clone(),
         #[cfg(feature = "ledger-distributed")]
         ProviderConfig::Postgres { .. } => {
-            anyhow::bail!("only the local SQLite store serves this call")
+            return send_remote(
+                config,
+                instance_id,
+                Sent::Start(Box::new(input.clone())),
+                timeout,
+            );
         }
     };
     let instance_id = instance_id.to_owned();
@@ -392,19 +477,207 @@ pub(crate) fn start_command(
 /// boots, no activity runs, and no command is queued.
 #[expect(dead_code, reason = "wired into run::act in the next slice")]
 pub(crate) fn read_status(config: &ProviderConfig, instance_id: &str) -> Result<Option<Snapshot>> {
-    let db_path = match config {
-        ProviderConfig::Sqlite { db_path } => db_path.clone(),
-        #[cfg(feature = "ledger-distributed")]
-        ProviderConfig::Postgres { .. } => {
-            anyhow::bail!("only the local SQLite store serves this call")
-        }
-    };
+    let config = config.clone();
     let instance_id = instance_id.to_owned();
     let mut lazy = LazyTokio::new();
     let snapshot = lazy.block_on(async move {
-        let store = open_sqlite_store(&db_path).await?;
+        let store = open_store(&config).await?;
         let client = LedgerOrchestratorClient::new(store, instance_id);
         client.snapshot().await
     })??;
     Ok(snapshot)
+}
+
+/// How long the CLI waits for the receipt of a command that workers serve, at the least. A
+/// gate waits for a free worker and for its checks, and a worker that dies holds its lease
+/// until the lock times out.
+#[cfg(feature = "ledger-distributed")]
+const REMOTE_WAIT: Duration = Duration::from_secs(3600);
+
+/// What the CLI sends to a run that workers serve.
+#[cfg(feature = "ledger-distributed")]
+enum Sent {
+    Start(Box<RunStartInput>),
+    Command(CommandEnvelope),
+}
+
+/// Sends a start or a command to a run in the PostgreSQL store, and waits for its receipt.
+///
+/// No runtime boots here: the workers run every activity. Before the send, the commits the
+/// workers need go to the run's branches on the remote, and a fix that was made before the
+/// commit the run stands at is rebased onto it first.
+#[cfg(feature = "ledger-distributed")]
+fn send_remote(
+    config: &ProviderConfig,
+    instance_id: &str,
+    sent: Sent,
+    timeout: Duration,
+) -> Result<(Snapshot, Receipt)> {
+    let ProviderConfig::Postgres { remote, .. } = config else {
+        anyhow::bail!("only the PostgreSQL store is served by workers")
+    };
+    let config = config.clone();
+    let remote = remote.clone();
+    let instance_id = instance_id.to_owned();
+    let mut lazy = LazyTokio::new();
+    lazy.block_on(async move {
+        let store = open_store(&config).await?;
+        let client = LedgerOrchestratorClient::new(store, instance_id.clone());
+        let branch = run_branch(&instance_id);
+        let command_id = match sent {
+            Sent::Start(input) => {
+                publish::start(&remote, &branch)?;
+                client.start_run(&input).await?;
+                input.command_id
+            }
+            Sent::Command(mut envelope) => {
+                if let Command::Gate { fix, head } = &mut envelope.command {
+                    let current = (client.snapshot().await?)
+                        .context("the run has not published its state yet")?
+                        .run
+                        .current;
+                    *head = publish::fix(&remote, &branch, fix, head, &current)?;
+                } else {
+                    publish::head(&remote, &branch)?;
+                }
+                client.enqueue_command(&envelope).await?;
+                envelope.command_id
+            }
+        };
+        let receipt = client
+            .wait_receipt(&command_id, timeout.max(REMOTE_WAIT))
+            .await?;
+        let snapshot = client
+            .snapshot()
+            .await?
+            .context("the run has no mirrored snapshot after its command")?;
+        Ok::<(Snapshot, Receipt), anyhow::Error>((snapshot, receipt))
+    })?
+}
+
+/// The commits of a run on the git remote, published from the checkout of the CLI, which
+/// `Place::find` made the folder of the process.
+#[cfg(feature = "ledger-distributed")]
+mod publish {
+    use std::path::{Path, PathBuf};
+    use std::process::{Command, Stdio};
+
+    use anyhow::{Context, Result, bail};
+
+    use crate::git;
+
+    fn here() -> &'static Path {
+        Path::new(".")
+    }
+
+    fn push(remote: &str, refspecs: &[String]) -> Result<()> {
+        let mut args = vec!["push", "--quiet", "--force", remote];
+        args.extend(refspecs.iter().map(String::as_str));
+        git::output(here(), &args)
+            .with_context(|| format!("cannot push the commits of the run to {remote}"))?;
+        Ok(())
+    }
+
+    /// Publishes the commit a run starts from as its `base` and its `head`.
+    pub(super) fn start(remote: &str, branch: &str) -> Result<()> {
+        push(
+            remote,
+            &[
+                format!("HEAD:refs/heads/{branch}/base"),
+                format!("HEAD:refs/heads/{branch}/head"),
+            ],
+        )
+    }
+
+    /// Publishes the commit of the checkout as the `head` of the run.
+    pub(super) fn head(remote: &str, branch: &str) -> Result<()> {
+        push(remote, &[format!("HEAD:refs/heads/{branch}/head")])
+    }
+
+    /// Publishes the fix `fix`, made at `head`, as the branch `fix/<fix>` of the run, and
+    /// returns the commit to gate. That is `head` when it stands on `current`, the commit the
+    /// run stands at. A fix made before an earlier fix was kept is rebased onto `current` in
+    /// a worktree of its own, and the rebased commit is the one the gate measures.
+    pub(super) fn fix(
+        remote: &str,
+        branch: &str,
+        fix: &str,
+        head: &str,
+        current: &str,
+    ) -> Result<String> {
+        git::output(
+            here(),
+            &[
+                "fetch",
+                "--quiet",
+                remote,
+                &format!("+refs/heads/{branch}/*:refs/remotes/{remote}/{branch}/*"),
+            ],
+        )
+        .with_context(|| format!("cannot fetch the run's branches from {remote}"))?;
+        let gated = if is_ancestor(current, head)? {
+            head.to_owned()
+        } else {
+            let rebased = rebase(head, current).with_context(|| {
+                format!(
+                    "the fix {fix} does not rebase cleanly onto {current}, where the run stands. Rebase it yourself and gate it again"
+                )
+            })?;
+            eprintln!(
+                "xpd: the fix {fix} was made before {current}, where the run stands, so it was rebased onto it as {rebased}. Check that commit out with `git reset --hard {rebased}`"
+            );
+            rebased
+        };
+        push(
+            remote,
+            &[
+                format!("{gated}:refs/heads/{branch}/fix/{fix}"),
+                format!("{gated}:refs/heads/{branch}/head"),
+            ],
+        )?;
+        Ok(gated)
+    }
+
+    fn is_ancestor(ancestor: &str, commit: &str) -> Result<bool> {
+        let status = Command::new("git")
+            .args(["merge-base", "--is-ancestor", ancestor, commit])
+            .stdin(Stdio::null())
+            .status()
+            .context("cannot run git")?;
+        match status.code() {
+            Some(0) => Ok(true),
+            Some(1) => Ok(false),
+            _ => bail!("git cannot compare {ancestor} with {commit}"),
+        }
+    }
+
+    /// A worktree of the checkout's repository, removed when it is dropped.
+    struct Scratch(PathBuf);
+
+    impl Drop for Scratch {
+        fn drop(&mut self) {
+            let path = self.0.to_string_lossy().into_owned();
+            let _ = git::output(here(), &["worktree", "remove", "--force", &path]);
+        }
+    }
+
+    /// `head` rebased onto `onto`, in a detached worktree, so the checkout stays as it is.
+    fn rebase(head: &str, onto: &str) -> Result<String> {
+        let name = format!("xpd-rebase-{}", std::process::id());
+        let path = git::output(here(), &["rev-parse", "--git-path", &name])?;
+        let path = PathBuf::from(path.trim());
+        let shown = path.to_string_lossy().into_owned();
+        git::output(
+            here(),
+            &["worktree", "add", "--quiet", "--detach", &shown, head],
+        )?;
+        let scratch = Scratch(path);
+        if let Err(error) = git::output(&scratch.0, &["rebase", "--quiet", onto]) {
+            let _ = git::output(&scratch.0, &["rebase", "--abort"]);
+            return Err(error);
+        }
+        Ok(git::output(&scratch.0, &["rev-parse", "HEAD"])?
+            .trim()
+            .to_owned())
+    }
 }
