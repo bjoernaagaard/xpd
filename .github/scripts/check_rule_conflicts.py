@@ -149,22 +149,28 @@ def fix_pairs(root: Path, config: str, samples: dict[str, str]) -> list[Pair]:
         if has_fix:
             fixable[code].add(file)
 
-    def one(code: str) -> list[Pair]:
+    def one(code: str) -> list[str]:
         files = {name: samples[name] for name in sorted(fixable[code])}
         folder = project(root, f"fix-{code}", config, files)
         run(["ruff", "check", *files, "--select", code, "--fix", "--unsafe-fixes", "-q"], folder)
-        touched = changed(folder, files)
-        if not touched:
-            return []
-        after = xpd_counts(folder, touched)
-        pairs = []
-        for name, rule in sorted({*before, *after}):
-            if name in touched and after[name, rule] != before[name, rule]:
-                pairs.append(Pair(code, rule, "fix", name))
-        return pairs
+        return changed(folder, files)
 
     with ThreadPoolExecutor() as pool:
-        return list(chain.from_iterable(pool.map(one, sorted(fixable))))
+        touched = dict(zip(sorted(fixable), pool.map(one, sorted(fixable)), strict=True))
+    targets = []
+    for code, names in touched.items():
+        targets += [f"fix-{code}/{name}" for name in names]
+    (root / "pyproject.toml").write_text(config)
+    after = xpd_counts(root, targets) if targets else Counter()
+    pairs = []
+    for code, names in touched.items():
+        for name in names:
+            path = f"fix-{code}/{name}"
+            rules = {rule for file, rule in before if file == name}
+            rules |= {rule for file, rule in after if file == path}
+            moved = sorted(rule for rule in rules if after[path, rule] != before[name, rule])
+            pairs += [Pair(code, rule, "fix", name) for rule in moved]
+    return pairs
 
 
 def format_pairs(root: Path, config: str, samples: dict[str, str]) -> list[Pair]:
@@ -255,18 +261,25 @@ def broken_pairs(root: Path, config: str, samples: dict[str, str]) -> list[Pair]
             suspects.add(name)
     if not suspects:
         return []
-    fixable = set()
+    fixable: dict[tuple[str, str], set[str]] = defaultdict(set)
     for issue in xpd_issues(base, sorted(suspects)):
         if issue["fix"]:
-            fixable.add((issue["file"], issue["rule"], issue["id"]))
-    pairs = []
-    for name, rule, rule_id in sorted(fixable):
-        folder = project(root, "one", config, {name: samples[name]})
-        run([*XPD, "check", name, "--rule", rule, "--fix", "--unsafe-fixes"], folder)
-        for (file, code), count in sorted(broken(folder, [name]).items()):
+            fixable[issue["rule"], issue["id"]].add(issue["file"])
+
+    def one(rule: str, rule_id: str) -> list[tuple[str, Pair]]:
+        names = sorted(fixable[rule, rule_id])
+        files = {name: samples[name] for name in names}
+        folder = project(root, f"one-{rule_id.replace('/', '-')}", config, files)
+        run([*XPD, "check", *names, "--rule", rule, "--fix", "--unsafe-fixes"], folder)
+        found = []
+        for (file, code), count in sorted(broken(folder, names).items()):
             if count > before[file, code]:
-                pairs.append(Pair(code, rule_id, "broken", name))
-    return pairs
+                found.append((rule, Pair(code, rule_id, "broken", file)))
+        return found
+
+    with ThreadPoolExecutor() as pool:
+        found = chain.from_iterable(pool.map(lambda key: one(*key), sorted(fixable)))
+    return [pair for _, pair in sorted(found, key=lambda item: (item[1].where, item[0]))]
 
 
 def stances() -> dict[tuple[str, str], str]:
