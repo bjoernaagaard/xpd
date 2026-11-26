@@ -64,21 +64,21 @@ Rulekit: issues that `xpd check` and the project's own rules already report: 0
 
 Written twice: code that is the same but for a few names, which one function with a parameter replaces: 1
   near-copy: 1
-    de2202e3  shop/prices.py:5-10, shop/prices.py:13-18  These 2 stretches of 6 lines are the same code but for `retail` and `wholesale`, `retail_total` and `wholesale_total`.
+    d0d923d9  shop/prices.py:5-10, shop/prices.py:13-18  These 2 stretches of 6 lines are the same code but for `retail` and `wholesale`, `retail_total` and `wholesale_total`.
 
 Done again: a value computed more than once, which one computation serves: 2
   repeated-call: 1
-    9be0d3ad  shop/prices.py:26  report computes `orders["price"].to_numpy()` 2 times, on line 26, and changes nothing that the call reads in between.
+    e948b2af  shop/prices.py:26  report computes `orders["price"].to_numpy()` 2 times, on line 26, and changes nothing that the call reads in between.
   loop-invariant-call: 1
-    d9de94da  shop/prices.py:24  The loop on line 23 of report computes `orders.groupby("kind")["price"].mean()` on every pass, and changes nothing that the call reads.
+    066069f5  shop/prices.py:24  The loop on line 23 of report computes `orders.groupby("kind")["price"].mean()` on every pass, and changes nothing that the call reads.
 
 Already guaranteed: an argument that changes nothing, because the library does the same without it: 1
   default-argument: 1
-    31c6f061  shop/prices.py:27  `axis=0` passes the default of `pandas.concat`.
+    5d90ce0e  shop/prices.py:27  `axis=0` passes the default of `pandas.concat`.
 
 Larger than the answer: work or storage that is much larger than the result: 1
   matrix-reduced: 1
-    ccb646b3  shop/prices.py:31, shop/prices.py:32  `prices[:, None] - levels` holds one value for each pair of elements of its two sides, and line 32 of nearest reduces it.
+    607bb2c5  shop/prices.py:31, shop/prices.py:32  `prices[:, None] - levels` holds one value for each pair of elements of its two sides, and line 32 of nearest reduces it.
 ```
 
 Each finding has its id, its places and what was measured. `--kind` keeps some kinds, and `--limit`

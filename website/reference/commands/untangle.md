@@ -69,25 +69,25 @@ No git history was read, so no finding rests on how the files changed.
 
 Hidden links: pieces that must change together, where the code does not show it: 1
   shared-state: 1
-    29ce6e4b  shop/orders.py:14  This writes RATE of the module pricing from outside it.
+    e09d695c  shop/orders.py:14  This writes RATE of the module pricing from outside it.
 
 Needless links: pieces tied together that change for different reasons: 1
   import-cycle: 1
-    8de3d24b  shop/orders.py:3, shop/pricing.py:1  These 2 modules import one another in a circle, so none of them can change alone.
+    fe026aac  shop/orders.py:3, shop/pricing.py:1  These 2 modules import one another in a circle, so none of them can change alone.
 
 Surplus: pieces with no reason of their own to change: 2
   unreferenced: 1
-    c17ac665  shop/pricing.py:10  No Python file that was read mentions report, apart from this definition.
+    9f695b77  shop/pricing.py:10  No Python file that was read mentions report, apart from this definition.
   constant-parameter: 1
-    0bea3ced  shop/orders.py:6  None of the 2 calls of load passes strict, so it always has its default.
+    692daac2  shop/orders.py:6  None of the 2 calls of load passes strict, so it always has its default.
 
 Special cases: code for one situation, which the design did not account for: 3
   one-value-branch: 1
-    ccd51d7f  shop/orders.py:12  This branch runs for one value: kind == "wholesale".
+    533fe45b  shop/orders.py:12  This branch runs for one value: kind == "wholesale".
   swallowed-exception: 1
-    ebae19e6  shop/orders.py:17  This catches an exception and does nothing with it.
+    768aad77  shop/orders.py:17  This catches an exception and does nothing with it.
   sleep-or-retry: 1
-    0c77beff  shop/orders.py:19  This waits a fixed time for something else to finish.
+    a1083008  shop/orders.py:19  This waits a fixed time for something else to finish.
 ```
 
 Each finding has its id, its places and what was measured. `--kind` keeps some kinds, and `--limit`
