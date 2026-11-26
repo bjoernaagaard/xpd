@@ -9,6 +9,7 @@ use std::fs;
 use std::hash::{Hash, Hasher as _};
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
+#[cfg(feature = "ledger-incremental")]
 use std::sync::Arc;
 
 use anyhow::{Context, Result};
@@ -225,12 +226,10 @@ fn legacy_id(kind: &str, key: &str, nth: usize) -> String {
 /// `GixSource` implements it over the git object database, and `FsSource` over the files on
 /// disk. Paths are relative to the top of the repository, and object ids are full hex ids in
 /// the object format of the repository.
-#[expect(
-    dead_code,
-    reason = "the sources that implement it come in the next slice"
-)]
+#[cfg(feature = "ledger-incremental")]
 pub(crate) trait ContentSource: std::fmt::Debug + Send + Sync {
     /// The full id of the commit that `rev`, such as `HEAD`, `main` or a hash, names.
+    #[expect(dead_code, reason = "the surveys that call it come in the next slice")]
     fn resolve_commit(&self, rev: &str) -> Result<String>;
 
     /// The code files under `paths` at `commit`, or in the working tree when it is `None`,
@@ -246,6 +245,7 @@ pub(crate) trait ContentSource: std::fmt::Debug + Send + Sync {
 
     /// The paths that each of the last `max_commits` commits without a merge changed, from
     /// `commit` back, newest first.
+    #[expect(dead_code, reason = "the surveys that call it come in the next slice")]
     fn commit_history(&self, commit: &str, max_commits: usize) -> Result<Vec<Vec<String>>>;
 }
 

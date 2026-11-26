@@ -2,7 +2,7 @@
 //! time: a call that a function computes more than once, a call that a loop repeats, a keyword
 //! argument that a library may already default to, and a matrix that is built to be reduced.
 
-use std::collections::{BTreeSet, HashMap, HashSet};
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::path::Path;
 
 use crate::source;
@@ -1133,15 +1133,23 @@ fn preserves_matrix(rhs: &Node<'_>, name: &str) -> bool {
     }
 }
 
+/// Returns the tracked matrix metadata for the first variable preserved by `right`, in
+/// deterministic name order.
+fn preserved_matrix<T: Clone>(tracked: &BTreeMap<String, T>, right: &Node<'_>) -> Option<T> {
+    tracked
+        .iter()
+        .find_map(|(name, info)| preserves_matrix(right, name).then(|| info.clone()))
+}
+
 /// Functions that return an outer-broadcast matrix, mapped to its build line and text.
-fn returned_outers(functions: &[Function<'_>]) -> HashMap<String, Outer> {
-    let mut returned: HashMap<String, Outer> = HashMap::new();
+fn returned_outers(functions: &[Function<'_>]) -> BTreeMap<String, Outer> {
+    let mut returned: BTreeMap<String, Outer> = BTreeMap::new();
     for function in functions {
         let outers = function.outers();
         if outers.is_empty() {
             continue;
         }
-        let mut bound: HashMap<String, Outer> = HashMap::new();
+        let mut bound: BTreeMap<String, Outer> = BTreeMap::new();
         for node in &function.nodes {
             if node.kind() == "assignment"
                 && let Some(left) = node.field("left").filter(|l| l.kind() == "identifier")
@@ -1149,10 +1157,7 @@ fn returned_outers(functions: &[Function<'_>]) -> HashMap<String, Outer> {
             {
                 if let Some(outer) = outers.iter().find(|o| within(o, &right)) {
                     bound.insert(left.text().into_owned(), (line(outer), one_line(outer)));
-                } else if let Some(hit) = bound
-                    .iter()
-                    .find_map(|(name, info)| preserves_matrix(&right, name).then(|| info.clone()))
-                {
+                } else if let Some(hit) = preserved_matrix(&bound, &right) {
                     bound.insert(left.text().into_owned(), hit);
                 }
             }
@@ -1182,7 +1187,7 @@ fn reduced(functions: &[Function<'_>]) -> Vec<Local> {
     let mut seen: HashSet<(String, String)> = HashSet::new();
     for function in functions {
         let outers = function.outers();
-        let mut tainted: HashMap<String, (usize, String, String)> = HashMap::new();
+        let mut tainted: BTreeMap<String, (usize, String, String)> = BTreeMap::new();
         for node in &function.nodes {
             if node.kind() == "assignment"
                 && let Some(left) = node.field("left").filter(|l| l.kind() == "identifier")
@@ -1202,10 +1207,7 @@ fn reduced(functions: &[Function<'_>]) -> Vec<Local> {
                         left.text().into_owned(),
                         (*built, text.clone(), format!(", through {helper}")),
                     );
-                } else if let Some(hit) = tainted
-                    .iter()
-                    .find_map(|(name, info)| preserves_matrix(&right, name).then(|| info.clone()))
-                {
+                } else if let Some(hit) = preserved_matrix(&tainted, &right) {
                     tainted.insert(left.text().into_owned(), hit);
                 }
             }
