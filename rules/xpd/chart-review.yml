@@ -9,6 +9,16 @@ facts:
     text: "The plotted x values of each trace, and the years they span when they are dates or years."
   - id: text
     text: "The title, the axis titles, the tick label angle and the annotations, and the text written in capitals."
+  - id: axes
+    text: "Resolved axis ranges, secondary axes, grid lines, box frames, and tick counts compared with plotted data points."
+  - id: banking
+    text: "Median absolute slope angle of line segments in pixels, checking whether a time-series aspect ratio banks near 45 degrees."
+  - id: table-borders
+    text: "Table cell borders, vertical gridlines, and alternating row striping in Plotly go.Table and AG Grid."
+  - id: table-numbers
+    text: "Numeric column formatting, decimal consistency, alignment, and zero versus missing value presentation in tables."
+  - id: table-structure
+    text: "Table row count, topical row grouping, header clarity, and alphabetical versus value-based row ordering."
 questions:
   - id: show-the-data
     page: 13
@@ -22,6 +32,7 @@ questions:
     plotly: "Draw the observations with px.scatter or px.line(markers=True) and add a fit as a separate trace."
     rules: ["heatmap-smoothing", "spline-line"]
     covers: [108, 118, 983]
+    mode: "judgment"
   - id: substance
     page: 13
     line: 109
@@ -29,11 +40,12 @@ questions:
     principle: "Substance over method"
     text: "Does the design send the reader to the substance of the data rather than to the method, the graphic design or the software, and would someone who knows the subject and the statistics stand behind it?"
     look: "Decoration and software defaults that draw the eye, and patterns that could be noise or an artifact of how the data were collected."
-    kinds: ["any"]
+    kinds: ["any", "table"]
     facts: []
     plotly: "Start from template=\"simple_white\" and remove what does not serve the data."
     rules: []
     covers: [109, 514, 1346, 3212, 3268, 3658, 5238, 7982]
+    mode: "judgment"
   - id: compare
     page: 13
     line: 113
@@ -41,11 +53,12 @@ questions:
     principle: "Encourage comparison"
     text: "Are the values the reader must compare placed side by side in one view, with marks of the same shape on a common scale?"
     look: "Comparisons split over separate charts, tabs or pages, and different shapes or scales for the things compared."
-    kinds: ["any"]
+    kinds: ["any", "table"]
     facts: []
     plotly: "Put the compared series in one figure or in facet_col panels with shared axes."
     rules: []
     covers: [113, 979, 5638, 6795, 7755]
+    mode: "judgment"
   - id: overview-and-detail
     page: 13
     line: 114
@@ -53,11 +66,12 @@ questions:
     principle: "Several levels of detail"
     text: "Can a reader see the overall pattern at a glance and the fine structure up close, in one coherent display of a complex data set?"
     look: "Whether the whole data set is shown and organized, or only a slice or an aggregate that loses the detail."
-    kinds: ["any"]
+    kinds: ["any", "table"]
     facts: []
     plotly: "Show all rows in one figure, and order or group them with category_orders."
     rules: []
     covers: [106, 112, 114, 5355, 5958, 6793, 8210]
+    mode: "judgment"
   - id: purpose
     page: 13
     line: 115
@@ -65,11 +79,12 @@ questions:
     principle: "A clear purpose"
     text: "What is the chart for, description, exploration, tabulation or decoration, and is a chart the right format for it, or would a sentence, a table or a combination serve better?"
     look: "The question the reader brings, and whether the chart answers it or only decorates the page."
-    kinds: ["any"]
+    kinds: ["any", "table"]
     facts: []
     plotly: "Choose the px function for the comparison the reader must make, or go.Table for lookup."
     rules: []
     covers: [80, 115, 7110, 7114]
+    mode: "judgment"
   - id: integrate-text
     page: 13
     line: 116
@@ -77,11 +92,12 @@ questions:
     principle: "Graphics integrated with text"
     text: "Is the chart run into the text that discusses it, in the same typeface, without ruled lines that wall it off, repeated near later references, and with Figure spelled out?"
     look: "The report, notebook or dashboard text around the chart, and the caption."
-    kinds: ["any"]
+    kinds: ["any", "table"]
     facts: []
     plotly: "Set layout.font.family to the page's typeface and place the figure beside its paragraph."
     rules: []
     covers: [62, 116, 7124, 7892, 7895, 7897, 7901]
+    mode: "judgment"
   - id: map-area
     page: 20
     line: 427
@@ -94,6 +110,7 @@ questions:
     plotly: "Use px.scatter_geo with size by count, or a sorted px.bar of the regions."
     rules: []
     covers: [427, 429]
+    mode: "judgment"
   - id: small-data-table
     page: 33
     line: 625
@@ -102,10 +119,11 @@ questions:
     text: "Does the chart show 20 or fewer numbers, exact values, or many labeled values that a table or a sentence shows better?"
     look: "The count of values drawn, whether the reader needs exact values, and whether the values are written into the code."
     kinds: ["any"]
-    facts: ["values"]
+    facts: ["values", "axes"]
     plotly: "Use go.Table(header=..., cells=...) or write the numbers in the text."
     rules: ["table-for-small-data"]
     covers: [556, 625, 4341, 4772, 7126, 7130, 7166, 7178, 7755]
+    mode: "hybrid"
   - id: multivariate
     page: 51
     line: 1354
@@ -118,6 +136,7 @@ questions:
     plotly: "Use px.scatter(x=, y=) for a relationship, and color, size or facet_col for a third variable."
     rules: []
     covers: [287, 766, 798, 850, 1007, 1354, 3270]
+    mode: "judgment"
   - id: zero-baseline
     page: 54
     line: 1391
@@ -126,10 +145,11 @@ questions:
     text: "Do the bars and filled areas start at zero, so a negative value or a difference is not disguised, and is a removed zero shown as removed?"
     look: "The value axis range, where the bars begin, and negative values."
     kinds: ["bar", "histogram", "area"]
-    facts: []
+    facts: ["axes"]
     plotly: "Leave the bar axis on autorange, which includes zero, and write no range_y that starts above it."
     rules: ["area-axis-without-zero", "bar-axis-without-zero"]
     covers: [1391]
+    mode: "mechanical"
   - id: labels
     page: 56
     line: 1527
@@ -142,6 +162,7 @@ questions:
     plotly: "Set labels={...} with units and add fig.add_annotation at each event and outlier."
     rules: []
     covers: [1527, 4001, 4341, 5355, 7884, 7945, 7974]
+    mode: "judgment"
   - id: lie-factor
     page: 57
     line: 1533
@@ -154,6 +175,7 @@ questions:
     plotly: "Use sizemode=\"area\" for marker sizes and bars from zero."
     rules: ["area-axis-without-zero", "bar-axis-without-zero", "marker-size-diameter", "polar-bar-area"]
     covers: [110, 1481, 1525, 1533, 1535, 1625, 2517, 2751, 3186]
+    mode: "hybrid"
   - id: design-variation
     page: 61
     line: 1863
@@ -162,10 +184,11 @@ questions:
     text: "Do scales, time intervals, periods and design stay constant across the chart, so every visible change is a change in the data?"
     look: "Uneven intervals on a time axis, partial periods next to full ones, a second y axis, and connector slopes set by spacing."
     kinds: ["any"]
-    facts: []
+    facts: ["axes"]
     plotly: "Plot dates on a date axis, normalize partial periods, and keep one y axis."
     rules: ["dual-y-axis"]
     covers: [977, 1436, 1563, 1685, 1863]
+    mode: "hybrid"
   - id: deflate-money
     page: 68
     line: 2635
@@ -178,6 +201,7 @@ questions:
     plotly: "Divide by a price index (and population) before px.line and title the axis like \"Price, 2015 euro\"."
     rules: []
     covers: [2603, 2635]
+    mode: "hybrid"
   - id: dimensions
     page: 71
     line: 2816
@@ -190,6 +214,7 @@ questions:
     plotly: "Use px.bar or px.line in two dimensions."
     rules: ["marker-size-diameter", "polar-bar-area", "three-d-for-two-d"]
     covers: [1565, 1567, 2594, 2733, 2816, 2942, 4341]
+    mode: "mechanical"
   - id: context
     page: 74
     line: 2968
@@ -202,6 +227,7 @@ questions:
     plotly: "Plot all years with px.line and add the comparison series in the same figure."
     rules: []
     covers: [824, 1623, 2968, 2995, 3054]
+    mode: "hybrid"
   - id: right-numbers
     page: 80
     line: 3233
@@ -209,11 +235,12 @@ questions:
     principle: "The right numbers"
     text: "Are these the right numbers for the question: a sound model, enough data, and a statistic worth showing, rather than a thin or simple series dressed up?"
     look: "A simple linear change that one or two numbers would summarize, a puny data set, a model the chart is asked to rescue."
-    kinds: ["any"]
+    kinds: ["any", "table"]
     facts: []
     plotly: "Report a simple change as a number in the text and keep the figure for varied data."
     rules: []
     covers: [295, 3233]
+    mode: "judgment"
   - id: data-ink
     page: 96
     line: 3819
@@ -222,10 +249,11 @@ questions:
     text: "Which ink shows no data? Could the background tint, frame, ticks, debris or uniform notes be erased or moved to the caption without loss, after a revision that compares versions?"
     look: "Background fills, boxes, tick marks, heavy axes, and notes that apply to every mark."
     kinds: ["any"]
-    facts: []
+    facts: ["axes"]
     plotly: "Use template=\"simple_white\" and remove what carries no data."
     rules: ["boxed-axis-frame", "default-template"]
     covers: [86, 3819, 3821, 3829, 3881, 3949, 3955, 3973, 3987, 4078, 6807, 7102]
+    mode: "hybrid"
   - id: repeat-cycle
     page: 98
     line: 3859
@@ -238,6 +266,7 @@ questions:
     plotly: "Append the first part of the cycle to the end of the data before px.line."
     rules: []
     covers: [3859, 3863, 3869, 6832, 6834]
+    mode: "judgment"
   - id: redundant-ink
     page: 100
     line: 3877
@@ -250,6 +279,33 @@ questions:
     plotly: "Drop color= when it repeats x or y."
     rules: ["redundant-color"]
     covers: [3845, 3859, 3877]
+    mode: "hybrid"
+  - id: uniform-notes-to-caption
+    page: 101
+    line: 3949
+    chapter: "4 Data-Ink and Graphical Redesign"
+    principle: "Move uniform notes to the caption"
+    text: "Are repeated bar outlines, repeated panel frames, and uniform annotations such as identical significance markers moved to the caption?"
+    look: "Identical notes, asterisks, or legends repeated across every bar or panel."
+    kinds: ["any"]
+    facts: []
+    plotly: "Remove repeated per-bar markers and state uniform notes once in the subtitle or caption."
+    rules: []
+    covers: [3949, 3955]
+    mode: "judgment"
+  - id: reference-curves
+    page: 103
+    line: 3973
+    chapter: "4 Data-Ink and Graphical Redesign"
+    principle: "Keep organizing reference curves"
+    text: "Where a theoretical curve or benchmark organizes the observations, is it drawn lightly behind the data while non-data interior grid marks are erased?"
+    look: "Reference curves, target lines, and theoretical baselines compared with grid clutter."
+    kinds: ["line", "scatter"]
+    facts: []
+    plotly: "Keep thin gray reference traces with add_hline or go.Scatter and erase the background grid."
+    rules: []
+    covers: [3973, 3987]
+    mode: "judgment"
   - id: vibration
     page: 108
     line: 4092
@@ -262,6 +318,7 @@ questions:
     plotly: "Remove pattern_shape and use flat gray fills."
     rules: ["pattern-fill"]
     covers: [3993, 4092, 4430]
+    mode: "mechanical"
   - id: grid
     page: 112
     line: 4531
@@ -270,10 +327,11 @@ questions:
     text: "Is the grid muted or gone, fainter than the data, kept only where the chart is used to look up values, and drawn at meaningful values such as events?"
     look: "Grid color and weight against the data, and whether the grid hides peaks."
     kinds: ["any"]
-    facts: []
+    facts: ["axes"]
     plotly: "Use template=\"simple_white\", or a faint gridcolor where the grid is needed."
     rules: ["explicit-grid"]
     covers: [798, 3799, 4531, 4535, 4547, 4555, 4576, 4582, 4584]
+    mode: "hybrid"
   - id: duck
     page: 116
     line: 4588
@@ -286,6 +344,7 @@ questions:
     plotly: "Replace the decorative form with a plain px chart or a number."
     rules: ["explicit-grid", "gauge-indicator", "pattern-fill"]
     covers: [4588, 4839]
+    mode: "mechanical"
   - id: quartile-plot
     page: 124
     line: 4877
@@ -298,6 +357,7 @@ questions:
     plotly: "Draw the minimum, quartiles, median and maximum with go.Scatter lines."
     rules: ["box-plot-ink"]
     covers: [4877, 4883, 4901]
+    mode: "hybrid"
   - id: bar-erase
     page: 127
     line: 4954
@@ -310,6 +370,7 @@ questions:
     plotly: "Use template=\"simple_white\" with showline=False on the value axis."
     rules: ["boxed-axis-frame"]
     covers: [4954, 4983, 5012, 5043, 5072, 5101, 5132]
+    mode: "hybrid"
   - id: range-frame
     page: 130
     line: 5156
@@ -322,6 +383,7 @@ questions:
     plotly: "Set the axis range and tickvals to the data minimum and maximum, with showline=True."
     rules: []
     covers: [5156, 5186, 5751]
+    mode: "judgment"
   - id: marginal
     page: 133
     line: 5192
@@ -334,6 +396,7 @@ questions:
     plotly: "Add marginal_x=\"rug\" and marginal_y=\"rug\" to px.scatter where the marginals matter."
     rules: []
     covers: [4877, 5180, 5192, 5200, 5216]
+    mode: "judgment"
   - id: multifunction
     page: 139
     line: 5258
@@ -346,6 +409,7 @@ questions:
     plotly: "Set tickvals and ticktext to data values, and add_vline at events."
     rules: []
     covers: [550, 5258, 5264, 5270, 5411, 5667, 5758, 5768, 5774, 5805, 5840]
+    mode: "judgment"
   - id: puzzle
     page: 139
     line: 5260
@@ -358,6 +422,7 @@ questions:
     plotly: "Label marks with text= or annotations instead of a coded legend."
     rules: []
     covers: [5260, 5895, 7978]
+    mode: "judgment"
   - id: zero-and-missing
     page: 145
     line: 5483
@@ -365,11 +430,38 @@ questions:
     principle: "Zero and missing"
     text: "Are zero values and missing values drawn differently, so an absent bar or a blank cell is not read as zero?"
     look: "Blank cells, absent bars and gaps in a series."
-    kinds: ["bar", "heatmap", "map", "line"]
-    facts: []
+    kinds: ["bar", "heatmap", "map", "line", "table"]
+    facts: ["table-numbers"]
     plotly: "Keep NaN as a gap and mark a true zero with a visible mark or text."
     rules: []
     covers: [664, 5483]
+    mode: "hybrid"
+  - id: meaningful-id-order
+    page: 149
+    line: 5758
+    chapter: "7 Multifunctioning Graphical Elements"
+    principle: "Meaningful identifier order"
+    text: "When items carry identification codes or labels, are those identifiers assigned in a meaningful order such as chronological or size order rather than alphabetically?"
+    look: "Numbered codes, cohort IDs, or category labels used as identifiers."
+    kinds: ["any", "table"]
+    facts: []
+    plotly: "Order identifiers by time, rank, or substantive group in both charts and AG Grid or go.Table rows."
+    rules: []
+    covers: [5758]
+    mode: "judgment"
+  - id: data-positioned-labels
+    page: 150
+    line: 5768
+    chapter: "7 Multifunctioning Graphical Elements"
+    principle: "Data-positioned value labels"
+    text: "For small sets of about 30 observations or fewer where exact values matter, do coordinate ticks or direct labels sit at the observed values themselves?"
+    look: "Round-number axis ticks on small datasets where exact observed values would inform the reader."
+    kinds: ["any"]
+    facts: ["axes"]
+    plotly: "Set tickvals to observed values or place direct text labels on the marks."
+    rules: []
+    covers: [5768, 5774, 5805, 5840]
+    mode: "judgment"
   - id: color-use
     page: 154
     line: 5939
@@ -382,6 +474,7 @@ questions:
     plotly: "Use a sequential scale such as color_continuous_scale=\"Greys\" or \"Blues\"."
     rules: ["rainbow-colorscale"]
     covers: [5939, 6546, 7098]
+    mode: "mechanical"
   - id: lines-of-sight
     page: 155
     line: 5960
@@ -389,11 +482,12 @@ questions:
     principle: "Lines of sight"
     text: "Is the display ordered so the eye reads it in a clear hierarchy, with steady horizontal or vertical lines of sight and aligned values?"
     look: "Panels and labels that make the eye jump, values out of alignment."
-    kinds: ["any"]
+    kinds: ["any", "table"]
     facts: []
     plotly: "Align panels with make_subplots(shared_xaxes=True) or facet_row."
     rules: []
     covers: [5950, 5960, 6072, 6076]
+    mode: "judgment"
   - id: many-numbers
     page: 168
     line: 6793
@@ -406,6 +500,7 @@ questions:
     plotly: "Set width and height with fig.update_layout, and add data or panels with facet_col."
     rules: ["gauge-indicator"]
     covers: [111, 6427, 6793, 6811]
+    mode: "hybrid"
   - id: scale-choice
     page: 169
     line: 6822
@@ -414,10 +509,11 @@ questions:
     text: "Is the vertical scale chosen for what the curve must show, neither so steep nor so flat that change is hidden, with zero removed only where the reader sees it removed and a log scale for relative change?"
     look: "The steepness of the curve, the start of the value axis, and the span of the values."
     kinds: ["line", "area"]
-    facts: []
+    facts: ["banking"]
     plotly: "Set the y range deliberately, or log_y=True for relative change."
     rules: []
     covers: [6822, 6823, 6825, 6827]
+    mode: "judgment"
   - id: small-multiples
     page: 170
     line: 6842
@@ -430,6 +526,7 @@ questions:
     plotly: "Use facet_col with shared axes in place of animation_frame."
     rules: ["animation-frame", "free-facet-scales"]
     covers: [904, 6842, 7047]
+    mode: "mechanical"
   - id: craft
     page: 177
     line: 7115
@@ -437,11 +534,38 @@ questions:
     principle: "Careful production"
     text: "Is the chart drawn with care in its technical details: no repeated or mistyped scale values, no clipped or overlapping text, one typeface?"
     look: "Tick labels, overlapping annotations, clipped margins, mixed fonts."
-    kinds: ["any"]
+    kinds: ["any", "table"]
     facts: []
     plotly: "Check the rendered figure with fig.write_image and fix margins with update_layout(margin=...)."
     rules: []
     covers: [664, 7115]
+    mode: "judgment"
+  - id: text-table-for-prose
+    page: 178
+    line: 7126
+    chapter: "9 Aesthetics and Technique in Data Graphical Design"
+    principle: "Aligned text-table for small comparisons"
+    text: "When presenting a handful of numbers for direct comparison, are they arranged in a clean aligned table rather than buried inside prose or boxed widgets?"
+    look: "Small comparison tables, KPI strips, and inline summary metrics."
+    kinds: ["table"]
+    facts: ["table-structure"]
+    plotly: "Use a minimal go.Table or borderless AG Grid with aligned columns and no heavy chrome."
+    rules: []
+    covers: [7126, 7130]
+    mode: "judgment"
+  - id: table-alignment-and-precision
+    page: 178
+    line: 7130
+    chapter: "9 Aesthetics and Technique in Data Graphical Design"
+    principle: "Table numeric alignment and consistent precision"
+    text: "Are numeric columns right-aligned (or decimal-aligned) with consistent rounding, and text labels left-aligned, with no raw unformatted floating-point strings?"
+    look: "Column alignment, decimal places, and valueFormatter or cells.format settings."
+    kinds: ["table"]
+    facts: ["table-numbers"]
+    plotly: "In AG Grid set type='numericColumn' and valueFormatter; in go.Table set cells.align='right' and cells.format."
+    rules: []
+    covers: [7130, 7166]
+    mode: "mechanical"
   - id: order
     page: 178
     line: 7149
@@ -449,11 +573,12 @@ questions:
     principle: "Order by content"
     text: "Are categories ordered by content or by value rather than alphabetically?"
     look: "The order of bars, rows, slices and panels."
-    kinds: ["bar", "pie", "heatmap", "box", "panels"]
-    facts: []
+    kinds: ["bar", "pie", "heatmap", "box", "panels", "table"]
+    facts: ["table-structure"]
     plotly: "Set category_orders or sort the frame before px.bar."
     rules: []
     covers: [7149]
+    mode: "hybrid"
   - id: pie
     page: 178
     line: 7166
@@ -466,6 +591,59 @@ questions:
     plotly: "Use go.Table, or px.bar sorted by value."
     rules: ["pie-chart", "sunburst-as-pie"]
     covers: [7166]
+    mode: "mechanical"
+  - id: table-topical-groups
+    page: 179
+    line: 7178
+    chapter: "9 Aesthetics and Technique in Data Graphical Design"
+    principle: "Supertable topical row grouping"
+    text: "For dense tables with many rows or many localized comparisons, are rows organized into topical clusters of 3 to 7 rows with subtle horizontal dividers instead of a flat wall of rows or dozens of tiny bar charts?"
+    look: "Row count, rowGroup or topical separators, and whether one supertable beats many small bar charts."
+    kinds: ["table", "panels", "bar"]
+    facts: ["table-structure"]
+    plotly: "Use AG Grid rowGroup or grouped sections in go.Table to divide rows into topical paragraphs."
+    rules: []
+    covers: [7178]
+    mode: "hybrid"
+  - id: table-rules-and-borders
+    page: 179
+    line: 7179
+    chapter: "9 Aesthetics and Technique in Data Graphical Design"
+    principle: "Horizontal dividers only, no vertical cages or zebra stripes"
+    text: "Does the table avoid vertical gridlines, full cell boxes, and alternating zebra striping, using thin horizontal rules only to separate headers, totals, and topical groups?"
+    look: "Column borders, cell borders, alternating odd-row background fills, and outer frames."
+    kinds: ["table"]
+    facts: ["table-borders"]
+    plotly: "In AG Grid disable columnBorder and oddRowBackgroundColor; in go.Table remove vertical cell lines and alternating fill colors."
+    rules: []
+    covers: [7178, 7897]
+    mode: "mechanical"
+  - id: table-caption-and-source
+    page: 179
+    line: 7182
+    chapter: "9 Aesthetics and Technique in Data Graphical Design"
+    principle: "Table scope, units, and source note"
+    text: "Does the table state its title, units, sample or scope, and data source clearly beside or inside the display so the numbers stand on their own?"
+    look: "Table title, subtitle, column units, footnotes, and source attribution."
+    kinds: ["table"]
+    facts: ["table-structure"]
+    plotly: "Place a plain title, unit labels in headers, and a source note directly with the go.Table or AgGrid."
+    rules: []
+    covers: [1527, 7178]
+    mode: "judgment"
+  - id: table-semi-graphic
+    page: 180
+    line: 7755
+    chapter: "9 Aesthetics and Technique in Data Graphical Design"
+    principle: "Semi-graphical table for heavily labeled numbers"
+    text: "Where heavily labeled rows benefit from visual comparison alongside exact figures, would inline sparklines, subtle bars, or a semi-graphical layout clarify the pattern?"
+    look: "Multi-metric comparison tables where inline micro-charts could pair with exact numbers."
+    kinds: ["table"]
+    facts: []
+    plotly: "Pair aligned numeric columns with compact AG Grid sparkline cell renderers or small multiples where helpful."
+    rules: []
+    covers: [7755]
+    mode: "judgment"
   - id: words-spelled-out
     page: 183
     line: 7966
@@ -473,11 +651,25 @@ questions:
     principle: "Words spelled out"
     text: "Are words spelled out on the chart, with no column names, codes or abbreviations?"
     look: "Axis titles, legends and labels that are column names or abbreviations."
-    kinds: ["any"]
+    kinds: ["any", "table"]
     facts: ["text"]
     plotly: "Pass labels={\"col_name\": \"Words with units\"} to the px call."
     rules: ["axis-title-column-name"]
     covers: [4772, 7966]
+    mode: "mechanical"
+  - id: table-header-clarity
+    page: 183
+    line: 7967
+    chapter: "9 Aesthetics and Technique in Data Graphical Design"
+    principle: "Spelled-out table headers with units"
+    text: "Are all table column headers spelled out in sentence case with units rather than raw database field names, snake_case identifiers, or all-caps labels?"
+    look: "AG Grid columnDefs headerName versus field, and go.Table header.values."
+    kinds: ["table"]
+    facts: ["table-structure"]
+    plotly: "Set headerName with units on every AG Grid columnDef and spelled-out sentence-case strings in go.Table header.values."
+    rules: []
+    covers: [7966, 7994]
+    mode: "mechanical"
   - id: horizontal-type
     page: 183
     line: 7970
@@ -490,6 +682,7 @@ questions:
     plotly: "Keep tickangle=0 and put the y axis title in an annotation above the axis."
     rules: ["rotated-tick-labels"]
     covers: [4001, 7970]
+    mode: "mechanical"
   - id: labels-on-graphic
     page: 183
     line: 7978
@@ -502,6 +695,7 @@ questions:
     plotly: "Add the series name at the end of each line with fig.add_annotation and set showlegend=False."
     rules: ["legend-instead-of-labels"]
     covers: [4430, 7884, 7978]
+    mode: "hybrid"
   - id: color-deficient
     page: 183
     line: 7986
@@ -514,6 +708,7 @@ questions:
     plotly: "Label lines directly and use line_dash or a blue against orange pair."
     rules: []
     covers: [7986]
+    mode: "hybrid"
   - id: type-case
     page: 183
     line: 7994
@@ -521,11 +716,12 @@ questions:
     principle: "Type"
     text: "Is the type clear, precise and modest, small for short labels, and in upper and lower case rather than capitals?"
     look: "Titles and labels in capitals, heavy or crowded type."
-    kinds: ["any"]
+    kinds: ["any", "table"]
     facts: ["text"]
     plotly: "Write titles in sentence case and keep font sizes modest."
     rules: ["all-caps-title"]
     covers: [7888, 7990, 7994]
+    mode: "mechanical"
   - id: lines
     page: 185
     line: 8068
@@ -538,6 +734,7 @@ questions:
     plotly: "Set line_width=1 to 2 for data and thinner, lighter reference lines."
     rules: []
     covers: [6799, 8068, 8082, 8106]
+    mode: "hybrid"
   - id: horizontal-shape
     page: 186
     line: 8090
@@ -546,10 +743,11 @@ questions:
     text: "Is the chart wider than tall, about half again as wide as tall when the data do not suggest another shape, and wider still for a wiggly curve?"
     look: "Width and height of the canvas and the number of panels."
     kinds: ["any"]
-    facts: ["canvas"]
+    facts: ["canvas", "banking"]
     plotly: "Set fig.update_layout(width=900, height=600) or a 3 to 2 container."
     rules: []
     covers: [2377, 7112, 8090, 8122, 8146, 8197, 8198]
+    mode: "hybrid"
   - id: judgment
     page: 191
     line: 8208
@@ -557,8 +755,9 @@ questions:
     principle: "Judgment"
     text: "Where the chart breaks one of these principles, does the exception show the data better?"
     look: "Each place where a question above was answered no on purpose."
-    kinds: ["any"]
+    kinds: ["any", "table"]
     facts: []
     plotly: "Keep the exception and say why in the text."
     rules: []
     covers: [4893, 8208]
+    mode: "judgment"

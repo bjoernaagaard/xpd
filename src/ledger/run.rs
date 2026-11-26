@@ -25,7 +25,7 @@ use serde::{Deserialize, Serialize};
 use crate::git;
 use crate::output::Format;
 
-use super::{Entry, Kind, Tree, at_commit, files, repository};
+use super::{AdapterPolicy, Kind, SurveyOutput, Tree, at_commit, files, repository};
 
 /// How many times a fix may fail its gate before the next stage is to drop it.
 const ATTEMPTS: usize = 2;
@@ -56,6 +56,9 @@ pub(crate) enum Action {
         /// How many timed runs each benchmark measurement takes.
         #[arg(long, default_value_t = 5)]
         bench_runs: usize,
+        /// A Python adapter file or shell command that emits rendered figure specs for runtime checks.
+        #[arg(long, value_name = "ADAPTER")]
+        adapter: Option<String>,
         /// Replace a run that is not finished.
         #[arg(long)]
         restart: bool,
@@ -131,6 +134,52 @@ pub(super) enum Goal {
     Faster,
     /// Must reduce both code lines and median `--bench` time.
     Both,
+    /// Must address cited review checklist questions and edit at least one owning figure file.
+    Design,
+}
+
+/// How a checklist question was settled in a plan.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub(super) enum Verdict {
+    Pass,
+    NotApplicable,
+    Exception,
+}
+
+/// A recorded settlement of one per-figure checklist item.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "verdict", rename_all = "kebab-case")]
+pub(super) enum AnswerRecord {
+    Fixed { fix: String, commit: String },
+    Pass { reason: String },
+    NotApplicable { reason: String },
+    Exception { reason: String },
+}
+
+/// One checklist verdict submitted in a plan.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub(super) struct Answered {
+    pub(super) item: String,
+    pub(super) verdict: Verdict,
+    pub(super) reason: String,
+}
+
+impl Answered {
+    pub(super) fn into_pair(self) -> (String, AnswerRecord) {
+        let record = match self.verdict {
+            Verdict::Pass => AnswerRecord::Pass {
+                reason: self.reason,
+            },
+            Verdict::NotApplicable => AnswerRecord::NotApplicable {
+                reason: self.reason,
+            },
+            Verdict::Exception => AnswerRecord::Exception {
+                reason: self.reason,
+            },
+        };
+        (self.item, record)
+    }
 }
 
 /// How a fix ended.
@@ -162,9 +211,12 @@ enum Outcome {
 struct Fix {
     id: String,
     title: String,
-    /// The ids of the findings that the fix is to remove. May be empty when `goal` is set.
+    /// The ids of the findings that the fix is to remove. May be empty when `goal` or `questions` is set.
     #[serde(default)]
     findings: Vec<String>,
+    /// The checklist item ids that the fix addresses.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    questions: Vec<String>,
     /// Measurable target for a judgment-based fix with no static finding id.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     goal: Option<Goal>,
@@ -194,6 +246,8 @@ struct Plan {
     fixes: Vec<Fix>,
     #[serde(default)]
     accepted: Vec<Accepted>,
+    #[serde(default)]
+    answered: Vec<Answered>,
 }
 
 /// What xpd records of a run.
@@ -209,6 +263,9 @@ struct Journal {
     /// Optional representative workload timed at start and at every gate.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     bench: Option<Bench>,
+    /// Optional runtime figure adapter recorded at start and run at every stage.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    adapter: Option<String>,
     /// How many findings the base had.
     was: usize,
     /// Total lines of code in `paths` at the start commit.
@@ -221,6 +278,9 @@ struct Journal {
     rounds: Vec<Vec<Fix>>,
     /// The findings that are right as they are, each id with its reason.
     accepted: BTreeMap<String, String>,
+    /// The per-figure checklist items settled by a kept fix or a plan verdict.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    answered: BTreeMap<String, AnswerRecord>,
     finished: bool,
 }
 
@@ -345,6 +405,9 @@ impl Journal {
                 bench.command, bench.baseline.median_ms, bench.current.median_ms, bench.runs
             );
         }
+        if let Some(adapter) = &self.adapter {
+            let _ = writeln!(text, "  adapter: {adapter}");
+        }
         for (round, fixes) in self.rounds.iter().enumerate() {
             let _ = writeln!(text, "  round {}", round + 1);
             for fix in fixes {
@@ -382,6 +445,9 @@ impl Journal {
             "  {} findings accepted with a reason",
             self.accepted.len()
         );
+        if !self.answered.is_empty() {
+            let _ = writeln!(text, "  {} checklist items answered", self.answered.len());
+        }
         let _ = writeln!(text, "Next: {}", self.next(command).text);
         text
     }
@@ -516,50 +582,102 @@ pub(super) struct Compared {
     pub(super) added: Vec<String>,
 }
 
-/// Whether a fix is kept. `before` and `after` hold the ids of the findings at the commit
-/// before the fix and after it, and `broken` the checks that passed at the start and fail now.
-pub(super) fn judge_fix(
-    findings: &[String],
-    goal: Option<Goal>,
-    before: &BTreeSet<String>,
-    after: &BTreeSet<String>,
-    broken: &[String],
-    lines: (usize, usize),
-    timing: Option<(Timing, Timing)>,
-) -> Result<Compared, String> {
-    if !broken.is_empty() {
+/// All measurements that [`judge_fix`] evaluates without touching files or commands.
+#[derive(Debug)]
+pub(super) struct GateEvidence<'a> {
+    pub(super) findings: &'a [String],
+    pub(super) questions: &'a [String],
+    pub(super) goal: Option<Goal>,
+    pub(super) before: &'a BTreeSet<String>,
+    pub(super) after: &'a BTreeSet<String>,
+    pub(super) broken: &'a [String],
+    pub(super) lines: (usize, usize),
+    pub(super) timing: Option<(Timing, Timing)>,
+    pub(super) changed_files: &'a BTreeSet<String>,
+    pub(super) checklist_before: &'a BTreeMap<String, String>,
+}
+
+/// Verifies that every cited checklist item existed before the fix and, for a design-only fix,
+/// that the commit modified at least one file owning a cited figure.
+fn check_design_questions(evidence: &GateEvidence<'_>) -> Result<(), String> {
+    let missing_questions: Vec<&str> = (evidence.questions.iter())
+        .filter(|item| !evidence.checklist_before.contains_key(*item))
+        .map(String::as_str)
+        .collect();
+    if !missing_questions.is_empty() {
         return Err(format!(
-            "These checks passed at the start and fail now: {}.",
-            broken.join("; ")
+            "The commit before the fix has no checklist item {}, so the gate cannot verify it. Drop the fix and plan it again.",
+            missing_questions.join(", ")
         ));
     }
-    if let Some(reason) = cited_missing(findings, before) {
+    if evidence.findings.is_empty()
+        && (!evidence.questions.is_empty() || evidence.goal == Some(Goal::Design))
+    {
+        if evidence.questions.is_empty() {
+            return Err("A design fix must name at least one checklist item.".to_owned());
+        }
+        let touches_figure = (evidence.questions.iter()).any(|item| {
+            evidence
+                .checklist_before
+                .get(item)
+                .is_some_and(|file| evidence.changed_files.contains(file))
+        });
+        if !touches_figure {
+            let owned: BTreeSet<&str> = (evidence.questions.iter())
+                .filter_map(|item| evidence.checklist_before.get(item).map(String::as_str))
+                .collect();
+            return Err(format!(
+                "The design fix did not change any file owning its checklist items ({}).",
+                owned.into_iter().collect::<Vec<_>>().join(", ")
+            ));
+        }
+    }
+    Ok(())
+}
+
+/// Whether a fix is kept. `before` and `after` hold the ids of the findings at the commit
+/// before the fix and after it, and `broken` the checks that passed at the start and fail now.
+pub(super) fn judge_fix(evidence: &GateEvidence<'_>) -> Result<Compared, String> {
+    if !evidence.broken.is_empty() {
+        return Err(format!(
+            "These checks passed at the start and fail now: {}.",
+            evidence.broken.join("; ")
+        ));
+    }
+    if let Some(reason) = cited_missing(evidence.findings, evidence.before) {
         return Err(reason);
     }
-    if !findings.is_empty() && !findings.iter().any(|id| !after.contains(id)) {
+    if !evidence.findings.is_empty()
+        && !evidence
+            .findings
+            .iter()
+            .any(|id| !evidence.after.contains(id))
+    {
         return Err("None of the findings the fix was to remove is gone.".to_owned());
     }
-    if after.len() > before.len() {
+    if evidence.after.len() > evidence.before.len() {
         return Err(format!(
             "The count of findings rose from {} to {}. The new ones: {}.",
-            before.len(),
-            after.len(),
-            after
-                .difference(before)
+            evidence.before.len(),
+            evidence.after.len(),
+            evidence
+                .after
+                .difference(evidence.before)
                 .cloned()
                 .collect::<Vec<_>>()
                 .join(", ")
         ));
     }
-    if let Some(goal) = goal {
-        let (lines_before, lines_after) = lines;
+    check_design_questions(evidence)?;
+    if let Some(goal) = evidence.goal {
+        let (lines_before, lines_after) = evidence.lines;
         if matches!(goal, Goal::Shorter | Goal::Both) && lines_after >= lines_before {
             return Err(format!(
                 "The goal is shorter code, but lines went from {lines_before} to {lines_after}."
             ));
         }
         if matches!(goal, Goal::Faster | Goal::Both) {
-            let Some((tb, ta)) = timing else {
+            let Some((tb, ta)) = evidence.timing else {
                 return Err("The goal is faster code, which needs `--bench` on `start`.".to_owned());
             };
             if tb.median_ms > 0.0 && ta.median_ms > tb.median_ms * MIN_SPEEDUP {
@@ -570,7 +688,7 @@ pub(super) fn judge_fix(
             }
         }
     }
-    if let Some((tb, ta)) = timing
+    if let Some((tb, ta)) = evidence.timing
         && tb.median_ms > 0.0
         && ta.median_ms > tb.median_ms * MAX_SLOWDOWN
         && ta.median_ms - tb.median_ms > 5.0
@@ -584,9 +702,28 @@ pub(super) fn judge_fix(
         ));
     }
     Ok(Compared {
-        fixed: before.difference(after).cloned().collect(),
-        added: after.difference(before).cloned().collect(),
+        fixed: evidence
+            .before
+            .difference(evidence.after)
+            .cloned()
+            .collect(),
+        added: evidence
+            .after
+            .difference(evidence.before)
+            .cloned()
+            .collect(),
     })
+}
+
+/// Tracked files changed between `current` and `head` in `top`.
+pub(super) fn changed_files(top: &Path, current: &str, head: &str) -> Result<BTreeSet<String>> {
+    let diff = git::output(top, &["diff", "--name-only", current, head])?;
+    Ok(diff
+        .lines()
+        .map(str::trim)
+        .filter(|line| !line.is_empty())
+        .map(|line| line.replace('\\', "/"))
+        .collect())
 }
 
 /// Runs each check that passed at the start and returns the ones that fail now.
@@ -698,13 +835,36 @@ pub(super) fn passes(command: &str) -> (bool, String) {
     }
 }
 
-/// The ids of the findings of a run at a commit, or of the files of today for `None`.
-type Found<'f> = &'f dyn Fn(&Journal, Option<&str>) -> Result<BTreeSet<String>>;
+/// The findings and per-figure checklist items (`id -> tracked file`) of a run at a commit,
+/// or of the files of today for `None`.
+type Found<'f> =
+    &'f dyn Fn(&Journal, Option<&str>) -> Result<(BTreeSet<String>, BTreeMap<String, String>)>;
 
 /// The findings at a commit, or in the working tree for `None`, as a map from the id that
 /// xpd 0.55.0 gave each one to its id of today.
 #[cfg(feature = "ledger-durable")]
 type Renamed<'r> = &'r dyn Fn(&Journal, Option<&str>) -> Result<BTreeMap<String, String>>;
+
+/// Normalizes an adapter argument: when it names an existing file under `here`, stores its
+/// repository-relative path so checkouts and worktrees find the same file.
+fn normalize_adapter(
+    place: &Place,
+    here: &Path,
+    adapter: Option<String>,
+) -> Result<Option<String>> {
+    let Some(adapter) = adapter else {
+        return Ok(None);
+    };
+    let candidate = here.join(&adapter);
+    if candidate.is_file() {
+        let absolute = fs::canonicalize(&candidate)
+            .with_context(|| format!("cannot read adapter {adapter}"))?;
+        if let Ok(below) = absolute.strip_prefix(&place.top) {
+            return Ok(Some(below.to_string_lossy().replace('\\', "/")));
+        }
+    }
+    Ok(Some(adapter))
+}
 
 /// A new journal for the paths, which are given from the folder `here`.
 fn start(
@@ -713,6 +873,7 @@ fn start(
     paths: &[PathBuf],
     checks: Vec<String>,
     bench: Option<(String, usize)>,
+    adapter: Option<String>,
     found: Found<'_>,
 ) -> Result<Journal> {
     place.clean()?;
@@ -730,6 +891,7 @@ fn start(
             })
         })
         .collect::<Result<Vec<_>>>()?;
+    let adapter = normalize_adapter(place, here, adapter)?;
     let base = place.head()?;
     let lines = count_lines(&paths);
     let bench = bench
@@ -755,14 +917,16 @@ fn start(
             })
             .collect(),
         bench,
+        adapter,
         was: 0,
         was_lines: lines,
         current_lines: lines,
         rounds: Vec::new(),
         accepted: BTreeMap::new(),
+        answered: BTreeMap::new(),
         finished: false,
     };
-    journal.was = found(&journal, None)?.len();
+    journal.was = found(&journal, None)?.0.len();
     Ok(journal)
 }
 
@@ -791,17 +955,29 @@ fn read_plan(journal: &Journal, text: &str, command: &str) -> Result<Plan> {
         .with_context(|| format!("the plan is not the JSON that `xpd {command} plan --help` shows"))
 }
 
-/// Adds `plan` to the journal, after checking it against `known`, the ids of the ledger of today.
+/// Adds `plan` to the journal, after checking it against `known` and `checklist` of today.
 #[cfg(not(feature = "ledger-durable"))]
-fn plan(journal: &mut Journal, plan: Plan, known: &BTreeSet<String>) -> Result<()> {
+fn plan(
+    journal: &mut Journal,
+    plan: Plan,
+    known: &BTreeSet<String>,
+    checklist: &BTreeMap<String, String>,
+) -> Result<()> {
     let mut named: BTreeSet<&str> = journal.fixes().map(|fix| fix.id.as_str()).collect();
     for fix in &plan.fixes {
         ensure!(named.insert(&fix.id), "two fixes are named {}", fix.id);
         ensure!(
-            !fix.findings.is_empty() || fix.goal.is_some(),
-            "the fix {} names no finding and sets no goal",
+            !fix.findings.is_empty() || !fix.questions.is_empty() || fix.goal.is_some(),
+            "the fix {} names no finding, names no checklist question and sets no goal",
             fix.id
         );
+        if fix.goal == Some(Goal::Design) {
+            ensure!(
+                !fix.questions.is_empty(),
+                "the fix {} has a design goal, which must name at least one checklist question",
+                fix.id
+            );
+        }
         if matches!(fix.goal, Some(Goal::Faster | Goal::Both)) {
             ensure!(
                 journal.bench.is_some(),
@@ -823,6 +999,14 @@ fn plan(journal: &mut Journal, plan: Plan, known: &BTreeSet<String>) -> Result<(
             "the ledger of today has no finding {id}"
         );
     }
+    let cited_questions = (plan.fixes.iter().flat_map(|fix| &fix.questions))
+        .chain(plan.answered.iter().map(|answered| &answered.item));
+    for item in cited_questions {
+        ensure!(
+            checklist.contains_key(item),
+            "the checklist of today has no item {item}"
+        );
+    }
     for accepted in plan.accepted {
         ensure!(
             !accepted.reason.trim().is_empty(),
@@ -830,6 +1014,15 @@ fn plan(journal: &mut Journal, plan: Plan, known: &BTreeSet<String>) -> Result<(
             accepted.finding
         );
         journal.accepted.insert(accepted.finding, accepted.reason);
+    }
+    for answered in plan.answered {
+        ensure!(
+            !answered.reason.trim().is_empty(),
+            "the answered item {} has no reason",
+            answered.item
+        );
+        let (item, record) = answered.into_pair();
+        journal.answered.insert(item, record);
     }
     if !plan.fixes.is_empty() {
         journal.rounds.push(plan.fixes);
@@ -869,6 +1062,8 @@ struct Measured {
     lines_before: usize,
     lines_after: usize,
     timing: Option<(Timing, Timing)>,
+    changed_files: BTreeSet<String>,
+    checklist_before: BTreeMap<String, String>,
 }
 
 /// Measures the commit that is checked out against the commit the run stands at.
@@ -886,8 +1081,9 @@ fn measure_gate(journal: &Journal, place: &Place, found: Found<'_>) -> Result<Me
             .iter()
             .map(|check| (check.command.as_str(), check.passed)),
     );
-    let before = found(journal, Some(&journal.current))?;
-    let after = found(journal, None)?;
+    let (before, checklist_before) = found(journal, Some(&journal.current))?;
+    let (after, _) = found(journal, None)?;
+    let changed = changed_files(&place.top, &journal.current, &commit)?;
     let lines_before = journal.current_lines;
     let lines_after = count_lines(&journal.paths);
     let timing = if broken.is_empty()
@@ -906,6 +1102,8 @@ fn measure_gate(journal: &Journal, place: &Place, found: Found<'_>) -> Result<Me
         lines_before,
         lines_after,
         timing,
+        changed_files: changed,
+        checklist_before,
     })
 }
 
@@ -914,16 +1112,24 @@ fn measure_gate(journal: &Journal, place: &Place, found: Found<'_>) -> Result<Me
 fn gate(journal: &mut Journal, place: &Place, id: &str, found: Found<'_>) -> Result<bool> {
     check_gate(journal, id)?;
     let measured = measure_gate(journal, place, found)?;
+    let (judged, questions) = {
+        let fix = journal.fix_mut(id)?;
+        let judged = judge_fix(&GateEvidence {
+            findings: &fix.findings,
+            questions: &fix.questions,
+            goal: fix.goal,
+            before: &measured.before,
+            after: &measured.after,
+            broken: &measured.broken,
+            lines: (measured.lines_before, measured.lines_after),
+            timing: measured.timing,
+            changed_files: &measured.changed_files,
+            checklist_before: &measured.checklist_before,
+        });
+        (judged, fix.questions.clone())
+    };
     let fix = journal.fix_mut(id)?;
-    match judge_fix(
-        &fix.findings,
-        fix.goal,
-        &measured.before,
-        &measured.after,
-        &measured.broken,
-        (measured.lines_before, measured.lines_after),
-        measured.timing,
-    ) {
+    match judged {
         Ok(Compared { fixed, added }) => {
             fix.outcome = Some(Outcome::Kept {
                 commit: measured.commit.clone(),
@@ -934,8 +1140,18 @@ fn gate(journal: &mut Journal, place: &Place, id: &str, found: Found<'_>) -> Res
                 timing_before: measured.timing.map(|(before, _)| before),
                 timing_after: measured.timing.map(|(_, after)| after),
             });
-            journal.current = measured.commit;
+            let commit = measured.commit;
+            journal.current.clone_from(&commit);
             journal.current_lines = measured.lines_after;
+            for item in questions {
+                journal.answered.insert(
+                    item,
+                    AnswerRecord::Fixed {
+                        fix: id.to_owned(),
+                        commit: commit.clone(),
+                    },
+                );
+            }
             if let (Some(bench), Some((_, after_timing))) = (&mut journal.bench, measured.timing) {
                 bench.current = after_timing;
             }
@@ -959,6 +1175,8 @@ struct Surveyed {
     after: BTreeSet<String>,
     /// The lines of code of today in the paths of the run.
     current_lines: usize,
+    /// The checklist item ids of today.
+    checklist_after: BTreeSet<String>,
 }
 
 /// Measures the files of today against the commit the run started from.
@@ -967,10 +1185,13 @@ fn measure_finish(journal: &Journal, place: &Place, found: Found<'_>) -> Result<
         bail!("the fix {} is still open", open.id);
     }
     place.clean()?;
+    let (before, _) = found(journal, Some(&journal.base))?;
+    let (after, checklist) = found(journal, None)?;
     Ok(Surveyed {
-        before: found(journal, Some(&journal.base))?,
-        after: found(journal, None)?,
+        before,
+        after,
         current_lines: count_lines(&journal.paths),
+        checklist_after: checklist.into_keys().collect(),
     })
 }
 
@@ -982,10 +1203,25 @@ fn unexplained<'s>(journal: &Journal, surveyed: &'s Surveyed) -> Vec<&'s str> {
         .collect()
 }
 
+/// The checklist items of today that have no recorded fix or verdict.
+fn unanswered<'s>(journal: &Journal, surveyed: &'s Surveyed) -> Vec<&'s str> {
+    (surveyed.checklist_after.iter())
+        .filter(|item| !journal.answered.contains_key(*item))
+        .map(String::as_str)
+        .collect()
+}
+
 fn report_unexplained(unexplained: &[&str]) {
     eprintln!(
         "xpd: these findings are new since the start and have no reason: {}. Remove them, or accept them in a plan",
         unexplained.join(", ")
+    );
+}
+
+fn report_unanswered(unanswered: &[&str]) {
+    eprintln!(
+        "xpd: these checklist items are unanswered: {}. Address them in a fix, or answer them in a plan",
+        unanswered.join(", ")
     );
 }
 
@@ -995,6 +1231,7 @@ fn report_finish(journal: &Journal, surveyed: &Surveyed) {
         before,
         after,
         current_lines,
+        ..
     } = surveyed;
     let bench_summary = journal.bench.as_ref().map_or_else(String::new, |bench| {
         format!(", bench {}", format_speedup(bench.baseline, bench.current))
@@ -1023,6 +1260,11 @@ fn finish(journal: &mut Journal, place: &Place, found: Found<'_>) -> Result<bool
         report_unexplained(&unexplained);
         return Ok(false);
     }
+    let unanswered = unanswered(journal, &surveyed);
+    if !unanswered.is_empty() {
+        report_unanswered(&unanswered);
+        return Ok(false);
+    }
     journal.current_lines = surveyed.current_lines;
     report_finish(journal, &surveyed);
     journal.finished = true;
@@ -1046,6 +1288,7 @@ fn act_journal(
             checks,
             bench,
             bench_runs,
+            adapter,
             restart,
         } => {
             if let Ok(old) = place.read(command) {
@@ -1060,6 +1303,7 @@ fn act_journal(
                 &paths,
                 checks,
                 bench.map(|cmd| (cmd, bench_runs)),
+                adapter,
                 found,
             )?
         }
@@ -1067,8 +1311,8 @@ fn act_journal(
             let mut journal = place.read(command)?;
             let text = plan_text(here, &file)?;
             let read = read_plan(&journal, &text, command)?;
-            let known = found(&journal, None)?;
-            plan(&mut journal, read, &known)?;
+            let (known, checklist) = found(&journal, None)?;
+            plan(&mut journal, read, &known, &checklist)?;
             journal
         }
         Action::Approve { fix } => {
@@ -1136,7 +1380,8 @@ mod durable_run {
     };
     use super::{
         Action, Found, Journal, Outcome, Place, Renamed, check_gate, measure_finish, measure_gate,
-        plan_text, read_plan, report_finish, report_unexplained, start, unexplained,
+        plan_text, read_plan, report_finish, report_unanswered, report_unexplained, start,
+        unanswered, unexplained,
     };
 
     /// How long a command waits for the receipt of the run. Every measurement is taken before
@@ -1588,6 +1833,7 @@ mod durable_run {
                 .map(|check| check.command.clone())
                 .collect(),
             bench: (state.bench.as_ref()).map(|bench| (bench.command.clone(), bench.runs)),
+            adapter: state.adapter.clone(),
             initial_state: Some(state.clone()),
         };
         let (snapshot, receipt) = start_command(
@@ -1636,6 +1882,7 @@ mod durable_run {
             checks,
             bench,
             bench_runs,
+            adapter,
             restart,
         } = action
         {
@@ -1644,6 +1891,7 @@ mod durable_run {
                 paths: &paths,
                 checks,
                 bench,
+                adapter,
                 restart,
             };
             return start_run(&store, place, here, latest.as_ref(), started, found);
@@ -1685,6 +1933,7 @@ mod durable_run {
         paths: &'a [PathBuf],
         checks: Vec<String>,
         bench: Option<(String, usize)>,
+        adapter: Option<String>,
         restart: bool,
     }
 
@@ -1737,8 +1986,19 @@ mod durable_run {
             started.paths,
             started.checks,
             started.bench,
+            started.adapter,
             found,
         )?;
+        #[cfg(feature = "ledger-distributed")]
+        if matches!(store.config, ProviderConfig::Postgres { .. })
+            && let Some(adapter) = &journal.adapter
+            && place.top.join(adapter).is_file()
+            && crate::git::output(&place.top, &["ls-files", "--error-unmatch", adapter]).is_err()
+        {
+            bail!(
+                "adapter {adapter} is untracked in git; commit it before starting a distributed run"
+            );
+        }
         if let Some(open) = open {
             store.cancel(open)?;
         }
@@ -1752,6 +2012,7 @@ mod durable_run {
                 .map(|check| check.command.clone())
                 .collect(),
             bench: (journal.bench.as_ref()).map(|bench| (bench.command.clone(), bench.runs)),
+            adapter: journal.adapter.clone(),
             initial_state: None,
         };
         let measurements = Measurements {
@@ -1775,14 +2036,15 @@ mod durable_run {
 
     fn plan_run(at: &At<'_>, text: &str, found: Found<'_>) -> Result<(Journal, bool)> {
         let plan = read_plan(&at.journal, text, at.store.command)?;
-        let known = found(&at.journal, None)?;
+        let (known, checklist) = found(&at.journal, None)?;
         let measurements = Measurements {
-            known: Some(ValidatePlanOutput { known }),
+            known: Some(ValidatePlanOutput { known, checklist }),
             ..at.measurements()
         };
         let planned = RunCommand::Plan {
             fixes: convert(&plan.fixes)?,
             accepted: convert(&plan.accepted)?,
+            answered: plan.answered,
         };
         let (journal, receipt) = at.send(measurements, "plan", planned)?;
         applied(&receipt)?;
@@ -1854,12 +2116,17 @@ mod durable_run {
             return Ok((journal, true));
         }
         let unexplained = unexplained(&journal, &surveyed);
+        if !unexplained.is_empty() {
+            report_unexplained(&unexplained);
+            return Ok((journal, false));
+        }
+        let unanswered = unanswered(&journal, &surveyed);
         ensure!(
-            !unexplained.is_empty(),
+            !unanswered.is_empty(),
             "{}",
             receipt.detail.unwrap_or_default()
         );
-        report_unexplained(&unexplained);
+        report_unanswered(&unanswered);
         Ok((journal, false))
     }
 
@@ -1872,42 +2139,66 @@ mod durable_run {
 }
 
 /// Runs one stage of a run of `K`'s command, and prints the run with the stage that comes
-/// next. `survey` is the survey of that command, as [`super::Select::print`] takes it.
+/// next. `survey` is the survey of that command, as [`super::Select::print_with`] takes it.
 pub(super) fn act<K: Kind, R>(
     action: Action,
     format: Format,
-    survey: impl Fn(&[PathBuf], Tree<'_>, Option<&Path>, &str) -> Result<(R, Vec<Entry<K>>)>,
+    survey: impl Fn(
+        &[PathBuf],
+        Tree<'_>,
+        Option<&Path>,
+        &str,
+        Option<&str>,
+        AdapterPolicy,
+    ) -> Result<SurveyOutput<K, R>>,
 ) -> Result<ExitCode> {
     let command = K::COMMAND;
     let here = std::env::current_dir()?;
     let place = Place::find(command)?;
-    let surveyed = |journal: &Journal, commit: Option<&str>| -> Result<Vec<Entry<K>>> {
+    let surveyed = |journal: &Journal, commit: Option<&str>| -> Result<SurveyOutput<K, R>> {
         let top = Some(place.top.as_path());
-        let entries = match commit {
+        let adapter = journal.adapter.as_deref();
+        match commit {
             None => {
                 let files = Tree {
                     top,
                     shown_from: None,
                 };
-                survey(&journal.paths, files, top, "HEAD")?.1
+                survey(
+                    &journal.paths,
+                    files,
+                    top,
+                    "HEAD",
+                    adapter,
+                    AdapterPolicy::Required,
+                )
             }
             Some(commit) => at_commit(&journal.paths, &place.top, commit, |then, files, at| {
-                Ok(survey(then, files, top, at)?.1)
+                survey(then, files, top, at, adapter, AdapterPolicy::Required)
             })?
-            .unwrap_or_default(),
-        };
-        Ok(entries)
+            .map_or_else(
+                || {
+                    anyhow::bail!(
+                        "commit {commit} holds none of the paths recorded for this {command} run"
+                    )
+                },
+                Ok,
+            ),
+        }
     };
-    let found = |journal: &Journal, commit: Option<&str>| -> Result<BTreeSet<String>> {
-        Ok((surveyed(journal, commit)?.into_iter())
-            .map(|entry| entry.id)
-            .collect())
+    let found = |journal: &Journal,
+                 commit: Option<&str>|
+     -> Result<(BTreeSet<String>, BTreeMap<String, String>)> {
+        let output = surveyed(journal, commit)?;
+        let checklist = output.checklist_files();
+        let ids = output.findings.into_iter().map(|entry| entry.id).collect();
+        Ok((ids, checklist))
     };
     #[cfg(not(feature = "ledger-durable"))]
     let (journal, kept) = act_journal(action, &place, &here, command, &found)?;
     #[cfg(feature = "ledger-durable")]
     let renamed = |journal: &Journal, commit: Option<&str>| -> Result<BTreeMap<String, String>> {
-        Ok((surveyed(journal, commit)?.into_iter())
+        Ok((surveyed(journal, commit)?.findings.into_iter())
             .map(|entry| (entry.legacy_id, entry.id))
             .collect())
     };

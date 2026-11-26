@@ -25,17 +25,18 @@ Use `xpd` whenever you write or change Python code.
   instead of writing `frame["x"] = ...`, and follow the plotly pack in a chart.
   The hook also prints a brief of the project when a session starts, and the playbook that
   answers a prompt. Read that playbook with `xpd api` before you write the code.
-- `xpd chart-review <file> --format json`: run it whenever you make,
-  change or review a chart, in plotly, Dash, matplotlib, seaborn, pandas or any other library,
-  also when the chart is one part of a larger task. It lists each chart with its kind and the
-  plotly call that draws it, the plotly rules that fire, and the questions of Tufte's book that
-  apply, each with its page, what to look at and the plotly code to write. Answer each question
-  from the chart and its data. Redraw a chart of another library in plotly with its route, unless
-  the user asks to keep the library. To measure the drawn figure, write an adapter whose
-  `figures()` returns a dict of name to figure, such as a Dash callback called with the inputs
-  of the state to review, and add `--run <adapter.py>`. It runs project code, so run it when the
-  app can run. A failed run keeps the questions. For a chart drawn without Python, answer the
-  questions of `xpd chart-review --questions` from the rendered chart.
+- `xpd chart-review <paths…> --format json`: run it whenever you make,
+  change or review a chart or presentation table, in Plotly, Dash, Dash AG Grid, Matplotlib,
+  Seaborn, pandas, `react-plotly.js`, `plotly.js`, `ag-grid-react`, or `ag-grid-community`,
+  also when the figure is one part of a larger task. It produces a finding ledger across five
+  groups from Edward Tufte's "The Visual Display of Quantitative Information" (second edition)
+  plus a per-figure checklist of the 57 Tufte principles. Add `--adapter <adapter.py>` (whose
+  `figures()` returns a dict of name to figure) or `--adapter "<command>"` (printing normalized
+  figure JSON) to measure rendered figures across 10 runtime facts. `xpd chart-review start
+  <paths> --check "<tests>" [--adapter "<adapter>"]` begins a recorded run with `plan`, `gate`,
+  `status`, and `finish` until every defect and checklist item is resolved. Run
+  `xpd chart-review --questions --format json` to inspect the full 57-question catalog. The
+  `xpd-chart-review` skill holds the steps.
 - `xpd find "<task>"`: discover separately ranked symbols, rules and recipes before choosing a library.
   Defaults are five symbols, three rules and three recipes. `--limit` sets the maximum per
   kind and `--kind` selects one. JSON has `symbols`, `rules` and `recipes` lists.

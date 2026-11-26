@@ -2,7 +2,7 @@
 //! and kind, each with an id that it keeps at another commit, and the count of each kind, which
 //! measures a round of work.
 
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::ffi::OsStr;
 use std::fmt::Write as _;
 use std::fs;
@@ -203,7 +203,7 @@ const ID_KEY: [u8; 16] = *b"xpd ledger id v1";
 /// The id of the `nth` finding of `kind` with `key`: SipHash-1-3 under `ID_KEY`, cut to 32 bits.
 /// Each part goes in as its length and its bytes, in little-endian order, so that the id is the
 /// same on every target and does not depend on how `Hash` writes a value.
-fn id(kind: &str, key: &str, nth: usize) -> String {
+pub(crate) fn id(kind: &str, key: &str, nth: usize) -> String {
     let mut hasher = SipHasher13::new_with_key(&ID_KEY);
     for part in [kind.as_bytes(), key.as_bytes()] {
         hasher.write(&u64::try_from(part.len()).unwrap_or(u64::MAX).to_le_bytes());
@@ -211,6 +211,37 @@ fn id(kind: &str, key: &str, nth: usize) -> String {
     }
     hasher.write(&u64::try_from(nth).unwrap_or(u64::MAX).to_le_bytes());
     format!("{:08x}", hasher.finish() & 0xffff_ffff)
+}
+
+/// One per-figure judgment question tracked alongside mechanical findings in a ledger run.
+#[derive(Debug, Clone, Serialize)]
+pub(crate) struct ChecklistEntry {
+    pub(crate) id: String,
+    pub(crate) file: String,
+    pub(crate) figure: String,
+    pub(crate) kind: String,
+    pub(crate) question: String,
+    pub(crate) page: u32,
+    pub(crate) principle: String,
+    pub(crate) text: String,
+    pub(crate) look: String,
+}
+
+/// What a ledger survey returns: what it read, its mechanical findings, and any checklist items.
+#[derive(Debug)]
+pub(crate) struct SurveyOutput<K, R> {
+    pub(crate) read: R,
+    pub(crate) findings: Vec<Entry<K>>,
+    pub(crate) checklist: Vec<ChecklistEntry>,
+}
+
+impl<K, R> SurveyOutput<K, R> {
+    pub(crate) fn checklist_files(&self) -> BTreeMap<String, String> {
+        self.checklist
+            .iter()
+            .map(|entry| (entry.id.clone(), entry.file.clone()))
+            .collect()
+    }
 }
 
 /// The id that xpd 0.55.0 and older gave the `nth` finding of `kind` with `key`: the standard
@@ -370,7 +401,20 @@ pub(crate) struct Select<K: Kind> {
     format: Option<Format>,
 }
 
+/// How a survey handles a runtime adapter failure: ad-hoc scans keep static findings while
+/// recorded runs fail so a broken adapter cannot forge a clean gate.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum AdapterPolicy {
+    BestEffort,
+    Required,
+}
+
 impl<K: Kind> Select<K> {
+    /// Output format flag passed on the command line, if any.
+    pub(crate) fn format_override(&self) -> Option<Format> {
+        self.format
+    }
+
     /// Prints the ledger of the paths, or runs a stage of a refactor run. `survey` reads the files under the paths it gets, which
     /// are in the folders of the tree, and returns what it read and the findings. It also gets
     /// the top of the repository and the commit that the files are from, which is `HEAD` for
@@ -381,6 +425,37 @@ impl<K: Kind> Select<K> {
         survey: impl Fn(&[PathBuf], Tree<'_>, Option<&Path>, &str) -> Result<(R, Vec<Entry<K>>)>,
         header: impl FnOnce(&Ledger<K, R>) -> String,
     ) -> Result<ExitCode> {
+        self.print_with(
+            default,
+            None,
+            |paths, files, top, commit, _, _| {
+                let (read, findings) = survey(paths, files, top, commit)?;
+                Ok(SurveyOutput {
+                    read,
+                    findings,
+                    checklist: Vec::new(),
+                })
+            },
+            header,
+        )
+    }
+
+    /// Prints the ledger of the paths, or runs a stage of a ledger run, forwarding an optional
+    /// runtime `adapter` and any per-figure checklist items returned by `survey`.
+    pub(crate) fn print_with<R: Serialize>(
+        self,
+        default: Format,
+        adapter: Option<&str>,
+        survey: impl Fn(
+            &[PathBuf],
+            Tree<'_>,
+            Option<&Path>,
+            &str,
+            Option<&str>,
+            AdapterPolicy,
+        ) -> Result<SurveyOutput<K, R>>,
+        header: impl FnOnce(&Ledger<K, R>) -> String,
+    ) -> Result<ExitCode> {
         if let Some(action) = self.action {
             return run::act(action, self.format.unwrap_or(default), survey);
         }
@@ -389,7 +464,14 @@ impl<K: Kind> Select<K> {
             top: top.as_deref(),
             shown_from: None,
         };
-        let (read, findings) = survey(&self.paths, files, top.as_deref(), "HEAD")?;
+        let output = survey(
+            &self.paths,
+            files,
+            top.as_deref(),
+            "HEAD",
+            adapter,
+            AdapterPolicy::BestEffort,
+        )?;
         let before = match &self.since {
             Some(commit) => {
                 let top = top.as_deref().with_context(|| {
@@ -399,7 +481,15 @@ impl<K: Kind> Select<K> {
                     )
                 })?;
                 let then = at_commit(&self.paths, top, commit, |then, files, resolved| {
-                    Ok(survey(then, files, Some(top), resolved)?.1)
+                    Ok(survey(
+                        then,
+                        files,
+                        Some(top),
+                        resolved,
+                        adapter,
+                        AdapterPolicy::BestEffort,
+                    )?
+                    .findings)
                 })?;
                 Some((commit.clone(), then.unwrap_or_default()))
             }
@@ -409,7 +499,13 @@ impl<K: Kind> Select<K> {
             kinds: &self.kind,
             limit: self.limit,
         };
-        let ledger = Ledger::new(read, findings, before, listed);
+        let ledger = Ledger::new(
+            output.read,
+            output.findings,
+            output.checklist,
+            before,
+            listed,
+        );
         match self.format.unwrap_or(default) {
             Format::Json => println!("{}", serde_json::to_string(&ledger)?),
             Format::Text => print!("{}", ledger.text(&header(&ledger), listed)),
@@ -432,6 +528,9 @@ pub(crate) struct Ledger<K: Kind, R> {
     /// With `--since`: the findings of the commit that are gone today, up to the limit.
     #[serde(skip_serializing_if = "Option::is_none")]
     fixed: Option<Vec<Entry<K>>>,
+    /// Remaining judgment questions scoped per figure, omitted for commands without a checklist.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub(crate) checklist: Vec<ChecklistEntry>,
 }
 
 impl<K: Kind, R> Ledger<K, R> {
@@ -440,6 +539,7 @@ impl<K: Kind, R> Ledger<K, R> {
     fn new(
         read: R,
         mut findings: Vec<Entry<K>>,
+        checklist: Vec<ChecklistEntry>,
         since: Option<(String, Vec<Entry<K>>)>,
         listed: Listed<'_, K>,
     ) -> Self {
@@ -472,6 +572,7 @@ impl<K: Kind, R> Ledger<K, R> {
             summary,
             findings: listed.of(findings),
             fixed: fixed.map(|fixed| listed.of(fixed)),
+            checklist,
         }
     }
 
@@ -537,6 +638,16 @@ impl<K: Kind, R> Ledger<K, R> {
             );
             for entry in fixed {
                 let _ = writeln!(text, "  {}  {}", entry.finding.kind.name(), entry.text());
+            }
+        }
+        if !self.checklist.is_empty() {
+            let _ = writeln!(text, "\nChecklist: {} items", self.checklist.len());
+            for item in &self.checklist {
+                let _ = writeln!(
+                    text,
+                    "  {}  {} ({}, page {})  {}",
+                    item.id, item.figure, item.principle, item.page, item.text
+                );
             }
         }
         text

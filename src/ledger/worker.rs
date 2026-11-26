@@ -18,7 +18,7 @@
 //! it runs on another class of machine than the one that timed the run's benchmark, it times
 //! the commit the run stands at and the fix back to back, and the run keeps its own timings.
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 use std::fs::{self, File};
 use std::path::{Path, PathBuf};
 use std::process::{Command, ExitCode, Stdio};
@@ -44,7 +44,9 @@ use super::orchestration::{
     ACT_FINISH_RUN, ACT_GATE_FIX, ACT_INIT_BASELINE, ACT_VALIDATE_PLAN, BaselineOutput, BenchState,
     CheckState, FinishOutput, GateOutput, RunStartInput, Snapshot, Timing, ValidatePlanOutput,
 };
-use super::run::{broken_checks, count_lines, host_fingerprint, measure_bench, passes};
+use super::run::{
+    broken_checks, changed_files, count_lines, host_fingerprint, measure_bench, passes,
+};
 
 /// Serve the ledger runs of a PostgreSQL store: take their orchestration turns, and gate
 /// their fixes in detached worktrees of a clone of the repository.
@@ -473,11 +475,12 @@ impl Worker {
             (ACT_INIT_BASELINE, _) => {
                 encode(&self.baseline(instance, &branch, &decode(input)?, &head)?)
             }
-            (ACT_VALIDATE_PLAN, _) => {
+            (ACT_VALIDATE_PLAN, Some(snapshot)) => {
                 let paths: Vec<String> = decode(input)?;
                 let worktree = self.worktree(&head)?;
-                let known = self.findings(&worktree, command, &paths)?;
-                encode(&ValidatePlanOutput { known })
+                let (known, checklist) =
+                    self.findings(&worktree, command, &paths, snapshot.run.adapter.as_deref())?;
+                encode(&ValidatePlanOutput { known, checklist })
             }
             (ACT_GATE_FIX, Some(snapshot)) => {
                 encode(&self.gate(instance, &branch, command, &decode(input)?, snapshot)?)
@@ -532,16 +535,22 @@ impl Worker {
         Ok(resolved.trim().to_owned())
     }
 
-    /// The ids of the findings of `command` under `paths` in a worktree. The survey is xpd
-    /// itself, run in the worktree, so its ids are the ids the CLI prints.
+    /// The finding ids and checklist map (`id -> tracked file`) of `command` under `paths` in
+    /// a worktree. The survey is xpd itself, run in the worktree, so its ids match the CLI.
     fn findings(
         &self,
         worktree: &Worktree<'_>,
         command: &str,
         paths: &[String],
-    ) -> Result<BTreeSet<String>> {
-        let output = Command::new(&self.xpd)
-            .args([command, "--format", "json", "--limit", "0", "--"])
+        adapter: Option<&str>,
+    ) -> Result<(BTreeSet<String>, BTreeMap<String, String>)> {
+        let mut cmd = Command::new(&self.xpd);
+        cmd.args([command, "--format", "json", "--limit", "0"]);
+        if let Some(adapter) = adapter {
+            cmd.args(["--adapter", adapter]);
+        }
+        let output = cmd
+            .arg("--")
             .args(paths)
             .current_dir(&worktree.path)
             .stdin(Stdio::null())
@@ -555,7 +564,7 @@ impl Worker {
         }
         let ledger: serde_json::Value =
             serde_json::from_slice(&output.stdout).context("the survey printed no JSON")?;
-        (ledger["findings"].as_array())
+        let ids: BTreeSet<String> = (ledger["findings"].as_array())
             .context("the survey printed no findings")?
             .iter()
             .map(|finding| {
@@ -563,7 +572,16 @@ impl Worker {
                     .map(str::to_owned)
                     .context("a finding of the survey has no id")
             })
-            .collect()
+            .collect::<Result<_>>()?;
+        let mut checklist = BTreeMap::new();
+        if let Some(items) = ledger["checklist"].as_array() {
+            for item in items {
+                if let (Some(id), Some(file)) = (item["id"].as_str(), item["file"].as_str()) {
+                    checklist.insert(id.to_owned(), file.to_owned());
+                }
+            }
+        }
+        Ok((ids, checklist))
     }
 
     /// The checks, benchmark, findings and lines of the commit a run starts from.
@@ -585,7 +603,13 @@ impl Worker {
                 })
                 .collect();
             let was = self
-                .findings(&worktree, &start.command, &start.paths)?
+                .findings(
+                    &worktree,
+                    &start.command,
+                    &start.paths,
+                    start.adapter.as_deref(),
+                )?
+                .0
                 .len();
             let paths: Vec<PathBuf> = start.paths.iter().map(PathBuf::from).collect();
             (checks, was, count_lines(&paths))
@@ -615,6 +639,7 @@ impl Worker {
             paths: start.paths.clone(),
             checks,
             bench,
+            adapter: start.adapter.clone(),
             was,
             was_lines,
         })
@@ -630,7 +655,9 @@ impl Worker {
         snapshot: &Snapshot,
     ) -> Result<GateOutput> {
         let run = &snapshot.run;
+        let adapter = run.adapter.as_deref();
         let commit = self.resolve(&request.head)?;
+        let current = self.resolve(&request.current)?;
         let after_tree = self.worktree(&commit)?;
         let (broken, after, lines_after) = {
             let _in = InFolder::enter(&after_tree)?;
@@ -639,7 +666,7 @@ impl Worker {
                     .iter()
                     .map(|check| (check.command.as_str(), check.passed)),
             );
-            let after = self.findings(&after_tree, command, &request.paths)?;
+            let (after, _) = self.findings(&after_tree, command, &request.paths, adapter)?;
             let paths: Vec<PathBuf> = request.paths.iter().map(PathBuf::from).collect();
             (broken, after, count_lines(&paths))
         };
@@ -663,8 +690,10 @@ impl Worker {
         };
         let paired = timed.as_ref().is_some_and(|reply| reply.paired);
         let timing = timed.map(|reply| (reply.before.unwrap_or(reply.after), reply.after));
-        let before_tree = self.worktree(&self.resolve(&request.current)?)?;
-        let before = self.findings(&before_tree, command, &request.paths)?;
+        let before_tree = self.worktree(&current)?;
+        let (before, checklist_before) =
+            self.findings(&before_tree, command, &request.paths, adapter)?;
+        let changed = changed_files(&self.top, &current, &commit)?;
         Ok(GateOutput {
             commit,
             broken,
@@ -674,6 +703,8 @@ impl Worker {
             lines_after,
             timing,
             paired,
+            changed_files: changed,
+            checklist_before,
         })
     }
 
@@ -686,19 +717,21 @@ impl Worker {
         head: &str,
         snapshot: &Snapshot,
     ) -> Result<FinishOutput> {
+        let adapter = snapshot.run.adapter.as_deref();
         let head_tree = self.worktree(&self.resolve(head)?)?;
-        let after = self.findings(&head_tree, command, paths)?;
+        let (after, checklist) = self.findings(&head_tree, command, paths, adapter)?;
         let current_lines = {
             let _in = InFolder::enter(&head_tree)?;
             count_lines(&paths.iter().map(PathBuf::from).collect::<Vec<_>>())
         };
         drop(head_tree);
         let base_tree = self.worktree(&self.resolve(&snapshot.run.base)?)?;
-        let before = self.findings(&base_tree, command, paths)?;
+        let (before, _) = self.findings(&base_tree, command, paths, adapter)?;
         Ok(FinishOutput {
             before,
             after,
             current_lines,
+            checklist_after: checklist.into_keys().collect(),
         })
     }
 }

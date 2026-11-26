@@ -348,25 +348,10 @@ enum Cmd {
         #[arg(long, value_enum)]
         format: Option<Format>,
     },
-    /// Review the charts of a file against Edward Tufte's book "The Visual Display of
-    /// Quantitative Information", in plotly, Dash, matplotlib, seaborn or pandas.
-    ///
-    /// It finds each chart call of the file and gives it a kind, such as pie, bar or line, and the
-    /// plotly call that draws it. It prints the plotly rules that fire on the file, and each
-    /// question of the book that applies to a chart it found, with the page of the book, what to
-    /// look at and the plotly code to write. Without a path, or for a file that is not Python, it
-    /// prints every question. `--run <adapter.py>` draws the figures that the adapter's
-    /// `figures()` returns in the project's Python, and prints each measured fact under the
-    /// questions it answers. A failed run leaves the questions in place. Exit 0 when it printed a
-    /// review, 2 if xpd can't run.
-    #[command(after_long_help = "Examples:
-  xpd chart-review report.py
-  xpd chart-review app.py --run chart_figures.py --format json
-  xpd chart-review --questions")]
     ChartReview(crate::chart_review::ChartReviewArgs),
     Untangle(crate::untangle::UntangleArgs),
     Optimize(crate::optimize::OptimizeArgs),
-    /// Serve the runs of `xpd untangle` and `xpd optimize` from a shared PostgreSQL store.
+    /// Serve the runs of `xpd untangle`, `xpd optimize`, and `xpd chart-review` from a shared PostgreSQL store.
     #[cfg(feature = "ledger-distributed")]
     #[command(subcommand)]
     Ledger(LedgerCommand),

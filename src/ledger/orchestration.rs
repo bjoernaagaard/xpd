@@ -15,8 +15,8 @@ use serde::{Deserialize, Serialize};
 
 use duroxide::{OrchestrationContext, RetryPolicy};
 
-use super::run::judge_fix;
-pub(super) use super::run::{Compared, Goal, Timing};
+pub(super) use super::run::{AnswerRecord, Answered, Compared, Goal, Timing};
+use super::run::{GateEvidence, judge_fix};
 
 /// The name the orchestration is registered and started under.
 pub(crate) const ORCHESTRATION_NAME: &str = "LedgerRun";
@@ -88,6 +88,8 @@ pub(crate) struct FixState {
     pub(crate) title: String,
     #[serde(default)]
     pub(crate) findings: Vec<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub(crate) questions: Vec<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub(crate) goal: Option<Goal>,
     #[serde(default)]
@@ -116,6 +118,8 @@ pub(crate) struct JournalState {
     pub(crate) checks: Vec<CheckState>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub(crate) bench: Option<BenchState>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) adapter: Option<String>,
     pub(crate) was: usize,
     #[serde(default)]
     pub(crate) was_lines: usize,
@@ -123,6 +127,8 @@ pub(crate) struct JournalState {
     pub(crate) current_lines: usize,
     pub(crate) rounds: Vec<Vec<FixState>>,
     pub(crate) accepted: BTreeMap<String, String>,
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub(crate) answered: BTreeMap<String, AnswerRecord>,
     pub(crate) finished: bool,
 }
 
@@ -249,6 +255,8 @@ pub(crate) struct RunStartInput {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub(crate) bench: Option<(String, usize)>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) adapter: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub(crate) initial_state: Option<JournalState>,
 }
 
@@ -260,14 +268,18 @@ pub(crate) struct BaselineOutput {
     pub(crate) checks: Vec<CheckState>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub(crate) bench: Option<BenchState>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) adapter: Option<String>,
     pub(crate) was: usize,
     pub(crate) was_lines: usize,
 }
 
-/// What `ValidatePlan` returns: the finding ids of the working tree.
+/// What `ValidatePlan` returns: the finding ids and per-figure checklist items of the working tree.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub(crate) struct ValidatePlanOutput {
     pub(crate) known: BTreeSet<String>,
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub(crate) checklist: BTreeMap<String, String>,
 }
 
 /// What `GateFix` measures for one fix. The judgment itself stays pure, in
@@ -287,6 +299,10 @@ pub(crate) struct GateOutput {
     /// its own timings, which are on another scale.
     #[serde(default)]
     pub(crate) paired: bool,
+    #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
+    pub(crate) changed_files: BTreeSet<String>,
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub(crate) checklist_before: BTreeMap<String, String>,
 }
 
 /// What `FinishRun` surveys at the end of a run.
@@ -295,6 +311,8 @@ pub(crate) struct FinishOutput {
     pub(crate) before: BTreeSet<String>,
     pub(crate) after: BTreeSet<String>,
     pub(crate) current_lines: usize,
+    #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
+    pub(crate) checklist_after: BTreeSet<String>,
 }
 
 /// One mutating command on the `commands` queue.
@@ -305,6 +323,8 @@ pub(crate) enum Command {
         fixes: Vec<FixState>,
         #[serde(default)]
         accepted: Vec<AcceptedState>,
+        #[serde(default)]
+        answered: Vec<Answered>,
     },
     Approve {
         fix: String,
@@ -369,23 +389,19 @@ impl Receipt {
 }
 
 /// Whether a fix is kept, with the exact rules of the journal gate.
-pub(crate) fn judge(
-    fix: &FixState,
-    before: &BTreeSet<String>,
-    after: &BTreeSet<String>,
-    broken: &[String],
-    lines: (usize, usize),
-    timing: Option<(Timing, Timing)>,
-) -> Result<Compared, String> {
-    judge_fix(
-        &fix.findings,
-        fix.goal,
-        before,
-        after,
-        broken,
-        lines,
-        timing,
-    )
+pub(crate) fn judge(fix: &FixState, output: &GateOutput) -> Result<Compared, String> {
+    judge_fix(&GateEvidence {
+        findings: &fix.findings,
+        questions: &fix.questions,
+        goal: fix.goal,
+        before: &output.before,
+        after: &output.after,
+        broken: &output.broken,
+        lines: (output.lines_before, output.lines_after),
+        timing: output.timing,
+        changed_files: &output.changed_files,
+        checklist_before: &output.checklist_before,
+    })
 }
 
 fn publish(ctx: &OrchestrationContext, state: &JournalState, command: &str) {
@@ -407,6 +423,7 @@ async fn apply_plan(
     state: &mut JournalState,
     fixes: Vec<FixState>,
     accepted: Vec<AcceptedState>,
+    answered: Vec<Answered>,
 ) -> Result<(), String> {
     if state.finished {
         return Err("the run is finished".to_owned());
@@ -426,9 +443,15 @@ async fn apply_plan(
         if !named.insert(fix.id.as_str()) {
             return Err(format!("two fixes are named {}", fix.id));
         }
-        if fix.findings.is_empty() && fix.goal.is_none() {
+        if fix.findings.is_empty() && fix.questions.is_empty() && fix.goal.is_none() {
             return Err(format!(
-                "the fix {} names no finding and sets no goal",
+                "the fix {} names no finding, names no checklist question and sets no goal",
+                fix.id
+            ));
+        }
+        if fix.goal == Some(Goal::Design) && fix.questions.is_empty() {
+            return Err(format!(
+                "the fix {} has a design goal, which must name at least one checklist question",
                 fix.id
             ));
         }
@@ -452,6 +475,13 @@ async fn apply_plan(
             return Err(format!("the ledger of today has no finding {id}"));
         }
     }
+    let cited_questions =
+        (fixes.iter().flat_map(|fix| &fix.questions)).chain(answered.iter().map(|item| &item.item));
+    for item in cited_questions {
+        if !known.checklist.contains_key(item) {
+            return Err(format!("the checklist of today has no item {item}"));
+        }
+    }
     for item in accepted {
         if item.reason.trim().is_empty() {
             return Err(format!(
@@ -460,6 +490,13 @@ async fn apply_plan(
             ));
         }
         state.accepted.insert(item.finding, item.reason);
+    }
+    for item in answered {
+        if item.reason.trim().is_empty() {
+            return Err(format!("the answered item {} has no reason", item.item));
+        }
+        let (id, record) = item.into_pair();
+        state.answered.insert(id, record);
     }
     if !fixes.is_empty() {
         state.rounds.push(fixes);
@@ -509,14 +546,11 @@ async fn apply_gate(
     }
     let judged = {
         let fix = state.fix_mut(id)?;
-        judge(
-            fix,
-            &output.before,
-            &output.after,
-            &output.broken,
-            (output.lines_before, output.lines_after),
-            output.timing,
-        )
+        judge(fix, &output)
+    };
+    let questions = {
+        let fix = state.fix_mut(id)?;
+        fix.questions.clone()
     };
     let fix = state.fix_mut(id)?;
     match judged {
@@ -530,8 +564,18 @@ async fn apply_gate(
                 timing_before: output.timing.map(|(before, _)| before),
                 timing_after: output.timing.map(|(_, after)| after),
             });
-            state.current = output.commit;
+            let commit = output.commit;
+            state.current.clone_from(&commit);
             state.current_lines = output.lines_after;
+            for item in questions {
+                state.answered.insert(
+                    item,
+                    AnswerRecord::Fixed {
+                        fix: id.to_owned(),
+                        commit: commit.clone(),
+                    },
+                );
+            }
             if let (Some(bench), Some((_, after)), false) =
                 (&mut state.bench, output.timing, output.paired)
             {
@@ -564,6 +608,16 @@ async fn apply_finish(ctx: &OrchestrationContext, state: &mut JournalState) -> R
             unexplained.join(", ")
         ));
     }
+    let unanswered: Vec<&str> = (output.checklist_after.iter())
+        .filter(|item| !state.answered.contains_key(*item))
+        .map(String::as_str)
+        .collect();
+    if !unanswered.is_empty() {
+        return Err(format!(
+            "these checklist items are unanswered: {}",
+            unanswered.join(", ")
+        ));
+    }
     state.current_lines = output.current_lines;
     state.finished = true;
     Ok(())
@@ -587,11 +641,13 @@ pub(crate) async fn ledger_run(ctx: OrchestrationContext, input: String) -> Resu
             paths: baseline.paths,
             checks: baseline.checks,
             bench: baseline.bench,
+            adapter: baseline.adapter,
             was: baseline.was,
             was_lines: baseline.was_lines,
             current_lines: baseline.was_lines,
             rounds: Vec::new(),
             accepted: BTreeMap::new(),
+            answered: BTreeMap::new(),
             finished: false,
         }
     };
@@ -619,9 +675,11 @@ pub(crate) async fn ledger_run(ctx: OrchestrationContext, input: String) -> Resu
             continue;
         }
         let applied = match envelope.command {
-            Command::Plan { fixes, accepted } => {
-                apply_plan(&ctx, &mut state, fixes, accepted).await
-            }
+            Command::Plan {
+                fixes,
+                accepted,
+                answered,
+            } => apply_plan(&ctx, &mut state, fixes, accepted, answered).await,
             Command::Approve { fix } => state.fix_mut(&fix).map(|fix| {
                 fix.approved = true;
             }),

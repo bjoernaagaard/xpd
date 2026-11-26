@@ -54,6 +54,10 @@ One rule's documentation as Markdown, the same text as its [rule page](../../rul
 
 The offline animation workflow and its editable Manim recipes.
 
+## skill://xpd-chart-review/
+
+The steps of a recorded chart and table review against Tufte's book, driven by [`xpd chart-review`](../../commands/chart-review/).
+
 ## skill://xpd-optimize/
 
 The steps from a finding of [`xpd optimize`](../../commands/optimize/) to a change with proof that

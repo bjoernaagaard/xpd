@@ -64,7 +64,7 @@ samples/bad.py:6:5: error [pandas/chained-assignment] Chained assignment writes 
 
 ```console
 $ echo '{"cwd":"/tmp/project","hook_event_name":"UserPromptSubmit","prompt":"improve my charts"}' | xpd hook
-Chart task: run `xpd chart-review <file>` on each file that draws the chart. It lists the plotly rules that fire and the questions from Tufte's book for each chart, in plotly or any other library, with the plotly route. Add `--run <adapter.py>` to measure the drawn figure. For a new chart, `xpd api xpd/recipe/plotly-chart` prints the plotly-chart playbook, which names the same command.
+Chart or table task: run `xpd chart-review <paths>` on the files that draw charts or presentation tables in Python or React/TypeScript (Plotly, Dash, AG Grid, Matplotlib, Seaborn, pandas). It lists mechanical Tufte findings and a per-figure checklist across all 57 principles from Tufte's book. Add `--adapter <adapter.py or command>` to measure rendered figures, and `xpd chart-review start` to record a gated review run. The `xpd-chart-review` skill holds the steps, and `xpd api xpd/recipe/plotly-chart` prints the plotly-chart playbook.
 ```
 
 ```console

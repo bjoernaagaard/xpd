@@ -460,12 +460,13 @@ fn user_prompt(cwd: &Path, prompt: &str) -> Result<ExitCode> {
     let chart = chart_prompt(prompt);
     if chart {
         text.push(
-            "Chart task: run `xpd chart-review <file>` on each file \
-             that draws the chart. It lists the plotly rules that fire and the questions from \
-             Tufte's book for each chart, in plotly or any other library, with the plotly route. \
-             Add `--run <adapter.py>` to measure the drawn figure. For a new chart, \
-             `xpd api xpd/recipe/plotly-chart` prints the plotly-chart playbook, which names the \
-             same command."
+            "Chart or table task: run `xpd chart-review <paths>` on the files \
+             that draw charts or presentation tables in Python or React/TypeScript (Plotly, Dash, \
+             AG Grid, Matplotlib, Seaborn, pandas). It lists mechanical Tufte findings and a \
+             per-figure checklist across all 57 principles from Tufte's book. Add `--adapter \
+             <adapter.py or command>` to measure rendered figures, and `xpd chart-review start` \
+             to record a gated review run. The `xpd-chart-review` skill holds the steps, and \
+             `xpd api xpd/recipe/plotly-chart` prints the plotly-chart playbook."
                 .to_owned(),
         );
     }
@@ -688,12 +689,13 @@ fn optimize_prompt(prompt: &str) -> bool {
         || lowered.contains("less code")
 }
 
-/// Whether `prompt` asks to make, change or review a chart, in any chart library. A strong word,
-/// such as chart, figure or the Danish graf, routes alone. A weak word, such as plot or a library
-/// name, routes only beside a second one, so "plot twist" stays out. Graph after a word such as
-/// dataflow, and figure in "figure out", have another sense.
+/// Whether `prompt` asks to make, change or review a chart or presentation table. A strong word,
+/// such as chart, figure, supertable, aggrid or the Danish graf, routes alone. A weak word, such
+/// as plot, table or a library name, routes only beside a second one, so "plot twist" or "sql
+/// table" stays out. Graph after a word such as dataflow, and figure in "figure out", have another
+/// sense.
 fn chart_prompt(prompt: &str) -> bool {
-    const STRONG: [&str; 29] = [
+    const STRONG: [&str; 33] = [
         "chart",
         "charts",
         "chartjunk",
@@ -716,6 +718,10 @@ fn chart_prompt(prompt: &str) -> bool {
         "scatterplot",
         "scatterplots",
         "tufte",
+        "supertable",
+        "supertables",
+        "aggrid",
+        "datatable",
         "graf",
         "grafer",
         "grafen",
@@ -724,7 +730,7 @@ fn chart_prompt(prompt: &str) -> bool {
         "figuren",
         "figurer",
     ];
-    const WEAK: [&str; 17] = [
+    const WEAK: [&str; 22] = [
         "plot",
         "plots",
         "plotting",
@@ -742,6 +748,11 @@ fn chart_prompt(prompt: &str) -> bool {
         "axis",
         "axes",
         "legend",
+        "table",
+        "tables",
+        "grid",
+        "columndefs",
+        "dashboard",
     ];
     const OTHER_GRAPHS: [&str; 11] = [
         "dataflow",
@@ -757,6 +768,9 @@ fn chart_prompt(prompt: &str) -> bool {
         "import",
     ];
     let lowered = prompt.to_lowercase();
+    if lowered.contains("ag-grid") || lowered.contains("ag grid") || lowered.contains("go.table") {
+        return true;
+    }
     let words: Vec<&str> = lowered
         .split(|character: char| !character.is_alphanumeric())
         .filter(|word| !word.is_empty())

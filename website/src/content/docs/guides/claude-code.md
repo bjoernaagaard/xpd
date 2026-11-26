@@ -57,7 +57,7 @@ xpd repository (loaded as a plugin)
 ├── .agents/plugins/marketplace.json    Codex marketplace listing
 ├── hooks/hooks.json                    runs xpd hook on SessionStart, UserPromptSubmit, PostToolUse, and Stop
 ├── mcp.json                            starts uvx xpd@<version> mcp
-└── skills/                             xpd, xpd-animate, xpd-untangle, xpd-optimize, python-best-practices, python-review
+└── skills/                             xpd, xpd-animate, xpd-chart-review, xpd-untangle, xpd-optimize, python-best-practices, python-review
 ```
 
 | Hook event | What `xpd hook` does |
@@ -136,6 +136,7 @@ mkdir -p .claude/skills/xpd && xpd skill > .claude/skills/xpd/SKILL.md
 | Skill | Purpose |
 | --- | --- |
 | `xpd` | When to run each `xpd` command |
+| `xpd-chart-review` | Recorded chart and table review workflow against Tufte's book driven by `xpd chart-review` |
 | `xpd-untangle` | Whole-codebase decoupling workflow driven by `xpd untangle` |
 | `xpd-optimize` | Structural and performance simplification workflow driven by `xpd optimize` |
 | `xpd-animate` | Creating and revising Manim animations with `xpd animate` |

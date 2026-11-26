@@ -1,588 +1,605 @@
-//! `xpd chart-review`: the questions of Edward Tufte's book "The Visual Display of Quantitative
-//! Information" for each chart of a file, in plotly, Dash, matplotlib, seaborn or pandas.
+//! `xpd chart-review`: the Duroxide ledger of Edward Tufte's "The Visual Display of Quantitative
+//! Information" across charts and presentation tables in Python (Plotly, `go.Table`, Dash AG Grid,
+//! Matplotlib, Seaborn, pandas) and React/TypeScript (`react-plotly.js`, `plotly.js`,
+//! `ag-grid-react`, `ag-grid-community`).
 //!
-//! The questions and facts live in `rules/xpd/chart-review.yml`, which this module embeds. A
-//! review finds each chart call of the file with a call table and gives it a kind, such as pie
-//! or line. It prints the plotly rules that fire on the file, and every question whose kinds
-//! hold `any` or a kind it found, with its page of the book and the plotly route. With
-//! `--run <adapter.py>`, `py/chart_facts.py` draws the figures that the adapter hands over in
-//! the project's Python, and each measured fact goes under the questions it answers.
+//! Mechanical findings (static AST rules plus optional `--adapter` runtime figure measurements)
+//! gate objectively on removal, while remaining per-figure judgment questions form a durable
+//! checklist that must be fixed or answered with a reason before `finish`.
 
-use std::collections::{BTreeSet, HashMap};
+mod inventory;
+mod python;
+mod runtime;
+mod tsx;
+
+use std::collections::BTreeSet;
 use std::fmt::Write as _;
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::process::{Command, ExitCode, Stdio};
+use std::process::ExitCode;
 
-use anyhow::{Context as _, Result};
-use serde::{Deserialize, Serialize};
+use anyhow::Result;
+use ast_grep_language::SupportLang;
+use clap::ValueEnum;
+use rayon::prelude::*;
+use serde::Serialize;
 use serde_json::{Value, json};
 
 use crate::catalog::Filters;
-use crate::check::FixMode;
-use crate::fix_safety::Applicability;
+use crate::ledger::gix_source::Listing;
+use crate::ledger::{self, AdapterPolicy, ChecklistEntry, Ledger, Select, SurveyOutput, Tree};
 use crate::output::Format;
-use crate::source;
-use crate::syntax::{self, Node, Root};
-use crate::venv;
+use crate::style::Style;
+use crate::syntax;
 use crate::workspace::Workspace;
 
-/// The questions and the facts, written from the ledger of the book.
-const INVENTORY: &str = include_str!("../rules/xpd/chart-review.yml");
-/// The script that measures the figures of an adapter in the project's Python.
-const CHART_FACTS_PY: &str = include_str!("../py/chart_facts.py");
-/// The title of the book that the questions cite by page.
-const BOOK: &str =
-    "Edward Tufte, \"The Visual Display of Quantitative Information\", second edition";
-/// The kind of a question that applies to every chart.
-const ANY: &str = "any";
-/// Chart libraries whose calls xpd does not read, which still get the questions for any chart.
-const OTHER_LIBRARIES: [&str; 7] = [
-    "altair",
-    "bokeh",
-    "holoviews",
-    "hvplot",
-    "plotnine",
-    "pyecharts",
-    "pygal",
-];
+pub(crate) use inventory::{BOOK, Inventory, load as inventory};
 
-/// One measured fact of a drawn figure.
-#[derive(Debug, Clone, Deserialize, Serialize)]
-pub(crate) struct Fact {
-    id: String,
-    text: String,
+pub(crate) type Finding = ledger::Finding<Kind>;
+
+/// The five Tufte analytical pillars that group `xpd chart-review` findings.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize)]
+#[serde(rename_all = "kebab-case")]
+pub(crate) enum Group {
+    GraphicalIntegrity,
+    DataInkAndChartjunk,
+    EncodingAndForm,
+    WordsAndLayout,
+    TabularPresentation,
 }
 
-/// One review question, with the page and line of the book it comes from.
-#[derive(Debug, Clone, Deserialize, Serialize)]
-pub(crate) struct Question {
+/// Mechanical Tufte finding kinds across charts and presentation tables.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, ValueEnum)]
+#[serde(rename_all = "kebab-case")]
+pub(crate) enum Kind {
+    /// Bar or area baseline starts above zero (VDQI p. 54).
+    NonZeroBaseline,
+    /// Two different value scales share one chart panel (VDQI p. 61).
+    DualAxis,
+    /// Chart depicts more varying dimensions than the data have (VDQI p. 71).
+    ExtraDimensions,
+    /// Mark area or radius distorts the underlying numerical ratio (VDQI p. 57).
+    DistortedSize,
+    /// Money shown over time without stating nominal, real, or constant units (VDQI p. 68).
+    UndeflatedMoney,
+    /// Two isolated points shown without surrounding trend or baseline context (VDQI p. 74).
+    MissingContext,
+    /// Default chart theme keeps heavy background tint and software chrome (VDQI p. 96).
+    DefaultTemplate,
+    /// Full box frame or mirrored spines enclose the plotting field without carrying data (VDQI p. 96).
+    BoxedFrame,
+    /// Explicit or dark grid competes with the data marks (VDQI p. 112).
+    HeavyGrid,
+    /// Color repeats a variable already encoded by position (VDQI p. 100).
+    RedundantColor,
+    /// Hatching or pattern fills produce moire vibration (VDQI p. 108).
+    PatternFill,
+    /// Decorative gauge or duck replaces plain quantitative marks (VDQI p. 116).
+    DecorativeGauge,
+    /// Standard box plot adds excess frame ink where a quartile plot fits (VDQI p. 124).
+    HeavyBoxPlot,
+    /// Heavy line strokes overwhelm the data (VDQI p. 185).
+    ThickLine,
+    /// Pie, donut, or sunburst forces angle comparison instead of a common scale (VDQI p. 178).
+    PieChart,
+    /// Twenty or fewer values drawn as a chart where a table or sentence works better (VDQI p. 33).
+    SmallDataChart,
+    /// Animation hides comparison across frames where small multiples belong (VDQI p. 170).
+    AnimationInsteadOfMultiples,
+    /// Facet panels use independent scales that break visual comparison (VDQI p. 170).
+    FreeFacetScales,
+    /// Unordered rainbow colormap distorts quantitative order (VDQI p. 154).
+    RainbowColorscale,
+    /// Series differ only by red against green with no secondary channel (VDQI p. 183).
+    RedGreenOnly,
+    /// Spline or heatmap smoothing invents values not in the data (VDQI p. 13).
+    SmoothedData,
+    /// More axis ticks are drawn than data points (VDQI p. 120).
+    ExcessTicks,
+    /// Categories are ordered alphabetically while values are unsorted (VDQI p. 178).
+    AlphabeticalOrder,
+    /// Exact zeros and missing values are mixed without visual distinction (VDQI p. 145).
+    ZeroMissingAmbiguity,
+    /// Legend forces eye travel where direct series labels belong (VDQI p. 183).
+    LegendInsteadOfLabels,
+    /// Axis or series label shows a raw column name instead of spelled-out words (VDQI p. 183).
+    ColumnNameLabel,
+    /// Tick labels are rotated instead of running left to right (VDQI p. 183).
+    RotatedTicks,
+    /// Titles or labels are set in all capitals (VDQI p. 183).
+    AllCapsText,
+    /// Single-panel chart is taller than wide (VDQI p. 186).
+    VerticalAspectRatio,
+    /// Line slope banking sits far from 45 degrees (VDQI p. 188).
+    PoorBanking,
+    /// Table draws vertical gridlines or heavy cell cages (VDQI p. 179).
+    TableVerticalRules,
+    /// Table uses alternating zebra row fills instead of subtle horizontal dividers (VDQI p. 179).
+    TableZebraStriping,
+    /// Table rows are ordered alphabetically while numeric columns are unsorted (VDQI p. 178).
+    TableAlphabeticalOrder,
+    /// Dense table exceeds 12 flat rows with no topical grouping (VDQI p. 179).
+    TableUngroupedRows,
+    /// Numeric table column renders raw or inconsistently rounded floats (VDQI p. 178).
+    TableUnformattedNumbers,
+    /// Numeric table column is not right-aligned (VDQI p. 178).
+    TableNumberAlignment,
+    /// Table header displays a raw field identifier or all-caps text (VDQI p. 183).
+    TableRawHeader,
+    /// Table numeric column mixes exact zeros and missing values without distinct formatting (VDQI p. 145).
+    TableMissingZeroAmbiguity,
+}
+
+impl ledger::Kind for Kind {
+    type Group = Group;
+
+    const COMMAND: &'static str = "chart-review";
+
+    const GROUPS: &'static [Group] = &[
+        Group::GraphicalIntegrity,
+        Group::DataInkAndChartjunk,
+        Group::EncodingAndForm,
+        Group::WordsAndLayout,
+        Group::TabularPresentation,
+    ];
+
+    fn group(self) -> Group {
+        match self {
+            Self::NonZeroBaseline
+            | Self::DualAxis
+            | Self::ExtraDimensions
+            | Self::DistortedSize
+            | Self::UndeflatedMoney
+            | Self::MissingContext => Group::GraphicalIntegrity,
+            Self::DefaultTemplate
+            | Self::BoxedFrame
+            | Self::HeavyGrid
+            | Self::RedundantColor
+            | Self::PatternFill
+            | Self::DecorativeGauge
+            | Self::HeavyBoxPlot
+            | Self::ThickLine => Group::DataInkAndChartjunk,
+            Self::PieChart
+            | Self::SmallDataChart
+            | Self::AnimationInsteadOfMultiples
+            | Self::FreeFacetScales
+            | Self::RainbowColorscale
+            | Self::RedGreenOnly
+            | Self::SmoothedData
+            | Self::ExcessTicks
+            | Self::AlphabeticalOrder
+            | Self::ZeroMissingAmbiguity => Group::EncodingAndForm,
+            Self::LegendInsteadOfLabels
+            | Self::ColumnNameLabel
+            | Self::RotatedTicks
+            | Self::AllCapsText
+            | Self::VerticalAspectRatio
+            | Self::PoorBanking => Group::WordsAndLayout,
+            Self::TableVerticalRules
+            | Self::TableZebraStriping
+            | Self::TableAlphabeticalOrder
+            | Self::TableUngroupedRows
+            | Self::TableUnformattedNumbers
+            | Self::TableNumberAlignment
+            | Self::TableRawHeader
+            | Self::TableMissingZeroAmbiguity => Group::TabularPresentation,
+        }
+    }
+
+    fn heading(group: Group) -> &'static str {
+        match group {
+            Group::GraphicalIntegrity => {
+                "Graphical integrity: distortions of scale, baseline, dimensions, money, or context (VDQI Ch. 2 to 3)"
+            }
+            Group::DataInkAndChartjunk => {
+                "Data-ink and chartjunk: non-data frames, grids, patterns, and software chrome (VDQI Ch. 4 to 6)"
+            }
+            Group::EncodingAndForm => {
+                "Encoding and form: weak chart types, unordered palettes, smoothing, and ordering (VDQI Ch. 1, 7, 8)"
+            }
+            Group::WordsAndLayout => {
+                "Words and layout: legends, labels, typography, aspect ratio, and slope banking (VDQI Ch. 1, 7, 9)"
+            }
+            Group::TabularPresentation => {
+                "Tabular presentation: borders, striping, alignment, formatting, grouping, and headers (VDQI pp. 33, 178 to 183)"
+            }
+        }
+    }
+}
+
+impl Kind {
+    /// Maps each rule in `rules/plotly/*.yml` onto its corresponding ledger finding kind.
+    pub(crate) fn of_plotly_rule(rule: &str) -> Option<Self> {
+        Some(match rule {
+            "bar-axis-without-zero" | "area-axis-without-zero" => Self::NonZeroBaseline,
+            "dual-y-axis" => Self::DualAxis,
+            "three-d-for-two-d" => Self::ExtraDimensions,
+            "marker-size-diameter" | "polar-bar-area" => Self::DistortedSize,
+            "default-template" => Self::DefaultTemplate,
+            "boxed-axis-frame" => Self::BoxedFrame,
+            "explicit-grid" => Self::HeavyGrid,
+            "redundant-color" => Self::RedundantColor,
+            "pattern-fill" => Self::PatternFill,
+            "gauge-indicator" => Self::DecorativeGauge,
+            "box-plot-ink" => Self::HeavyBoxPlot,
+            "pie-chart" | "sunburst-as-pie" => Self::PieChart,
+            "table-for-small-data" => Self::SmallDataChart,
+            "animation-frame" => Self::AnimationInsteadOfMultiples,
+            "free-facet-scales" => Self::FreeFacetScales,
+            "rainbow-colorscale" => Self::RainbowColorscale,
+            "spline-line" | "heatmap-smoothing" => Self::SmoothedData,
+            "legend-instead-of-labels" => Self::LegendInsteadOfLabels,
+            "axis-title-column-name" => Self::ColumnNameLabel,
+            "rotated-tick-labels" => Self::RotatedTicks,
+            "all-caps-title" => Self::AllCapsText,
+            _ => return None,
+        })
+    }
+}
+
+/// One detected chart or presentation table in a surveyed file.
+#[derive(Debug, Clone, Serialize)]
+pub(crate) struct Figure {
     pub(crate) id: String,
-    pub(crate) page: u32,
-    line: u32,
-    chapter: String,
-    pub(crate) principle: String,
-    pub(crate) text: String,
-    look: String,
-    kinds: Vec<String>,
-    facts: Vec<String>,
-    plotly: String,
-    pub(crate) rules: Vec<String>,
-    covers: Vec<u32>,
+    pub(crate) file: String,
+    #[serde(skip)]
+    pub(crate) tracked: String,
+    pub(crate) line: usize,
+    pub(crate) symbol: String,
+    pub(crate) call: String,
+    pub(crate) kind: &'static str,
+    pub(crate) library: &'static str,
+    pub(crate) route: &'static str,
 }
 
-/// Every question and fact of the review.
-#[derive(Debug, Deserialize)]
-pub(crate) struct Inventory {
-    facts: Vec<Fact>,
-    pub(crate) questions: Vec<Question>,
+/// What a `chart-review` survey read.
+#[derive(Debug, Serialize)]
+struct Read {
+    files: usize,
+    python: usize,
+    typescript: usize,
+    book: &'static str,
+    libraries: Vec<&'static str>,
+    figures: Vec<Figure>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    facts: Option<Value>,
 }
 
-/// The inventory that ships with xpd.
-pub(crate) fn inventory() -> Result<Inventory> {
-    serde_saphyr::from_str(INVENTORY).context("rules/xpd/chart-review.yml does not parse")
-}
-
-/// The arguments of `xpd chart-review`.
+/// Review charts and presentation tables against Edward Tufte's "The Visual Display of
+/// Quantitative Information" as a Duroxide ledger.
+///
+/// Inspects Python (Plotly, `go.Table`, Dash AG Grid, Matplotlib, Seaborn, pandas) and
+/// React/TypeScript (`react-plotly.js`, `plotly.js`, `ag-grid-react`, `ag-grid-community`).
+/// Mechanical findings (static rules plus optional `--adapter` runtime measurements) carry
+/// deterministic IDs and gate objectively on removal, while remaining per-figure judgment
+/// questions form a checklist that must be fixed or answered with a reason before `finish`.
 #[derive(Debug, clap::Args)]
+#[command(after_long_help = "Examples:
+  xpd chart-review src/
+  xpd chart-review report.py --adapter figures.py --format json
+  xpd chart-review start src/ --check \"pytest\" --adapter figures.py
+  xpd chart-review --questions --format json")]
 pub(crate) struct ChartReviewArgs {
-    /// The Python file that draws the charts. Without it, or for a file that is not Python,
-    /// every question is printed.
-    path: Option<PathBuf>,
-    /// A Python file that defines `figures()`, which returns a dict of name to figure. It runs
-    /// in the project's Python, and each figure's measured facts go under their questions.
+    #[command(flatten)]
+    select: Select<Kind>,
+    /// A Python adapter file or shell command that emits rendered figure specs for runtime checks.
     #[arg(long, value_name = "ADAPTER")]
-    run: Option<PathBuf>,
-    /// Print the whole inventory of questions and facts, with no file.
-    #[arg(long, conflicts_with_all = ["path", "run"])]
+    adapter: Option<String>,
+    /// Print the whole inventory of Tufte questions and runtime facts, with no file scan.
+    #[arg(long)]
     questions: bool,
-    /// Output format. Default: text on a terminal, json otherwise.
-    #[arg(long, value_enum)]
-    format: Option<Format>,
 }
 
 impl ChartReviewArgs {
     pub(crate) fn run(self, default: Format) -> Result<ExitCode> {
-        let inventory = inventory()?;
-        let format = self.format.unwrap_or(default);
-        let review = if self.questions {
-            json!({
-                "facts": inventory.facts,
-                "questions": inventory.questions.iter().map(|question| question_json(question, &[], &[], &[])).collect::<Vec<_>>(),
-            })
-        } else {
-            review(&inventory, self.path.as_deref(), self.run.as_deref())?
-        };
-        match format {
-            Format::Json => println!("{review}"),
-            Format::Text => print!("{}", to_text(&review)),
-        }
-        Ok(ExitCode::SUCCESS)
-    }
-}
-
-/// One chart call of a file.
-#[derive(Debug, Clone, Serialize)]
-struct Chart {
-    line: usize,
-    call: String,
-    kind: &'static str,
-    library: &'static str,
-    plotly: &'static str,
-}
-
-/// The review of one file, or of no file.
-fn review(inventory: &Inventory, path: Option<&Path>, adapter: Option<&Path>) -> Result<Value> {
-    let python = path.filter(|path| source::is_python(path));
-    let (libraries, charts, issues) = match python {
-        Some(path) => {
-            let text = fs::read_to_string(path).with_context(|| source::cannot_read(path))?;
-            let (libraries, charts) = charts(&syntax::parse(&text));
-            (libraries, charts, plotly_issues(path)?)
-        }
-        None => (Vec::new(), Vec::new(), Vec::new()),
-    };
-    let kinds: BTreeSet<&str> = charts.iter().map(|chart| chart.kind).collect();
-    let facts = adapter.map(measure);
-    let figures = facts
-        .as_ref()
-        .and_then(|facts| facts.get("figures"))
-        .and_then(Value::as_array)
-        .cloned()
-        .unwrap_or_default();
-    let fired: Vec<String> = issues
-        .iter()
-        .filter_map(|issue| issue.get("rule").and_then(Value::as_str))
-        .map(str::to_owned)
-        .collect();
-    let questions: Vec<Value> = inventory
-        .questions
-        .iter()
-        .filter(|question| {
-            python.is_none()
-                || question
-                    .kinds
-                    .iter()
-                    .any(|kind| kind == ANY || kinds.contains(kind.as_str()))
-        })
-        .map(|question| {
-            let lines: Vec<usize> = charts
-                .iter()
-                .filter(|chart| {
-                    question
-                        .kinds
-                        .iter()
-                        .any(|kind| kind == ANY || kind == chart.kind)
-                })
-                .map(|chart| chart.line)
-                .collect();
-            question_json(question, &lines, &fired, &figures)
-        })
-        .collect();
-    Ok(json!({
-        "file": path.map(|path| path.display().to_string()),
-        "book": BOOK,
-        "libraries": libraries,
-        "charts": charts,
-        "issues": issues,
-        "questions": questions,
-        "of": inventory.questions.len(),
-        "facts": facts,
-    }))
-}
-
-/// A question as the review prints it: its fields from the inventory, the chart lines it applies
-/// to, the plotly rules of it that fired, and what the run measured for it.
-fn question_json(
-    question: &Question,
-    lines: &[usize],
-    fired: &[String],
-    figures: &[Value],
-) -> Value {
-    let mut measured = Vec::new();
-    for figure in figures {
-        for fact in &question.facts {
-            let Some(found) = figure.pointer(&format!("/facts/{fact}")) else {
-                continue;
-            };
-            measured.push(json!({
-                "figure": figure.get("name"),
-                "fact": fact,
-                "summary": found.get("summary"),
-                "findings": found.get("findings"),
-            }));
-        }
-    }
-    let rules: Vec<String> = question
-        .rules
-        .iter()
-        .map(|rule| format!("plotly/{rule}"))
-        .collect();
-    let reported: Vec<&String> = rules
-        .iter()
-        .filter(|rule| {
-            fired
-                .iter()
-                .any(|fired| rule.ends_with(&format!("/{fired}")))
-        })
-        .collect();
-    json!({
-        "id": question.id,
-        "page": question.page,
-        "line": question.line,
-        "chapter": question.chapter,
-        "principle": question.principle,
-        "text": question.text,
-        "look": question.look,
-        "kinds": question.kinds,
-        "plotly": question.plotly,
-        "rules": rules,
-        "reported": reported,
-        "facts": question.facts,
-        "covers": question.covers,
-        "charts": lines,
-        "measured": measured,
-    })
-}
-
-/// The issues of the plotly rules on `path`, as `xpd check --rule plotly` reports them.
-fn plotly_issues(path: &Path) -> Result<Vec<Value>> {
-    let workspace = Workspace::open(
-        std::env::current_dir()?,
-        None,
-        &Filters {
-            rules: vec!["plotly".to_owned()],
-            severity: None,
-        },
-    )?;
-    let report = workspace.check(&[path.to_path_buf()], FixMode::Apply(None))?;
-    let json = report.to_json(Applicability::Safe);
-    Ok(json
-        .get("issues")
-        .and_then(Value::as_array)
-        .cloned()
-        .unwrap_or_default())
-}
-
-/// Runs the adapter in the project's Python and returns what `py/chart_facts.py` printed, or
-/// the reason it could not run. What the adapter and the libraries print on stderr is kept only
-/// for a failed run, whose error ends with its last line. A failed run leaves the questions in
-/// place.
-fn measure(adapter: &Path) -> Value {
-    let shown = adapter.display().to_string();
-    let output = Command::new(venv::project_python())
-        .arg("-c")
-        .arg(CHART_FACTS_PY)
-        .arg(adapter)
-        .stdin(Stdio::null())
-        .output();
-    let output = match output {
-        Ok(output) => output,
-        Err(error) => {
-            return json!({"adapter": shown, "figures": [], "error": format!("could not start python: {error}")});
-        }
-    };
-    let stderr = String::from_utf8_lossy(&output.stderr);
-    let last = stderr.lines().rev().find(|line| !line.trim().is_empty());
-    let mut found: Value = serde_json::from_slice(&output.stdout).unwrap_or_else(|_| {
-        let code = output
-            .status
-            .code()
-            .map_or_else(|| "a signal".to_owned(), |code| code.to_string());
-        json!({"figures": [], "error": format!("{shown} exited with {code} and printed no facts")})
-    });
-    if let (Some(error), Some(last)) = (found.get("error").and_then(Value::as_str), last) {
-        found["error"] = json!(format!("{error}. Its last line on stderr: {}", last.trim()));
-    }
-    found["adapter"] = json!(shown);
-    found
-}
-
-/// The chart libraries that `root` imports and its chart calls in the order of their lines.
-fn charts(root: &Root) -> (Vec<&'static str>, Vec<Chart>) {
-    let names = imported(root);
-    let modules: BTreeSet<&str> = names
-        .values()
-        .map(|module| module.split('.').next().unwrap_or_default())
-        .collect();
-    let mut charts = Vec::new();
-    for call in root.root().dfs().filter(|node| node.kind() == "call") {
-        let Some(function) = call.field("function") else {
-            continue;
-        };
-        let written: String = function
-            .text()
-            .chars()
-            .filter(|c| !c.is_whitespace())
-            .collect();
-        let line = call.start_pos().line() + 1;
-        let resolved = resolve(&written, &names);
-        for (kind, library) in classify(&written, resolved.as_deref(), &call, &modules) {
-            charts.push(Chart {
-                line,
-                call: written.clone(),
-                kind,
-                library,
-                plotly: route(kind),
+        if self.questions {
+            let inv = inventory()?;
+            let catalog = json!({
+                "book": BOOK,
+                "facts": inv.facts,
+                "questions": inv.questions.iter().map(inventory::Question::to_catalog_json).collect::<Vec<_>>(),
             });
+            match self.select.format_override().unwrap_or(default) {
+                Format::Json => println!("{catalog}"),
+                Format::Text => print!("{}", catalog_text(&inv)),
+            }
+            return Ok(ExitCode::SUCCESS);
         }
-    }
-    let mut libraries: BTreeSet<&'static str> = charts.iter().map(|chart| chart.library).collect();
-    for library in ["plotly", "dash", "matplotlib", "seaborn"]
-        .into_iter()
-        .chain(OTHER_LIBRARIES)
-    {
-        if modules.contains(library) {
-            libraries.insert(library);
-        }
-    }
-    (libraries.into_iter().collect(), charts)
-}
 
-/// The dotted module or name that each imported name of `root` stands for.
-fn imported(root: &Root) -> HashMap<String, String> {
-    let mut names = HashMap::new();
-    for import in root.root().dfs() {
-        match &*import.kind() {
-            "import_statement" => {
-                for name in import.field_children("name") {
-                    if name.kind() == "aliased_import" {
-                        if let (Some(module), Some(alias)) =
-                            (name.field("name"), name.field("alias"))
-                        {
-                            names.insert(alias.text().to_string(), module.text().to_string());
-                        }
-                    } else {
-                        let text = name.text().to_string();
-                        let head = text.split('.').next().unwrap_or_default().to_owned();
-                        names.insert(head.clone(), head);
-                    }
+        let header = |ledger: &Ledger<Kind, Read>| {
+            let Read {
+                files,
+                python,
+                typescript,
+                libraries,
+                figures,
+                facts,
+                ..
+            } = &ledger.read;
+            let mut out = String::new();
+            let file_word = if *files == 1 { "file" } else { "files" };
+            let fig_word = if figures.len() == 1 {
+                "figure"
+            } else {
+                "figures"
+            };
+            let item_word = if ledger.checklist.len() == 1 {
+                "item"
+            } else {
+                "items"
+            };
+            let _ = writeln!(
+                out,
+                "xpd chart-review: {} in {files} {file_word} ({python} Python, {typescript} JS/TS), {} {fig_word}, {} checklist {item_word}",
+                ledger.count(),
+                figures.len(),
+                ledger.checklist.len(),
+            );
+            if !libraries.is_empty() {
+                let _ = writeln!(out, "Libraries: {}", libraries.join(", "));
+            }
+            if !figures.is_empty() {
+                out.push_str("Figures:\n");
+                for fig in figures {
+                    let _ = writeln!(
+                        out,
+                        "  {}  {}:{}  {} ({} in {}, route: {})",
+                        fig.id, fig.file, fig.line, fig.call, fig.kind, fig.library, fig.route
+                    );
                 }
             }
-            "import_from_statement" => {
-                let Some(module) = import
-                    .field("module_name")
-                    .filter(|module| module.kind() == "dotted_name")
-                else {
-                    continue;
-                };
-                let module = module.text().to_string();
-                for name in import.field_children("name") {
-                    let (target, alias) = if name.kind() == "aliased_import" {
-                        let (Some(target), Some(alias)) = (name.field("name"), name.field("alias"))
-                        else {
-                            continue;
-                        };
-                        (target.text().to_string(), alias.text().to_string())
+            if let Some(facts) = facts {
+                if let Some(error) = facts.get("error").and_then(Value::as_str) {
+                    let _ = writeln!(out, "Adapter error: {error}");
+                } else if let Some(measured) = facts.get("figures").and_then(Value::as_array) {
+                    let names: Vec<&str> = measured
+                        .iter()
+                        .filter_map(|f| f.get("name").and_then(Value::as_str))
+                        .collect();
+                    let measured_word = if names.len() == 1 {
+                        "figure"
                     } else {
-                        (name.text().to_string(), name.text().to_string())
+                        "figures"
                     };
-                    names.insert(alias, format!("{module}.{target}"));
+                    let _ = writeln!(
+                        out,
+                        "Adapter `{}` measured {} {measured_word}: {}",
+                        facts.get("adapter").and_then(Value::as_str).unwrap_or(""),
+                        names.len(),
+                        names.join(", ")
+                    );
                 }
             }
-            _ => {}
-        }
-    }
-    names
-}
-
-/// The dotted name that `written` calls, when its first name is imported.
-fn resolve(written: &str, names: &HashMap<String, String>) -> Option<String> {
-    let (head, rest) = written.split_once('.').unwrap_or((written, ""));
-    let module = names.get(head)?;
-    Some(if rest.is_empty() {
-        module.clone()
-    } else {
-        format!("{module}.{rest}")
-    })
-}
-
-/// The kinds and library of a call. A call can be a chart and also make panels, as
-/// `px.line(..., facet_col="region")` does.
-fn classify(
-    written: &str,
-    resolved: Option<&str>,
-    call: &Node<'_>,
-    modules: &BTreeSet<&str>,
-) -> Vec<(&'static str, &'static str)> {
-    let method = written.rsplit('.').next().unwrap_or(written);
-    let mut found = Vec::new();
-    if let Some(name) = resolved {
-        let last = name.rsplit('.').next().unwrap_or(name);
-        if let Some(function) = name.strip_prefix("plotly.express.") {
-            if let Some(kind) = express_kind(function) {
-                found.push((kind, "plotly"));
-            }
-            if ["facet_col", "facet_row"]
-                .iter()
-                .any(|key| syntax::keyword_arg(call, key).is_some())
-            {
-                found.push(("panels", "plotly"));
-            }
-        } else if name.starts_with("plotly.graph_objects.")
-            || name.starts_with("plotly.graph_objs.")
-        {
-            if let Some(kind) = trace_kind(&last.to_lowercase(), call) {
-                found.push((kind, "plotly"));
-            }
-        } else if name == "plotly.subplots.make_subplots" {
-            found.push(("panels", "plotly"));
-        } else if let Some(function) = name.strip_prefix("seaborn.") {
-            if let Some(kind) = seaborn_kind(function) {
-                found.push((kind, "seaborn"));
-            }
-        } else if name.starts_with("matplotlib.")
-            && let Some(kind) = matplotlib_kind(last, call)
-        {
-            found.push((kind, "matplotlib"));
-        }
-        return found;
-    }
-    if !written.contains('.') {
-        return found;
-    }
-    if modules.contains("plotly")
-        && let Some(kind) = method
-            .strip_prefix("add_")
-            .and_then(|trace| trace_kind(trace, call))
-    {
-        found.push((kind, "plotly"));
-        return found;
-    }
-    if modules.contains("pandas")
-        && (written.contains(".plot.")
-            || (method == "plot"
-                && !modules.contains("matplotlib")
-                && !modules.contains("seaborn")))
-    {
-        let kind = if method == "plot" {
-            syntax::keyword_arg(call, "kind")
-                .and_then(|kind| syntax::string_literal(&kind))
-                .unwrap_or_else(|| "line".to_owned())
-        } else {
-            method.to_owned()
+            out
         };
-        if let Some(kind) = pandas_kind(&kind) {
-            found.push((kind, "pandas"));
-        }
-        return found;
+
+        let adapter = self.adapter;
+        (self.select).print_with(
+            default,
+            adapter.as_deref(),
+            |paths, files, top, commit, adapter, policy| {
+                survey(
+                    paths,
+                    files,
+                    &Listing::of(paths, files, top, commit)?,
+                    adapter,
+                    policy,
+                )
+            },
+            header,
+        )
     }
-    if (modules.contains("matplotlib") || modules.contains("seaborn"))
-        && let Some(kind) = matplotlib_kind(method, call)
-    {
-        found.push((kind, "matplotlib"));
-    }
-    found
 }
 
-fn express_kind(function: &str) -> Option<&'static str> {
-    Some(match function {
-        "pie" | "sunburst" | "funnel_area" => "pie",
-        "bar" | "bar_polar" | "timeline" => "bar",
-        "histogram" => "histogram",
-        "line" | "line_polar" | "line_3d" | "ecdf" => "line",
-        "area" => "area",
-        "scatter" | "scatter_3d" | "scatter_polar" | "scatter_matrix" | "strip" => "scatter",
-        "box" | "violin" => "box",
-        "imshow" | "density_heatmap" | "density_contour" => "heatmap",
-        "choropleth" | "choropleth_map" | "choropleth_mapbox" | "scatter_geo" | "scatter_map"
-        | "scatter_mapbox" | "line_geo" | "line_map" | "line_mapbox" | "density_map"
-        | "density_mapbox" => "map",
-        _ => return None,
+/// Formats `xpd chart-review --questions --format text`.
+fn catalog_text(inv: &Inventory) -> String {
+    let mut out = String::new();
+    out.push_str("Facts that --adapter measures:\n");
+    for fact in &inv.facts {
+        let _ = writeln!(out, "  {}: {}", fact.id, fact.text);
+    }
+    let _ = writeln!(
+        out,
+        "\nQuestions from {BOOK}, {} total:",
+        inv.questions.len()
+    );
+    for q in &inv.questions {
+        let _ = writeln!(
+            out,
+            "\n{} (page {}, {:?}): {}\n  {}\n  Look at: {}\n  In plotly/AG Grid: {}",
+            q.id, q.page, q.mode, q.principle, q.text, q.look, q.plotly
+        );
+    }
+    out
+}
+
+/// Whether `lang` is a JavaScript or TypeScript language parsed by `tsx`.
+fn is_js_ts(lang: SupportLang) -> bool {
+    matches!(
+        lang,
+        SupportLang::TypeScript | SupportLang::Tsx | SupportLang::JavaScript
+    )
+}
+
+/// Opens a plotly-only rule workspace for Python files.
+fn plotly_workspace(paths: &[PathBuf], tree: Tree<'_>) -> Result<Workspace> {
+    let root = tree
+        .top
+        .map(Path::to_path_buf)
+        .or_else(|| {
+            let first = paths.first()?;
+            let absolute = fs::canonicalize(first).ok()?;
+            Some(if absolute.is_dir() {
+                absolute
+            } else {
+                absolute.parent().unwrap_or(&absolute).to_path_buf()
+            })
+        })
+        .unwrap_or_else(|| PathBuf::from("."));
+    let filters = Filters {
+        rules: vec!["plotly".to_owned()],
+        severity: None,
+    };
+    Workspace::open(root, None, &filters).or_else(|_| Workspace::bundled(Style::Default))
+}
+
+/// Per-file static extraction result collected across parallel workers.
+struct FileResult {
+    is_python: bool,
+    is_js_ts: bool,
+    libraries: Vec<&'static str>,
+    figures: Vec<Figure>,
+    findings: Vec<Finding>,
+}
+
+/// Surveys `paths` for static figures, mechanical findings, optional runtime measurements, and
+/// the per-figure Tufte checklist.
+fn survey(
+    paths: &[PathBuf],
+    tree: Tree<'_>,
+    listing: &Listing,
+    adapter: Option<&str>,
+    policy: AdapterPolicy,
+) -> Result<SurveyOutput<Kind, Read>> {
+    let inv = inventory()?;
+    let files = &listing.files;
+    let workspace = files
+        .iter()
+        .any(|(_, lang)| *lang == SupportLang::Python)
+        .then(|| plotly_workspace(paths, tree))
+        .transpose()?;
+
+    let per_file: Vec<FileResult> = (files.par_iter())
+        .filter_map(|(path, language)| {
+            let is_py = *language == SupportLang::Python;
+            let is_ts = is_js_ts(*language);
+            if !is_py && !is_ts {
+                return None;
+            }
+            let text = listing.text(path)?;
+            let absolute = listing.absolute(path)?;
+            let shown = tree.shown(path);
+            let tracked = tree.tracked(&absolute).unwrap_or_else(|| shown.clone());
+            let root = syntax::parse_as(&text, *language);
+            if is_py {
+                let surveyed =
+                    python::survey_file(path, &shown, &tracked, &text, &root, workspace.as_ref());
+                Some(FileResult {
+                    is_python: true,
+                    is_js_ts: false,
+                    libraries: surveyed.libraries,
+                    figures: surveyed.figures,
+                    findings: surveyed.findings,
+                })
+            } else {
+                let surveyed = tsx::survey_file(&shown, &tracked, &root);
+                Some(FileResult {
+                    is_python: false,
+                    is_js_ts: true,
+                    libraries: surveyed.libraries,
+                    figures: surveyed.figures,
+                    findings: surveyed.findings,
+                })
+            }
+        })
+        .collect();
+
+    let mut libraries: BTreeSet<&'static str> = BTreeSet::new();
+    let mut figures = Vec::new();
+    let mut findings = Vec::new();
+    let mut python_count = 0usize;
+    let mut ts_count = 0usize;
+
+    for result in per_file {
+        if result.is_python {
+            python_count += 1;
+        }
+        if result.is_js_ts {
+            ts_count += 1;
+        }
+        libraries.extend(result.libraries);
+        figures.extend(result.figures);
+        findings.extend(result.findings);
+    }
+
+    let runtime_result = match adapter {
+        Some(spec) => {
+            let work_dir = tree
+                .top
+                .filter(|_| tree.shown_from.is_some())
+                .map(Path::to_path_buf)
+                .or_else(|| std::env::current_dir().ok())
+                .unwrap_or_else(|| PathBuf::from("."));
+            Some(runtime::measure(spec, &work_dir, policy)?)
+        }
+        None => None,
+    };
+
+    let coverage = if runtime_result
+        .as_ref()
+        .is_some_and(|res| res.summary.get("error").is_none())
+    {
+        inventory::RuntimeCoverage::WithRuntime
+    } else {
+        inventory::RuntimeCoverage::StaticOnly
+    };
+    let facts = runtime_result.map(|res| {
+        findings.extend(res.findings);
+        res.summary
+    });
+    let checklist = build_checklist(&inv, &figures, coverage);
+
+    let read = Read {
+        files: python_count + ts_count,
+        python: python_count,
+        typescript: ts_count,
+        book: BOOK,
+        libraries: libraries.into_iter().collect(),
+        figures,
+        facts,
+    };
+
+    Ok(SurveyOutput {
+        read,
+        findings: ledger::named(findings),
+        checklist,
     })
 }
 
-/// The kind of a graph objects trace, by its lowercase class name. A scatter trace whose mode
-/// draws only markers is a scatter, and any other is a line.
-fn trace_kind(trace: &str, call: &Node<'_>) -> Option<&'static str> {
-    Some(match trace {
-        "pie" | "sunburst" | "funnelarea" => "pie",
-        "bar" | "barpolar" => "bar",
-        "histogram" => "histogram",
-        "scatter" | "scattergl" => {
-            let mode =
-                syntax::keyword_arg(call, "mode").and_then(|mode| syntax::string_literal(&mode));
-            match mode {
-                Some(mode) if mode.contains("markers") && !mode.contains("lines") => "scatter",
-                _ => "line",
+/// Builds the per-figure Tufte checklist from the inventory and detected figures.
+fn build_checklist(
+    inv: &Inventory,
+    figures: &[Figure],
+    coverage: inventory::RuntimeCoverage,
+) -> Vec<ChecklistEntry> {
+    let mut checklist = Vec::new();
+    for fig in figures {
+        for q in &inv.questions {
+            if q.applies_to(fig.kind) && q.needs_checklist(coverage) {
+                checklist.push(ChecklistEntry {
+                    id: format!("{}/{}", fig.id, q.id),
+                    file: fig.tracked.clone(),
+                    figure: format!(
+                        "{}:{} ({} in {})",
+                        fig.file, fig.line, fig.kind, fig.library
+                    ),
+                    kind: fig.kind.to_owned(),
+                    question: q.id.clone(),
+                    page: q.page,
+                    principle: q.principle.clone(),
+                    text: q.text.clone(),
+                    look: q.look.clone(),
+                });
             }
         }
-        "box" | "violin" => "box",
-        "heatmap" | "contour" | "image" | "histogram2d" => "heatmap",
-        "choropleth" | "choroplethmap" | "choroplethmapbox" | "scattergeo" | "scattermap"
-        | "scattermapbox" | "densitymap" | "densitymapbox" => "map",
-        _ => return None,
-    })
+    }
+    checklist
 }
 
-fn seaborn_kind(function: &str) -> Option<&'static str> {
-    Some(match function {
-        "barplot" | "countplot" => "bar",
-        "histplot" | "displot" => "histogram",
-        "lineplot" | "kdeplot" | "ecdfplot" => "line",
-        "scatterplot" | "regplot" | "lmplot" | "stripplot" | "swarmplot" | "jointplot" => "scatter",
-        "boxplot" | "violinplot" | "boxenplot" => "box",
-        "heatmap" | "clustermap" => "heatmap",
-        "catplot" | "relplot" | "pairplot" | "FacetGrid" => "panels",
-        _ => return None,
-    })
-}
-
-/// The kind of a matplotlib Axes or pyplot call. `subplots` makes panels when it asks for more
-/// than one.
-fn matplotlib_kind(function: &str, call: &Node<'_>) -> Option<&'static str> {
-    Some(match function {
-        "pie" => "pie",
-        "bar" | "barh" => "bar",
-        "hist" => "histogram",
-        "plot" | "step" | "stairs" | "errorbar" => "line",
-        "fill_between" | "stackplot" => "area",
-        "scatter" | "hexbin" => "scatter",
-        "boxplot" | "violinplot" => "box",
-        "imshow" | "pcolormesh" | "contourf" => "heatmap",
-        "subplots" if panel_count(call) > 1 => "panels",
-        "subplot_mosaic" => "panels",
-        _ => return None,
-    })
-}
-
-/// The number of panels that `subplots(nrows, ncols)` asks for, as written.
-fn panel_count(call: &Node<'_>) -> u64 {
-    let number = |node: Option<Node<'_>>| {
-        node.filter(|node| node.kind() == "integer")
-            .and_then(|node| node.text().parse::<u64>().ok())
-    };
-    let positional: Vec<Node<'_>> = call
-        .field("arguments")
-        .map(|list| {
-            list.named_children()
-                .filter(|argument| !matches!(&*argument.kind(), "keyword_argument" | "comment"))
-                .collect()
-        })
-        .unwrap_or_default();
-    let rows =
-        number(syntax::keyword_arg(call, "nrows")).or_else(|| number(positional.first().cloned()));
-    let cols =
-        number(syntax::keyword_arg(call, "ncols")).or_else(|| number(positional.get(1).cloned()));
-    rows.unwrap_or(1) * cols.unwrap_or(1)
-}
-
-fn pandas_kind(kind: &str) -> Option<&'static str> {
-    Some(match kind {
-        "line" | "kde" | "density" => "line",
-        "bar" | "barh" => "bar",
-        "hist" => "histogram",
-        "box" => "box",
-        "area" => "area",
-        "pie" => "pie",
-        "scatter" | "hexbin" => "scatter",
-        _ => return None,
-    })
-}
-
-/// The plotly call that draws a chart of `kind`.
-fn route(kind: &str) -> &'static str {
+/// Recommended Plotly or AG Grid target call for a figure kind.
+pub(crate) fn route_for(kind: &str) -> &'static str {
     match kind {
+        "table" => "go.Table, or AG Grid (dash_ag_grid.AgGrid / AgGridReact)",
         "pie" => "go.Table, or px.bar sorted by value",
         "bar" => "px.bar",
         "histogram" => "px.histogram",
@@ -596,179 +613,43 @@ fn route(kind: &str) -> &'static str {
     }
 }
 
-/// The text of a JSON string, or nothing.
-fn text(value: &Value) -> String {
-    value.as_str().unwrap_or_default().to_owned()
+/// Whether `text` contains at least two multi-letter alphabetic words all written in uppercase.
+pub(crate) fn is_all_caps(text: &str) -> bool {
+    let words: Vec<&str> = text
+        .split(|ch: char| !ch.is_alphabetic())
+        .filter(|word| word.chars().count() > 1)
+        .collect();
+    words.len() >= 2
+        && words
+            .iter()
+            .all(|word| word.chars().all(char::is_uppercase))
 }
 
-/// The items of a JSON array, or none.
-fn list(value: &Value) -> Vec<Value> {
-    value.as_array().cloned().unwrap_or_default()
-}
-
-/// The review as text, from the same JSON that `--format json` prints. Writing to a `String`
-/// cannot fail, so the results of `writeln!` are dropped.
-fn to_text(review: &Value) -> String {
-    let mut out = String::new();
-    if let Some(file) = review.get("file").and_then(Value::as_str) {
-        file_text(&mut out, file, review);
+/// Whether `text` looks like a raw `snake_case` or `camelCase` code identifier rather than prose.
+pub(crate) fn looks_like_identifier(text: &str) -> bool {
+    let trimmed = text.trim();
+    if trimmed.is_empty() || trimmed.contains(char::is_whitespace) {
+        return false;
     }
-    if let Some(facts) = review.get("facts").filter(|facts| !facts.is_null()) {
-        facts_text(&mut out, facts);
+    if trimmed.contains('_') && trimmed.chars().any(char::is_alphabetic) {
+        return true;
     }
-    let questions = list(&review["questions"]);
-    let of = review
-        .get("of")
-        .map_or_else(|| questions.len().to_string(), ToString::to_string);
-    let _ = writeln!(out, "Questions from {BOOK}, {} of {of}:", questions.len());
-    for question in &questions {
-        question_text(&mut out, question);
-    }
-    out
-}
-
-/// The libraries, the charts and the plotly issues of a reviewed file.
-fn file_text(out: &mut String, file: &str, review: &Value) {
-    let _ = writeln!(out, "Chart review of {file}");
-    let libraries: Vec<String> = list(&review["libraries"]).iter().map(text).collect();
-    let named = if libraries.is_empty() {
-        "none that xpd reads".to_owned()
-    } else {
-        libraries.join(", ")
-    };
-    let _ = writeln!(out, "Libraries: {named}");
-    let charts = list(&review["charts"]);
-    if charts.is_empty() {
-        out.push_str(
-            "Charts: no chart call that xpd reads, so the questions for any chart follow.\n",
-        );
-    } else {
-        out.push_str("Charts:\n");
-        for chart in &charts {
-            let _ = writeln!(
-                out,
-                "  line {}: {} draws a {} chart in {}. Plotly route: {}",
-                chart["line"],
-                text(&chart["call"]),
-                text(&chart["kind"]),
-                text(&chart["library"]),
-                text(&chart["plotly"]),
-            );
+    if trimmed.len() >= 5 {
+        let chars: Vec<char> = trimmed.chars().collect();
+        let has_hump = chars
+            .windows(2)
+            .any(|pair| pair[0].is_ascii_lowercase() && pair[1].is_ascii_uppercase());
+        if has_hump && chars.iter().all(char::is_ascii_alphanumeric) {
+            return true;
         }
     }
-    let others: Vec<&str> = libraries
-        .iter()
-        .map(String::as_str)
-        .filter(|library| !matches!(*library, "plotly" | "dash"))
-        .collect();
-    if !others.is_empty() {
-        let _ = writeln!(
-            out,
-            "The plotly rules do not read {}. The questions below apply to every library, and each chart's plotly route is the call that draws it in plotly, the house library.",
-            others.join(" or ")
-        );
-    }
-    let issues = list(&review["issues"]);
-    if issues.is_empty() {
-        out.push_str("Plotly rules: none fires.\n");
-        return;
-    }
-    out.push_str("Plotly rules that fire:\n");
-    for issue in &issues {
-        let _ = writeln!(
-            out,
-            "  {}:{}:{} {} [plotly/{}] {}",
-            text(&issue["file"]),
-            issue["line"],
-            issue["column"],
-            text(&issue["severity"]),
-            text(&issue["rule"]),
-            text(&issue["message"]),
-        );
-    }
+    false
 }
 
-/// What the run measured or why it failed, or the definitions that `--questions` prints.
-fn facts_text(out: &mut String, facts: &Value) {
-    if let Some(error) = facts.get("error").and_then(Value::as_str) {
-        let _ = writeln!(out, "The run measured nothing: {error}");
-    } else if let Some(figures) = facts.get("figures").and_then(Value::as_array) {
-        let names: Vec<String> = figures.iter().map(|figure| text(&figure["name"])).collect();
-        let count = if names.len() == 1 {
-            "1 figure".to_owned()
-        } else {
-            format!("{} figures", names.len())
-        };
-        let _ = writeln!(
-            out,
-            "The run of {} measured {count}: {}",
-            text(&facts["adapter"]),
-            names.join(", ")
-        );
-        for figure in figures {
-            if let Some(reason) = figure.get("unresolved").and_then(Value::as_str) {
-                let _ = writeln!(
-                    out,
-                    "  {} is measured as written, because plotly could not draw it: {reason}",
-                    text(&figure["name"])
-                );
-            }
-        }
-    } else if let Some(defined) = facts.as_array() {
-        out.push_str("Facts that --run measures:\n");
-        for fact in defined {
-            let _ = writeln!(out, "  {}: {}", text(&fact["id"]), text(&fact["text"]));
-        }
-    }
-}
-
-/// One question with the charts it applies to, its rules and what the run measured for it.
-fn question_text(out: &mut String, question: &Value) {
-    let _ = writeln!(
-        out,
-        "\n{} (page {}): {}\n  {}\n  Look at: {}\n  In plotly: {}",
-        text(&question["id"]),
-        question["page"],
-        text(&question["principle"]),
-        text(&question["text"]),
-        text(&question["look"]),
-        text(&question["plotly"]),
-    );
-    let charts: Vec<String> = list(&question["charts"])
-        .iter()
-        .map(ToString::to_string)
-        .collect();
-    if !charts.is_empty() {
-        let _ = writeln!(out, "  Charts at lines: {}", charts.join(", "));
-    }
-    let reported: Vec<String> = list(&question["reported"]).iter().map(text).collect();
-    let rules: Vec<String> = list(&question["rules"])
-        .iter()
-        .map(text)
-        .map(|rule| {
-            if reported.contains(&rule) {
-                format!("{rule} (fires)")
-            } else {
-                rule
-            }
-        })
-        .collect();
-    if !rules.is_empty() {
-        let _ = writeln!(out, "  Rules: {}", rules.join(", "));
-    }
-    for measured in list(&question["measured"]) {
-        let findings: Vec<String> = list(&measured["findings"]).iter().map(text).collect();
-        let named = if findings.is_empty() {
-            String::new()
-        } else {
-            format!(". {}", findings.join("; "))
-        };
-        let _ = writeln!(
-            out,
-            "  Measured in {} ({}): {}{named}",
-            text(&measured["figure"]),
-            text(&measured["fact"]),
-            text(&measured["summary"]),
-        );
-    }
+/// Whether a colorscale or colormap name is an unordered rainbow spectrum.
+pub(crate) fn is_rainbow_scale(name: &str) -> bool {
+    matches!(
+        name.trim().to_ascii_lowercase().as_str(),
+        "rainbow" | "jet" | "hsv" | "spectral" | "gist_rainbow" | "nipy_spectral" | "turbo"
+    )
 }

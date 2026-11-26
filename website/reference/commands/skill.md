@@ -12,6 +12,7 @@ python-best-practices
 python-review
 xpd
 xpd-animate
+xpd-chart-review
 xpd-optimize
 xpd-untangle
 ```
