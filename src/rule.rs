@@ -15,17 +15,12 @@ use serde::Deserialize;
 use crate::fix_safety::Applicability;
 use crate::frames;
 use crate::imports;
-use crate::names;
-use crate::pack::Library;
+use crate::names::{self, Library, Shape};
 use crate::rule_id::RuleId;
 use crate::severity::Severity;
 use crate::style::{Mark, Style};
 use crate::syntax::Root;
 use crate::version::Version;
-
-/// A shape of code that a rule's metadata names, as an ast-grep rule that can use the `utils`
-/// of its document.
-type Shape = ast_grep_config::Rule;
 
 /// Where a rule document comes from, which decides how its `metadata` is read and whether
 /// xpd's Python checks run on its matches.

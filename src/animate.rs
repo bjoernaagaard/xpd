@@ -87,7 +87,7 @@ impl Animation {
                         include_str!("../skills/xpd-animate/examples/three_d.py")
                     }
                 };
-                return Ok(crate::cli::print_out(text));
+                return Ok(crate::output::print_out(text));
             }
             Self::Doctor { json } => {
                 child.arg("doctor");

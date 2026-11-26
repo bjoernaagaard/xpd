@@ -26,9 +26,8 @@ use ast_grep_language::config_file_type;
 use serde::Deserialize;
 
 use crate::category::{Category, Policy, Prefixes};
-use crate::pack::{self, AlsoOnSource, Manifest, Pack};
+use crate::pack::{self, AlsoOnSource, Manifest, Pack, PackageCheckSource};
 use crate::pack_names::is_module_name;
-use crate::package_check::PackageCheckSource;
 use crate::project::{self, RuleFolders, SGCONFIG, TestFolder, XPD_CONFIG, pack_entry};
 use crate::rule::{Origin, Rule};
 use crate::source::cannot_read;

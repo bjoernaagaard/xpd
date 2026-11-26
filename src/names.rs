@@ -15,8 +15,20 @@ use ast_grep_core::tree_sitter::StrDoc;
 use ast_grep_core::{Matcher, NodeMatch};
 use ast_grep_language::SupportLang;
 
-use crate::pack::Library;
 use crate::syntax::Node;
+
+/// A shape of code that a pack's manifest or rule metadata names, as an ast-grep rule.
+pub(crate) type Shape = ast_grep_config::Rule;
+
+/// A pack's library as one file uses it, which a value proof starts from.
+#[derive(Clone, Copy)]
+pub(crate) struct Library<'p> {
+    /// The name the library is imported by.
+    pub(crate) module: &'p str,
+    /// The expression that stands for the library's module in this file. `None` in a file
+    /// without the pack's `alsoOn` setting.
+    pub(crate) stand_in: Option<&'p Shape>,
+}
 
 /// What gives a name its value at the place of one use.
 pub(crate) struct Origin<'t> {

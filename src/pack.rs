@@ -17,8 +17,8 @@ use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use serde::Deserialize;
 
 use crate::category::{Category, Policy, Prefixes, RuleCategory};
+use crate::names::{Library, Shape};
 use crate::pack_names::OWN_PACK;
-use crate::package_check::{PackageCheck, PackageCheckSource};
 use crate::rule::{Origin, Rule};
 use crate::rule_id::RuleId;
 use crate::source::File;
@@ -144,18 +144,74 @@ impl fmt::Debug for ManifestRule {
     }
 }
 
-/// A pack's library as one file uses it, which a value proof starts from.
-#[derive(Clone, Copy)]
-pub(crate) struct Library<'p> {
-    /// The name the library is imported by.
-    pub(crate) module: &'p str,
-    /// The expression that stands for the library's module in this file. `None` in a file
-    /// without the pack's `alsoOn` setting.
-    pub(crate) stand_in: Option<&'p Shape>,
+/// One entry under `packages` in a pack's `pack.yml`, as it is written.
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub(crate) struct PackageCheckSource {
+    id: String,
+    package: String,
+    #[serde(default)]
+    only_with: Vec<String>,
+    only_where: Option<SerializableRule>,
+    message: String,
 }
 
-/// A shape of code that a pack's manifest names, as an ast-grep rule.
-pub(crate) type Shape = ast_grep_config::Rule;
+/// What a project that lacks a recommended package must also show for a package check to report.
+#[derive(Debug)]
+pub(crate) struct PackageCheckCondition {
+    /// When not empty, the project uses one of these tools.
+    pub(crate) only_with: Vec<String>,
+    /// When set, a file that the run checked with the pack holds code of this shape.
+    pub(crate) only_where: Option<ManifestRule>,
+}
+
+/// One package check of a pack.
+#[derive(Debug)]
+pub(crate) struct PackageCheck {
+    /// Rule name in the report, such as `missing-pyarrow`.
+    pub(crate) id: String,
+    /// Distribution name, such as `pandas-stubs`.
+    pub(crate) package: String,
+    pub(crate) when: PackageCheckCondition,
+    /// May name `{count}` and `{first}` when the check has `onlyWhere`.
+    pub(crate) message: String,
+}
+
+/// The placeholders a package-check message may name when its check has `onlyWhere`.
+const PACKAGE_CHECK_PLACEHOLDERS: [&str; 2] = ["{count}", "{first}"];
+
+impl PackageCheck {
+    /// Reads `onlyWhere` against the pack's utility rules in `globals`.
+    pub(crate) fn new(source: PackageCheckSource, globals: &GlobalRules) -> Result<Self> {
+        let PackageCheckSource {
+            id,
+            package,
+            only_with,
+            only_where,
+            message,
+        } = source;
+        let only_where = only_where
+            .map(|rule| ManifestRule::read(rule, globals))
+            .transpose()
+            .with_context(|| format!("onlyWhere of {id}"))?;
+        if only_where.is_none()
+            && let Some(placeholder) = PACKAGE_CHECK_PLACEHOLDERS
+                .iter()
+                .find(|p| message.contains(*p))
+        {
+            bail!("the package check {id} names {placeholder} in its message without onlyWhere");
+        }
+        Ok(Self {
+            id,
+            package,
+            when: PackageCheckCondition {
+                only_with,
+                only_where,
+            },
+            message,
+        })
+    }
+}
 
 /// Which files a pack's rules run on. A rule runs only on a file of the rule's own language.
 pub(crate) enum Gate {

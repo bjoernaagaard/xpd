@@ -2,13 +2,10 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
-use std::path::Path;
 
 use anyhow::{Result, ensure};
 use serde::{Deserialize, Serialize};
 
-use crate::catalog::LocalProject;
-use crate::pack;
 use crate::pack_names::is_module_name;
 
 #[derive(
@@ -137,20 +134,11 @@ pub(crate) struct Categories {
 }
 
 impl Categories {
-    pub(crate) fn load(config: Option<&Path>) -> Result<Self> {
-        let bundled = pack::category_policies()?;
-        let mut project = BTreeMap::<String, Policy>::new();
-        if let Some(config) = config {
-            for (package, policy) in LocalProject::category_policies(config)? {
-                project.entry(package).or_insert(policy);
-            }
-        }
-        Ok(Self { bundled, project })
-    }
-
-    pub(crate) fn current() -> Result<Self> {
-        let config = LocalProject::find(&std::env::current_dir()?)?;
-        Self::load(config.as_deref())
+    pub(crate) fn from_policies(
+        bundled: BTreeMap<String, Policy>,
+        project: BTreeMap<String, Policy>,
+    ) -> Self {
+        Self { bundled, project }
     }
 
     pub(crate) fn default_for(&self, package: &str) -> Option<Category> {

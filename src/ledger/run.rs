@@ -27,31 +27,6 @@ use crate::output::Format;
 
 use super::{Entry, Kind, Tree, at_commit, files, repository};
 
-#[cfg(feature = "ledger-durable")]
-#[path = "durable.rs"]
-#[expect(
-    clippy::allow_attributes,
-    reason = "rustc cannot expect unfulfilled_lint_expectations, so only allow silences it"
-)]
-#[allow(
-    unfulfilled_lint_expectations,
-    reason = "durable.rs marks the items this module now calls as dead code awaiting this wiring"
-)]
-mod durable;
-#[cfg(feature = "ledger-distributed")]
-pub(crate) use durable::worker;
-#[cfg(feature = "ledger-durable")]
-#[path = "orchestration.rs"]
-#[expect(
-    clippy::allow_attributes,
-    reason = "rustc cannot expect unfulfilled_lint_expectations, so only allow silences it"
-)]
-#[allow(
-    unfulfilled_lint_expectations,
-    reason = "orchestration.rs marks ledger_run as dead code awaiting this wiring"
-)]
-mod orchestration;
-
 /// How many times a fix may fail its gate before the next stage is to drop it.
 const ATTEMPTS: usize = 2;
 /// How much of the output of a failed check the journal keeps.
@@ -128,11 +103,11 @@ struct Check {
 
 /// Measured wall-clock duration of one benchmark point, in milliseconds.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
-struct Timing {
-    median_ms: f64,
-    min_ms: f64,
-    max_ms: f64,
-    runs: usize,
+pub(super) struct Timing {
+    pub(super) median_ms: f64,
+    pub(super) min_ms: f64,
+    pub(super) max_ms: f64,
+    pub(super) runs: usize,
 }
 
 /// A benchmark command tracked across the run.
@@ -440,7 +415,7 @@ fn format_speedup(before: Timing, after: Timing) -> String {
 }
 
 /// Total lines across all code files under `paths`.
-fn count_lines(paths: &[PathBuf]) -> usize {
+pub(super) fn count_lines(paths: &[PathBuf]) -> usize {
     files(paths)
         .into_iter()
         .map(|(path, _)| fs::read_to_string(&path).map_or(0, |text| text.lines().count()))
@@ -450,7 +425,7 @@ fn count_lines(paths: &[PathBuf]) -> usize {
 /// Rounds a millisecond measurement to two decimal places.
 /// The class of machine this process runs on: its CPU model, OS and architecture. Two
 /// timings of a benchmark compare only when they come from the same class.
-fn host_fingerprint() -> String {
+pub(super) fn host_fingerprint() -> String {
     format!(
         "{} / {} / {}",
         cpu_model().unwrap_or_else(|| "unknown CPU".to_owned()),
@@ -487,7 +462,7 @@ fn round_ms(ms: f64) -> f64 {
 }
 
 /// Times `command` with one warmup run followed by `runs` measured runs.
-fn measure_bench(command: &str, runs: usize) -> Result<Timing> {
+pub(super) fn measure_bench(command: &str, runs: usize) -> Result<Timing> {
     let runs = runs.max(1);
     let (passed, printed) = passes(command);
     ensure!(
@@ -523,7 +498,7 @@ fn measure_bench(command: &str, runs: usize) -> Result<Timing> {
 /// Why a gate cannot judge a fix that cites `findings`, when the commit before the fix lacks
 /// any of them. Such an id cannot be gone after the fix either, so without this rule the gate
 /// would count it as removed and keep a fix that removed nothing.
-fn cited_missing(findings: &[String], before: &BTreeSet<String>) -> Option<String> {
+pub(super) fn cited_missing(findings: &[String], before: &BTreeSet<String>) -> Option<String> {
     let missing: Vec<&str> = (findings.iter())
         .filter(|id| !before.contains(*id))
         .map(String::as_str)
@@ -687,7 +662,7 @@ fn git_path(top: &Path, name: &str) -> Result<PathBuf> {
 }
 
 /// Whether `command` exits 0 in the working folder, with the end of what it printed.
-fn passes(command: &str) -> (bool, String) {
+pub(super) fn passes(command: &str) -> (bool, String) {
     let mut shell = if cfg!(windows) {
         let mut shell = Command::new("cmd");
         shell.arg("/C");
@@ -1141,11 +1116,11 @@ mod durable_run {
     use serde::de::DeserializeOwned;
     use siphasher::sip::SipHasher13;
 
-    use super::durable::{
+    use super::super::durable::{
         LazyTokio, LedgerOrchestratorClient, ProviderConfig, instance_id, open_store, run_command,
         start_command,
     };
-    use super::orchestration::{
+    use super::super::orchestration::{
         ACT_FINISH_RUN, ACT_GATE_FIX, ACT_INIT_BASELINE, ACT_VALIDATE_PLAN, BaselineOutput,
         Command as RunCommand, CommandEnvelope, FinishOutput, GateOutput, JournalState, Receipt,
         ReceiptOutcome, RunStartInput, Snapshot, ValidatePlanOutput,

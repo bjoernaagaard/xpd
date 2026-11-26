@@ -7,10 +7,6 @@ use std::hash::{DefaultHasher, Hash, Hasher};
 
 use crate::syntax::Node;
 
-#[cfg(feature = "ledger-incremental")]
-#[path = "../ledger/salsa_db.rs"]
-pub(crate) mod salsa_db;
-
 /// The fewest tokens of a near copy. A shorter stretch has the structure of another by chance.
 const TOKENS: usize = 60;
 /// The fewest lines of a near copy.
@@ -25,12 +21,12 @@ const DIFFERENT_PERCENT: usize = 25;
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub(crate) struct Block {
     /// The same for two stretches with the same kinds of tokens in the same structure.
-    pub(super) shape: u64,
+    pub(crate) shape: u64,
     /// The index of the nearest stretch around this one, in the blocks of the file.
     parent: Option<usize>,
-    pub(super) tokens: usize,
+    pub(crate) tokens: usize,
     /// The first and the last line, counted from 1.
-    pub(super) lines: (usize, usize),
+    pub(crate) lines: (usize, usize),
     /// The first and the last of its tokens, in the tokens of the file.
     leaves: (usize, usize),
 }
@@ -122,15 +118,15 @@ fn visit(node: &Node<'_>, shapes: &mut Shapes) -> (usize, u64, Vec<usize>) {
 type At = (usize, usize);
 
 /// A text that two stretches differ in, as the first writes it and as the other does.
-pub(super) type Swap<'f> = (&'f str, &'f str);
+pub(crate) type Swap<'f> = (&'f str, &'f str);
 
 /// Stretches of code that are the same but for `swaps`.
 #[derive(Debug)]
-pub(super) struct Twins<'f> {
+pub(crate) struct Twins<'f> {
     /// The file and the stretch of each, in the order of the files.
-    pub(super) members: Vec<(&'f str, &'f Block)>,
+    pub(crate) members: Vec<(&'f str, &'f Block)>,
     /// The texts that differ between the first stretch and another one.
-    pub(super) swaps: Vec<Swap<'f>>,
+    pub(crate) swaps: Vec<Swap<'f>>,
 }
 
 /// The texts that the tokens `a` and `b` differ in. `None` when they differ in more than a
@@ -153,7 +149,7 @@ fn swaps<'f>(a: &'f [String], b: &'f [String]) -> Option<Vec<Swap<'f>>> {
 
 /// The groups of near copies among the files, each file with its path. A stretch inside a
 /// larger near copy is left out, so each one is named once, at its full size.
-pub(super) fn groups<'f>(files: &'f [(&'f str, Shapes)]) -> Vec<Twins<'f>> {
+pub(crate) fn groups<'f>(files: &'f [(&'f str, Shapes)]) -> Vec<Twins<'f>> {
     let mut by_shape: HashMap<u64, Vec<At>> = HashMap::new();
     for (file, (_, shapes)) in files.iter().enumerate() {
         for (index, block) in shapes.blocks.iter().enumerate() {

@@ -30,10 +30,6 @@ use super::orchestration::{
     ledger_run, receipt_key,
 };
 
-#[cfg(feature = "ledger-distributed")]
-#[path = "worker.rs"]
-pub(crate) mod worker;
-
 /// The variable that names the PostgreSQL store of horizontal mode.
 #[cfg(feature = "ledger-distributed")]
 pub(crate) const PG_URL_VAR: &str = "XPD_LEDGER_PG_URL";
@@ -165,15 +161,6 @@ impl LazyTokio {
         Self { runtime: None }
     }
 
-    /// Whether the runtime has been built yet.
-    #[expect(
-        dead_code,
-        reason = "the proof of lazy boot reads it before the next slice wires it"
-    )]
-    pub(crate) fn is_booted(&self) -> bool {
-        self.runtime.is_some()
-    }
-
     /// The runtime, built on this first call.
     pub(crate) fn runtime(&mut self) -> Result<&tokio::runtime::Runtime> {
         if self.runtime.is_none() {
@@ -245,7 +232,6 @@ impl fmt::Debug for LedgerOrchestratorClient {
     }
 }
 
-#[expect(dead_code, reason = "wired into run::act in the next slice")]
 impl LedgerOrchestratorClient {
     pub(crate) fn new(store: Arc<dyn Provider>, instance_id: String) -> Self {
         Self::of(Client::new(store), instance_id)
@@ -258,10 +244,6 @@ impl LedgerOrchestratorClient {
             client,
             instance_id,
         }
-    }
-
-    pub(crate) fn instance_id(&self) -> &str {
-        &self.instance_id
     }
 
     /// Starts the run and returns at once. The start is done when the receipt
@@ -348,25 +330,6 @@ impl LedgerOrchestratorClient {
         Ok(Some(snapshot))
     }
 
-    /// Waits for the mirror to move past `last_seen_version`.
-    pub(crate) async fn wait_for_status_change(
-        &self,
-        last_seen_version: u64,
-        timeout: Duration,
-    ) -> Result<OrchestrationStatus> {
-        let status = self
-            .client
-            .wait_for_status_change(
-                &self.instance_id,
-                last_seen_version,
-                Duration::from_millis(25),
-                timeout,
-            )
-            .await
-            .context("the run status did not change in time")?;
-        Ok(status)
-    }
-
     /// Cancels the instance, as a restart does with the run it replaces.
     pub(crate) async fn cancel(&self, reason: &str) -> Result<()> {
         self.client
@@ -384,7 +347,6 @@ impl LedgerOrchestratorClient {
 /// own receipt, and both runtimes shut down before the snapshot returns. A
 /// receipt that says the command was rejected still returns its snapshot, so
 /// the caller can print the stage that comes next and choose its exit code.
-#[expect(dead_code, reason = "wired into run::act in the next slice")]
 pub(crate) fn run_command(
     config: &ProviderConfig,
     instance_id: &str,
@@ -428,7 +390,6 @@ pub(crate) fn run_command(
 }
 
 /// Starts a run on a runtime built only for it, and waits for its receipt.
-#[expect(dead_code, reason = "wired into run::act in the next slice")]
 pub(crate) fn start_command(
     config: &ProviderConfig,
     instance_id: &str,
@@ -469,23 +430,6 @@ pub(crate) fn start_command(
         Ok::<(Snapshot, Receipt), anyhow::Error>((snapshot, receipt))
     })??;
     Ok((snapshot, receipt))
-}
-
-/// The snapshot a `status` call prints, read with a client alone.
-///
-/// The Tokio runtime here serves only the store read. No `duroxide` runtime
-/// boots, no activity runs, and no command is queued.
-#[expect(dead_code, reason = "wired into run::act in the next slice")]
-pub(crate) fn read_status(config: &ProviderConfig, instance_id: &str) -> Result<Option<Snapshot>> {
-    let config = config.clone();
-    let instance_id = instance_id.to_owned();
-    let mut lazy = LazyTokio::new();
-    let snapshot = lazy.block_on(async move {
-        let store = open_store(&config).await?;
-        let client = LedgerOrchestratorClient::new(store, instance_id);
-        client.snapshot().await
-    })??;
-    Ok(snapshot)
 }
 
 /// How long the CLI waits for the receipt of a command that workers serve, at the least. A

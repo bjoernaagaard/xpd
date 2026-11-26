@@ -13,8 +13,8 @@ use clap_complete::Generator;
 use serde_json::Value;
 
 use crate::author;
-use crate::catalog::{Catalog, Filters};
-use crate::category::{Categories, Category};
+use crate::catalog::{self, Catalog, Filters};
+use crate::category::Category;
 use crate::check::FixMode;
 use crate::fix_safety::Applicability;
 use crate::graph::Graph;
@@ -24,7 +24,7 @@ use crate::lsp;
 use crate::mcp;
 use crate::migration::MapArgs;
 use crate::outline::OutlineArgs;
-use crate::output::Format;
+use crate::output::{self, Format};
 use crate::query::RunArgs;
 use crate::settings::Settings;
 use crate::skills;
@@ -477,7 +477,8 @@ pub fn run() -> ExitCode {
                 index::api(&entries, &name)?.with_context(|| format!("no entry named {name}"))?;
             entry.keywords.clear();
             if categories {
-                entry.categories = entries.entry_categories(&Categories::current()?, &entry);
+                entry.categories =
+                    entries.entry_categories(&catalog::current_categories()?, &entry);
             }
             print_entries(&[entry], format, Detail::Full)
         })()),
@@ -527,12 +528,14 @@ pub fn run() -> ExitCode {
             let format = format.unwrap_or(default_format);
             command_result(crate::doctor::run(format, mode, kind.as_deref(), &tools))
         }
-        Cmd::Skill { json: false } => print_out(SKILL),
-        Cmd::Skill { json: true } => print_out(&format!("{}\n", skills::to_json())),
+        Cmd::Skill { json: false } => output::print_out(SKILL),
+        Cmd::Skill { json: true } => output::print_out(&format!("{}\n", skills::to_json())),
         Cmd::Mcp { args } => mcp::run(&args),
         Cmd::Lsp => lsp::run(),
         Cmd::Completions { shell } => run_completions(shell),
-        Cmd::Commands => print_out(&format!("{}\n", crate::commands::to_json(Cli::command()))),
+        Cmd::Commands => {
+            output::print_out(&format!("{}\n", crate::commands::to_json(Cli::command())))
+        }
     }
 }
 
@@ -556,7 +559,9 @@ fn find(args: FindArgs) -> Result<()> {
     }
     let entries = index::load_for(index.as_deref(), package.as_deref())?;
     let query = query.context("provide a task query or --check")?;
-    let policy = category.map(|_| Categories::current()).transpose()?;
+    let policy = category
+        .map(|_| catalog::current_categories())
+        .transpose()?;
     let found = index::find_in_category(
         &entries,
         &query,
@@ -583,12 +588,6 @@ fn run_completions(shell: clap_complete::Shell) -> ExitCode {
         Err(error) if error.kind() == io::ErrorKind::BrokenPipe => ExitCode::SUCCESS,
         result => unit_result(result.map_err(Into::into)),
     }
-}
-
-/// Prints `text` as it is, for a command that cannot fail.
-pub(crate) fn print_out(text: &str) -> ExitCode {
-    print!("{text}");
-    ExitCode::SUCCESS
 }
 
 fn unit_result(result: Result<()>) -> ExitCode {
@@ -646,7 +645,7 @@ fn refresh_index(args: IndexArgs) -> Result<()> {
     } = args;
     let version = version.map_or_else(|| index::source_version(&source, &package), Ok)?;
     let output = output.unwrap_or_else(|| PathBuf::from(format!("indexes/{package}.json")));
-    let categories = Categories::current()?;
+    let categories = catalog::current_categories()?;
     let mut index = index::generate(&source, &package, &version)?;
     index.classify(&categories);
     if let (Some(root), Some(url), Some(license)) =
@@ -747,7 +746,7 @@ fn rules(options: RulesOptions, default: Format) -> Result<ExitCode> {
         .as_ref()
         .map(|project| project.config.as_path());
     let policy = (categories || category.is_some())
-        .then(|| Categories::load(project))
+        .then(|| catalog::load_categories(project))
         .transpose()?;
     let entries = catalog.entries();
     let review = crate::chart_review::inventory()?;
@@ -827,7 +826,7 @@ fn check(args: CheckArgs, default_format: Format) -> Result<ExitCode> {
     )?;
     let policy = category_summary
         .then(|| {
-            Categories::load(
+            catalog::load_categories(
                 workspace
                     .catalog
                     .project

@@ -15,7 +15,7 @@ use serde::{Deserialize, Serialize};
 
 use duroxide::{OrchestrationContext, RetryPolicy};
 
-use super::cited_missing;
+use super::run::cited_missing;
 
 /// The name the orchestration is registered and started under.
 pub(crate) const ORCHESTRATION_NAME: &str = "LedgerRun";
@@ -650,7 +650,6 @@ async fn apply_finish(ctx: &OrchestrationContext, state: &mut JournalState) -> R
 
 /// The orchestration of one ledger run. It returns the final snapshot JSON,
 /// which completes the instance, when a `finish` command ends the run.
-#[expect(dead_code, reason = "wired into the ledger in the next slice")]
 pub(crate) async fn ledger_run(ctx: OrchestrationContext, input: String) -> Result<String, String> {
     let start: RunStartInput =
         serde_json::from_str(&input).map_err(|error| format!("bad run start: {error}"))?;

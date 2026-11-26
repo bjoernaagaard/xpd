@@ -4,7 +4,7 @@
 
 mod local;
 
-use std::collections::{BTreeSet, HashMap};
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::path::{Path, PathBuf};
 
 use crate::severity::Severity;
@@ -12,7 +12,25 @@ use anyhow::{Context, Result, bail};
 use serde_json::{Value, json};
 
 pub(crate) use self::local::LocalProject;
-use crate::category::{Categories, Category, RuleCategory};
+use crate::category::{Categories, Category, Policy, RuleCategory};
+
+/// Loads bundled and optional project category policies into a [`Categories`] resolver.
+pub(crate) fn load_categories(config: Option<&Path>) -> Result<Categories> {
+    let bundled = pack::category_policies()?;
+    let mut project = BTreeMap::<String, Policy>::new();
+    if let Some(config) = config {
+        for (package, policy) in LocalProject::category_policies(config)? {
+            project.entry(package).or_insert(policy);
+        }
+    }
+    Ok(Categories::from_policies(bundled, project))
+}
+
+/// Loads category policies for the current working directory.
+pub(crate) fn current_categories() -> Result<Categories> {
+    let config = LocalProject::find(&std::env::current_dir()?)?;
+    load_categories(config.as_deref())
+}
 use crate::fix_safety::Applicability;
 use crate::pack::{self, Pack};
 use crate::package_check;

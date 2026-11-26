@@ -27,7 +27,7 @@ use crate::style::Style;
 use crate::syntax;
 use crate::workspace::Workspace;
 
-use crate::optimize::gix_source::Listing;
+use crate::ledger::gix_source::Listing;
 use history::History;
 
 type Finding = ledger::Finding<Kind>;

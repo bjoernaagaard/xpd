@@ -18,7 +18,7 @@ use std::sync::Arc;
 use ast_grep_language::SupportLang;
 use salsa::Durability;
 
-use crate::optimize::twins;
+use super::twins;
 use crate::syntax;
 
 /// How many file texts stay in memory at once.

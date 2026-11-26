@@ -1,8 +1,15 @@
 use std::collections::HashSet;
+use std::process::ExitCode;
 use std::sync::LazyLock;
 
 use clap::ValueEnum;
 use regex::Regex;
+
+/// Prints `text` as it is, for a command that cannot fail.
+pub(crate) fn print_out(text: &str) -> ExitCode {
+    print!("{text}");
+    ExitCode::SUCCESS
+}
 
 /// How `graph`, `rules`, `find`, `api`, `rules new` and `rules test` print what they found.
 #[derive(Debug, Clone, Copy, ValueEnum)]

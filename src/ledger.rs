@@ -20,10 +20,19 @@ use siphasher::sip::SipHasher13;
 
 use crate::git;
 
+#[cfg(feature = "ledger-durable")]
+mod durable;
+pub(crate) mod gix_source;
+#[cfg(feature = "ledger-durable")]
+mod orchestration;
 mod run;
-use crate::output::Format;
+#[cfg(feature = "ledger-incremental")]
+pub(crate) mod salsa_db;
+pub(crate) mod twins;
 #[cfg(feature = "ledger-distributed")]
-pub(crate) use run::worker;
+pub(crate) mod worker;
+
+use crate::output::Format;
 
 /// How many places of a finding the text shows. The JSON holds every place.
 const PLACES_SHOWN: usize = 3;

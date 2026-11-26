@@ -14,7 +14,8 @@ use serde::de::IgnoredAny;
 use serde_json::{Value, json};
 
 use super::document::{self, Name, RuleDoc};
-use crate::category::{Categories, Category};
+use crate::catalog;
+use crate::category::Category;
 use crate::project::{
     self, PROJECT_FILES, PackList, RuleFolders, SGCONFIG, TestFolder, XPD_CONFIG, pack_entry,
 };
@@ -122,7 +123,7 @@ impl Pack {
             self.default_category = if let Some(category) = category {
                 category
             } else {
-                Categories::load(None)?
+                catalog::load_categories(None)?
                     .default_for(&self.module)
                     .unwrap_or_default()
             };

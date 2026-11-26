@@ -7,10 +7,7 @@
 //! indexed for one element are read from Python, with defaults from the index that `xpd api`
 //! reads.
 
-#[path = "ledger/gix_source.rs"]
-pub(crate) mod gix_source;
 mod python;
-mod twins;
 
 use std::collections::{BTreeSet, HashMap, HashSet};
 use std::fs;
@@ -25,14 +22,14 @@ use serde::Serialize;
 
 use crate::catalog::Filters;
 use crate::index::{self, Library, Method};
-use crate::ledger::{self, Ledger, Place, Select, Tree};
+use crate::ledger::gix_source::Listing;
+use crate::ledger::{self, Ledger, Place, Select, Tree, twins};
 use crate::output::Format;
 use crate::source;
 use crate::style::Style;
 use crate::syntax;
 use crate::workspace::Workspace;
 
-use gix_source::Listing;
 use python::{Callee, Keyword};
 
 type Finding = ledger::Finding<Kind>;

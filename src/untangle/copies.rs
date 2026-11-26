@@ -103,31 +103,12 @@ pub(super) fn groups<'f>(blocks: &'f [(&'f str, Block)]) -> Vec<Vec<(&'f str, &'
 use std::sync::Arc;
 
 #[cfg(feature = "ledger-incremental")]
-use ast_grep_language::SupportLang;
+use crate::ledger::salsa_db::SourceText;
 
 /// How many per-file facts stay in memory at once.
 #[cfg(feature = "ledger-incremental")]
 #[expect(dead_code, reason = "the surveys that call it come in the next slice")]
 pub(crate) const FILE_FACTS_LRU: usize = 2048;
-
-/// The text of one file, captured by the caller before the survey runs, for the incremental
-/// facts query. The blob id or text hash names the text, so the query reads no file.
-#[cfg(feature = "ledger-incremental")]
-#[salsa::input]
-pub(crate) struct BlockSource {
-    /// The path below the top of the repository.
-    #[returns(deref)]
-    pub(crate) rel_path: String,
-    /// The id of the blob at a commit, or the hash of the text of the working tree.
-    #[returns(deref)]
-    pub(crate) blob_oid: String,
-    /// The language of the file.
-    #[returns(copy)]
-    pub(crate) lang: SupportLang,
-    /// The text itself, as read from the object database or from disk.
-    #[returns(deref)]
-    pub(crate) text: String,
-}
 
 /// The per-file facts of `xpd untangle` for one file: its lines and its copied stretches.
 #[cfg(feature = "ledger-incremental")]
@@ -145,7 +126,7 @@ pub(crate) struct UntangleFileSummary {
 #[salsa::tracked(lru = 2048, returns(ref))]
 pub(crate) fn untangle_file_facts(
     db: &dyn salsa::Database,
-    source: BlockSource,
+    source: SourceText,
 ) -> Arc<UntangleFileSummary> {
     let text: Arc<str> = Arc::from(source.text(db));
     let root = crate::syntax::parse_as(&text, source.lang(db));
