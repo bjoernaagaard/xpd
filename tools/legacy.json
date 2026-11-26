@@ -394,7 +394,6 @@
   "rules/python/unpacked-comprehension.yml": "1-3",
   "rules/python/utils/cell-marker.yml": "3-6",
   "rules/python/utils/importable-module.yml": "3-5",
-  "rules/python/vague-module-name.yml": "1-4",
   "rules/scipy/callable-metric.yml": "1-6,35",
   "rules/scipy/cdf-complement.yml": "1-7,51",
   "rules/scipy/ckdtree.yml": "1-7",

@@ -8,8 +8,9 @@ and the `python-review` skill reviews code against it.
 | Group | Rules |
 | --- | --- |
 | Names | `module-private-name`, `vague-module-name` |
+| Search | `error-message-prefix`, `deprecated-without-decorator` |
 | Modules | `import-side-effect` |
-| Types | `typing-cast`, `dict-str-any`, `record-without-namedtuple`, `json-without-type`, `same-type-conversion`, `float-around-number` |
+| Types | `typing-cast`, `dict-str-any`, `id-without-newtype`, `record-without-namedtuple`, `json-without-type`, `same-type-conversion`, `float-around-number` |
 | Functions | `pass-through-function`, `multi-line-call-argument` |
 | Tests | `mock-import`, `test-skip`, `test-rerun`, `test-sleep`, `test-suppressed-health-check` |
 | Comprehensions | `comprehension-merges-dicts`, `unpacked-comprehension`, `comprehension-two-fors`, `comprehension-multi-line`, `comprehension-among-arguments` |
@@ -23,6 +24,13 @@ Name each module after what it holds, and leave the underscore off module level 
 - module-private-name
 - vague-module-name
 
+## Search
+
+Put the words a search uses where the search lands, so a message from a log or a deprecated name leads to its source in one search.
+
+- error-message-prefix
+- deprecated-without-decorator
+
 ## Modules
 
 Keep calls and environment reads out of the top level of a module, so an import runs no work.
@@ -35,6 +43,7 @@ State the real type in a signature, so the type checker can check the keys and t
 
 - typing-cast
 - dict-str-any
+- id-without-newtype
 - record-without-namedtuple
 - json-without-type
 - same-type-conversion

@@ -8,11 +8,12 @@ import os
 import json
 import time
 import tomllib
+import warnings
 from collections import Counter, defaultdict, deque
 from dataclasses import dataclass
 from datetime import date, datetime
 from functools import cache
-from typing import Any, NamedTuple, TypeVar, cast
+from typing import Any, NamedTuple, NewType, TypeVar, cast
 from unittest.mock import patch  # xpd: mock-import
 
 import toml
@@ -375,3 +376,41 @@ def nested(items: list[dict]) -> list[str]:
 def flat_calls(items: list[dict]) -> list[str]:
     label = "{name}:{price}".format(name=items[0]["name"], price=items[0]["price"])
     return [label]
+
+
+def require_column(columns: list[str], column: str) -> None:
+    if column not in columns:
+        raise KeyError(f"{column}: missing from the frame")  # xpd: error-message-prefix
+
+
+def require_column_named(columns: list[str], column: str) -> None:
+    if column not in columns:
+        raise KeyError(f"Column missing from the frame: {column}")
+
+
+UserId = NewType("UserId", str)
+OrgId = NewType("OrgId", str)
+
+
+def transfer_owner(user_id: str, org_id: str = "") -> None:  # xpd: id-without-newtype
+    log.info("Transfer owner %s to org %s", user_id, org_id)
+
+
+def transfer_owner_typed(user_id: UserId, org_id: OrgId) -> None:
+    log.info("Transfer owner %s to org %s", user_id, org_id)
+
+
+def load_orders_csv(path: str) -> str:
+    warnings.warn("Use load_orders_parquet", DeprecationWarning, stacklevel=2)  # xpd: deprecated-without-decorator
+    return path
+
+
+@warnings.deprecated("Use load_orders_parquet")
+def load_orders_tsv(path: str) -> str:
+    return path
+
+
+def load_orders(path: str, sep: str | None = None) -> str:
+    if sep is not None:
+        warnings.warn("The sep argument is ignored", DeprecationWarning, stacklevel=2)
+    return path

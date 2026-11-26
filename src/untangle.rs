@@ -59,7 +59,7 @@ pub(crate) enum Kind {
     ImportCycle,
     /// Code uses a private name of another module.
     PrivateReach,
-    /// A module named `utils`, `helpers` or `common` holds code with no single purpose.
+    /// A module named `utils`, `helpers`, `config` or another role holds code with no single purpose.
     VagueModule,
     /// A function only passes its parameters to one call.
     PassThrough,

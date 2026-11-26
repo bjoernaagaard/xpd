@@ -76,8 +76,9 @@ The first two groups are where real bugs live.
 - A public function without annotations, or one that takes or returns `Any`.
 - `typing.cast` or `# type: ignore` in place of fixing the type where the value is made.
 - A `dict[str, Any]` passed between functions where a `NamedTuple` would name the
-  fields (`python/dict-str-any`), a `typing.cast` (`python/typing-cast`), or a function
-  that returns `json.loads` in place of a typed value (`python/json-without-type`).
+  fields (`python/dict-str-any`), a `typing.cast` (`python/typing-cast`), a function
+  that returns `json.loads` in place of a typed value (`python/json-without-type`), or two
+  IDs typed as plain `str` or `int` that a caller can swap (`python/id-without-newtype`).
 - A frozen dataclass that can be a `NamedTuple` (`python/record-without-namedtuple`), a record that
   no function takes and that only carries two or three results to one caller, or a
   record with one field.
@@ -108,8 +109,11 @@ The first two groups are where real bugs live.
 
 - Module level names that start with an underscore, and a module without `__all__`
   whose callers have to guess what is public (`python/module-private-name`).
-- Mutable module level state, a `utils` or `helpers` module (`python/vague-module-name`),
-  or a wildcard import.
+- Mutable module level state, a `utils`, `helpers` or `config` module
+  (`python/vague-module-name`), or a wildcard import.
+- An error message that starts with a value, so a log line does not search back to the raise
+  (`python/error-message-prefix`), and a deprecation that only warns at run time in place of
+  `@deprecated` (`python/deprecated-without-decorator`).
 - A module that configures a library, sets up logging or reads the environment when it is
   imported (`python/import-side-effect`).
 - An import inside a function without a stated reason.
