@@ -1,0 +1,29 @@
+id: id-without-newtype
+language: python
+severity: warning
+message: $NAME takes two or more IDs typed as plain str or int, so a caller can swap them without a type error. Give each kind of ID its own NewType, such as UserId = NewType("UserId", str).
+rule:
+  kind: function_definition
+  all:
+    - has: { field: name, pattern: $NAME }
+    - has:
+        field: parameters
+        has:
+          matches: plain-id-parameter
+          precedes: { stopBy: end, matches: plain-id-parameter }
+  not:
+    inside:
+      stopBy: end
+      kind: module
+      has:
+        any:
+          - kind: import_statement
+            has: { stopBy: end, kind: dotted_name, regex: ^hamilton(\.|$) }
+          - kind: import_from_statement
+            has: { field: module_name, regex: ^hamilton(\.|$) }
+utils:
+  plain-id-parameter:
+    any:
+      - kind: typed_parameter
+      - kind: typed_default_parameter
+    regex: ^(\w+_)?id\s*:\s*(str|int)\s*(=|$)

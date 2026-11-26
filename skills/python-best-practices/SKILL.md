@@ -272,14 +272,15 @@ def table(models: list[Model], catalog: Catalog) -> list[dict[str, object]]:
 |---|---|
 | Layout, quotes, import order, unused names, mutable defaults (`B006`), bare `except`, a `lambda` bound to a name (`E731`), an import inside a function (`PLC0415`), access to another object's private member (`SLF001`) | `ruff format`, `ruff check` |
 | Types, `None` handling, missing annotations in strict mode | the project's type checker |
-| Module level names with an underscore, a `utils` module | `xpd check`: `python/module-private-name`, `python/vague-module-name` |
+| Module level names with an underscore, a `utils` or `config` module | `xpd check`: `python/module-private-name`, `python/vague-module-name` |
+| An error message that starts with a value, a `warnings.warn` deprecation in place of `@deprecated` | `xpd check`: `python/error-message-prefix`, `python/deprecated-without-decorator` |
 | Calls and environment reads at import | `xpd check`: `python/import-side-effect` |
 | `**` merges, unpacked comprehensions, two `for` clauses | `xpd check`: `python/comprehension-merges-dicts`, `python/unpacked-comprehension`, `python/comprehension-two-fors` |
 | A comprehension over several lines, or among other arguments | `xpd check`: `python/comprehension-multi-line`, `python/comprehension-among-arguments` |
 | A function that only passes its parameters on, a call over several lines inside another call | `xpd check`: `python/pass-through-function`, `python/multi-line-call-argument` |
 | A frame rebuilt from the columns of another frame | `xpd check`: `pandas/frame-rebuilt-from-columns` |
 | Three or more `reset_index` or `to_numpy` calls in one function, rows repeated through the index | `xpd check`: `pandas/repeated-reset-index`, `pandas/numpy-round-trip`, `pandas/repeat-rows-by-index` |
-| `typing.cast`, `dict[str, Any]` in a signature | `xpd check`: `python/typing-cast`, `python/dict-str-any` |
+| `typing.cast`, `dict[str, Any]` in a signature, two IDs typed as plain `str` or `int` | `xpd check`: `python/typing-cast`, `python/dict-str-any`, `python/id-without-newtype` |
 | A frozen dataclass or attrs class, a function that returns `json.loads` | `xpd check`: `python/record-without-namedtuple`, `python/json-without-type` |
 | `float()`, `int()`, `str()` or `bool()` around a value of that type | `xpd check`: `python/same-type-conversion`, `python/float-around-number` |
 | `setdefault(key, [])` on a dict the function starts as `{}` | `xpd check`: `python/setdefault-without-defaultdict` |

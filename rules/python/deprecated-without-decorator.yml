@@ -1,0 +1,16 @@
+id: deprecated-without-decorator
+language: python
+severity: warning
+message: This function warns that it is deprecated only when it runs. Mark it with @deprecated from warnings or typing_extensions, so the type checker reports every call to it.
+rule:
+  kind: call
+  all:
+    - has: { field: function, regex: ^(warnings\.)?warn$ }
+    - has:
+        field: arguments
+        has: { regex: \b(Pending)?DeprecationWarning$ }
+  inside:
+    kind: expression_statement
+    inside:
+      kind: block
+      inside: { kind: function_definition }

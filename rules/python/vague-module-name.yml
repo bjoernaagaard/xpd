@@ -1,13 +1,9 @@
-# A module named utils, helpers, common or misc says nothing about what it holds, so unrelated
-# code collects in it and every other module imports it. Name the module after what it holds. The
-# rule has no fix, because the new name is not in the file, and every import of the module would
-# change with it.
 id: vague-module-name
 language: python
 severity: warning
 message: This module's name does not say what it holds. Name it after its contents, and split it when the contents have no single name.
 files:
-  - "**/{util,utils,helper,helpers,common,misc}.py"
-  - "**/{util,utils,helper,helpers,common,misc}/__init__.py"
+  - "**/{util,utils,helper,helpers,common,misc,config,types,constants,handlers}.py"
+  - "**/{util,utils,helper,helpers,common,misc,config,types,constants,handlers}/__init__.py"
 rule:
   kind: module
