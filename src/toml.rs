@@ -133,14 +133,6 @@ impl Observed {
             .map(|value| Self::of_value(&value))
     }
 
-    pub(crate) fn is_empty(&self) -> bool {
-        match self {
-            Self::Bool(b) => !b,
-            Self::Text(text) => text.is_empty(),
-            Self::Items(items) => items.is_empty(),
-        }
-    }
-
     pub(crate) fn show(&self) -> String {
         match self {
             Self::Bool(b) => b.to_string(),

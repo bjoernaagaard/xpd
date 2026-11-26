@@ -391,6 +391,7 @@ enum Cmd {
   xpd doctor
   xpd doctor --check
   xpd doctor --apply --kind library
+  xpd doctor --apply --kind pipeline --tools ruff,ty,pytest
   xpd doctor --format json | jq '.profile.changes[] | {item, path, old, new}'")]
     Doctor {
         /// Output format. Default: text on a terminal, json otherwise.
@@ -406,6 +407,11 @@ enum Cmd {
         /// it, and pyproject.toml records it.
         #[arg(long)]
         kind: Option<String>,
+        /// Hold only the settings of these tools, with their pins and their lock: ruff, ty and
+        /// pytest, such as --tools ruff,ty,pytest. pyproject.toml records them, and a project
+        /// without them holds the whole profile.
+        #[arg(long, value_delimiter = ',')]
+        tools: Vec<String>,
     },
     /// Print the agent skill (SKILL.md) for this xpd version.
     Skill {
@@ -496,6 +502,7 @@ pub fn run() -> ExitCode {
             check,
             apply,
             kind,
+            tools,
         } => {
             let mode = match (check, apply) {
                 (true, _) => crate::doctor::Mode::Check,
@@ -503,7 +510,7 @@ pub fn run() -> ExitCode {
                 _ => crate::doctor::Mode::Report,
             };
             let format = format.unwrap_or(default_format);
-            command_result(crate::doctor::run(format, mode, kind.as_deref()))
+            command_result(crate::doctor::run(format, mode, kind.as_deref(), &tools))
         }
         Cmd::Skill { json: false } => print_out(SKILL),
         Cmd::Skill { json: true } => print_out(&format!("{}\n", skills::to_json())),

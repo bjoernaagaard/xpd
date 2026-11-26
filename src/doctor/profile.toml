@@ -1,5 +1,5 @@
-schema = 5
-revision = 5
+schema = 6
+revision = 6
 summary = "The setup that xpd doctor holds a Python project to. Each value is explained by the record of the same id in decisions.jsonl."
 
 [pins]
@@ -24,6 +24,11 @@ jactionlint = "2.6.0"
 pins = ["pytest", "pytest-timeout", "pytest-randomly", "hypothesis", "ruff", "ty", "tombi", "rumdl", "yamllint", "typos", "deptry", "lefthook", "jactionlint"]
 shell = ["shellcheck-py", "shfmt-py"]
 notebooks = ["nbstripout"]
+
+[dev.tools]
+ruff = ["ruff"]
+ty = ["ty"]
+pytest = ["pytest", "pytest-timeout", "pytest-randomly", "hypothesis"]
 
 [kinds.library]
 summary = "A package that others install. It keeps its build backend, and uv.lock locks its development environment."
@@ -73,6 +78,7 @@ python-version = false
 path = "conftest.py"
 template = "conftest.py.template"
 holds = 'settings.register_profile("slow", deadline=None)'
+tool = "pytest"
 
 [files.editorconfig]
 path = ".editorconfig"
@@ -180,6 +186,9 @@ ignore = [
     "D203",
     "D206",
     "D300",
+    "DOC201",
+    "DOC402",
+    "DOC501",
     "E111",
     "E114",
     "E117",
@@ -188,11 +197,17 @@ ignore = [
     "FBT003",
     "ISC001",
     "ISC002",
+    "PD010",
+    "PD013",
+    "PERF401",
     "PLR0912",
     "PLR0913",
+    "PLR0914",
+    "PLR0915",
     "PLR0917",
     "PLR2004",
     "Q",
+    "RET504",
     "TC",
     "TD",
     "TRY003",

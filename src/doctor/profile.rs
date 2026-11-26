@@ -3,8 +3,9 @@
 //!
 //! ```toml
 //! [tool.xpd.profile]
-//! revision = 5
+//! revision = 6
 //! kind = "application"
+//! tools = ["ruff", "ty", "pytest"]
 //!
 //! [[tool.xpd.profile.exceptions]]
 //! tool = "ruff"
@@ -38,13 +39,17 @@
 //! plugin, by its `pytest11` entry point or its module: `-p no:<name>` turns off a plugin of the
 //! profile, and `-p <name>` loads a plugin that the profile removes.
 //!
+//! A project that records `tools` holds only the settings of those tools, with their pins, their
+//! lock and the owned files that name one of them as their `tool`. `[dev.tools]` names the pins
+//! that come with each tool. Without `tools` the project holds the whole profile.
+//!
 //! `[packaging]` holds uv's cooldown, the Python floor, the build backends, uv's defaults and the
 //! old packaging files, which `packaging.rs` holds a project to.
 
 use std::collections::BTreeSet;
 
 use anyhow::{Context, Result, bail, ensure};
-use toml_edit::{Item, TableLike};
+use toml_edit::{Item, TableLike, Value};
 
 use super::catalog::{self, Catalog, Decision, Key, Kind, Level, Surface, Tool};
 use crate::toml::{self, Toml};
@@ -53,10 +58,55 @@ use crate::toml::{self, Toml};
 const PROFILE: &str = include_str!("profile.toml");
 
 /// The shape of `profile.toml` and of `[tool.xpd.profile]` that this xpd reads.
-pub(crate) const SCHEMA: i64 = 5;
+pub(crate) const SCHEMA: i64 = 6;
 
 /// Where a project's record of the profile lives in its `pyproject.toml`.
 pub(crate) const TABLE: [&str; 3] = ["tool", "xpd", "profile"];
+
+/// The part of the profile that a project holds: the whole of it, or the settings of the tools
+/// it names in `tools`.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub(crate) struct Scope(Option<Vec<Tool>>);
+
+impl Scope {
+    /// The scope that `names` spell, in the order ruff, ty and pytest.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `names` is empty, repeats a tool or names another one.
+    pub(crate) fn parse<S: AsRef<str>>(names: &[S]) -> Result<Self> {
+        ensure!(!names.is_empty(), "no tool is named");
+        let mut tools = Vec::new();
+        for name in names {
+            let name = name.as_ref();
+            let tool = [Tool::Ruff, Tool::Ty, Tool::Pytest]
+                .into_iter()
+                .find(|tool| tool.name() == name)
+                .with_context(|| format!("{name} is none of ruff, ty and pytest"))?;
+            ensure!(!tools.contains(&tool), "{name} is named twice");
+            tools.push(tool);
+        }
+        tools.sort();
+        Ok(Self(Some(tools)))
+    }
+
+    /// Whether the project holds the whole profile.
+    pub(crate) fn whole(&self) -> bool {
+        self.0.is_none()
+    }
+
+    /// Whether the project holds the settings of `tool`.
+    pub(crate) fn holds(&self, tool: Tool) -> bool {
+        self.0.as_ref().is_none_or(|tools| tools.contains(&tool))
+    }
+
+    /// The names of the tools, or `None` for the whole profile.
+    pub(crate) fn names(&self) -> Option<Vec<&'static str>> {
+        self.0
+            .as_ref()
+            .map(|tools| tools.iter().map(|tool| tool.name()).collect())
+    }
+}
 
 /// How a kind of project locks its dependencies.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -135,6 +185,9 @@ pub(crate) struct Owned {
     /// `hatchling.build` for a release workflow that builds a pure Python package. `None` owns it
     /// for every project of the kind.
     pub(crate) backend: Option<String>,
+    /// The tool whose settings the file belongs to, so that a project which holds only some
+    /// tools still gets it. `None` for a file that only the whole profile owns.
+    pub(crate) tool: Option<Tool>,
 }
 
 /// Which files a project tracks that only some tools check.
@@ -593,6 +646,8 @@ pub(crate) struct Profile {
     pub(crate) shell_pins: Vec<(String, String)>,
     /// The pins that only a project with notebooks gets.
     pub(crate) notebook_pins: Vec<(String, String)>,
+    /// The pins that come with each tool, for a project that holds only some tools.
+    pub(crate) tool_pins: Vec<(Tool, Vec<String>)>,
     pub(crate) kinds: Vec<KindSpec>,
     /// The values for every kind.
     pub(crate) base: Values,
@@ -635,6 +690,21 @@ impl Profile {
         let dev_pins = dev_pins(top, pins, "pins")?;
         let shell_pins = dev_pins_of(top, pins, "shell")?;
         let notebook_pins = dev_pins_of(top, pins, "notebooks")?;
+        let by_tool = table(table(top, "dev")?, "tools").context("dev")?;
+        let tool_pins = [Tool::Ruff, Tool::Ty, Tool::Pytest]
+            .into_iter()
+            .map(|tool| {
+                let names = strings(by_tool, tool.name()).context("dev.tools")?;
+                for name in &names {
+                    ensure!(
+                        dev_pins.iter().any(|(pin, _)| pin == name),
+                        "dev.tools.{} names {name}, which dev.pins lacks",
+                        tool.name()
+                    );
+                }
+                Ok((tool, names))
+            })
+            .collect::<Result<Vec<_>>>()?;
         let kinds = table(top, "kinds")?
             .iter()
             .map(|(name, item)| {
@@ -684,6 +754,7 @@ impl Profile {
             dev_pins,
             shell_pins,
             notebook_pins,
+            tool_pins,
             kinds,
             base: Values::read(top)?,
             forbid: PytestForbid::read(table(top, "pytest")?)?,
@@ -901,8 +972,23 @@ impl Profile {
         }
     }
 
-    /// The tools that a project which tracks `tracked` pins in `[dependency-groups] dev`.
-    pub(crate) fn pins(&self, tracked: Tracked) -> Vec<(String, String)> {
+    /// The tools that a project which tracks `tracked` and holds `scope` pins in
+    /// `[dependency-groups] dev`. A project that holds only some tools pins what comes with them.
+    pub(crate) fn pins(&self, tracked: Tracked, scope: &Scope) -> Vec<(String, String)> {
+        if !scope.whole() {
+            let held: Vec<&String> = self
+                .tool_pins
+                .iter()
+                .filter(|(tool, _)| scope.holds(*tool))
+                .flat_map(|(_, names)| names)
+                .collect();
+            return self
+                .dev_pins
+                .iter()
+                .filter(|(name, _)| held.contains(&name))
+                .cloned()
+                .collect();
+        }
         let mut pins = self.dev_pins.clone();
         if tracked.shell {
             pins.extend(self.shell_pins.iter().cloned());
@@ -914,9 +1000,9 @@ impl Profile {
     }
 
     /// The release of Tombi that formats `pyproject.toml` after an apply, when the profile owns
-    /// `tombi.toml` for the kind `kind`.
-    pub(crate) fn formats_toml(&self, kind: Option<&str>) -> Option<String> {
-        self.owned(kind)
+    /// `tombi.toml` for the kind `kind` in a project that holds `scope`.
+    pub(crate) fn formats_toml(&self, kind: Option<&str>, scope: &Scope) -> Option<String> {
+        self.owned(kind, scope)
             .iter()
             .any(|file| file.path == "tombi.toml")
             .then(|| {
@@ -928,14 +1014,15 @@ impl Profile {
             .flatten()
     }
 
-    /// The files the profile owns for the kind `kind`.
-    pub(crate) fn owned(&self, kind: Option<&str>) -> Vec<&Owned> {
+    /// The files the profile owns for the kind `kind` in a project that holds `scope`.
+    pub(crate) fn owned(&self, kind: Option<&str>, scope: &Scope) -> Vec<&Owned> {
         let Some(kind) = kind.and_then(|kind| self.kind(kind)) else {
             return Vec::new();
         };
         self.files
             .iter()
             .filter(|file| kind.files.contains(&file.name))
+            .filter(|file| scope.whole() || file.tool.is_some_and(|tool| scope.holds(tool)))
             .collect()
     }
 }
@@ -1037,6 +1124,18 @@ fn owned_file(name: &str, item: &Item) -> Result<Owned> {
         backend: file
             .get("backend")
             .map(|_| string(file, "backend"))
+            .transpose()?,
+        tool: file
+            .get("tool")
+            .map(|_| {
+                let tool = string(file, "tool")?;
+                [Tool::Ruff, Tool::Ty, Tool::Pytest]
+                    .into_iter()
+                    .find(|known| known.name() == tool)
+                    .with_context(|| {
+                        format!("files.{name}.tool is {tool:?}, not ruff, ty or pytest")
+                    })
+            })
             .transpose()?,
     })
 }
@@ -1167,6 +1266,8 @@ pub(crate) struct Record {
     /// The profile revision that the project's settings follow. `None` before the first apply.
     pub(crate) revision: Option<i64>,
     pub(crate) kind: Option<String>,
+    /// The part of the profile the project holds, from `tools`.
+    pub(crate) scope: Scope,
     pub(crate) exceptions: Vec<Exception>,
 }
 
@@ -1194,8 +1295,8 @@ const EXCEPTION_KEYS: [&str; 5] = ["tool", "id", "files", "value", "reason"];
 ///
 /// # Errors
 ///
-/// Returns an error if the table, its `revision`, its `kind` or its `exceptions` have the wrong
-/// type, or the table holds another key.
+/// Returns an error if the table, its `revision`, its `kind`, its `tools` or its `exceptions`
+/// have the wrong type, or the table holds another key.
 pub(crate) fn record(doc: &Toml) -> Result<Option<Record>> {
     let Some(item) = toml::get(doc, &TABLE) else {
         return Ok(None);
@@ -1206,10 +1307,10 @@ pub(crate) fn record(doc: &Toml) -> Result<Option<Record>> {
         .with_context(|| format!("pyproject.toml: [{name}] is no table"))?;
     if let Some((key, _)) = table
         .iter()
-        .find(|(key, _)| !matches!(*key, "revision" | "kind" | "exceptions"))
+        .find(|(key, _)| !matches!(*key, "revision" | "kind" | "tools" | "exceptions"))
     {
         bail!(
-            "pyproject.toml: [{name}] has no key {key}. Its keys are revision, kind and exceptions"
+            "pyproject.toml: [{name}] has no key {key}. Its keys are revision, kind, tools and exceptions"
         );
     }
     let revision = match table.get("revision") {
@@ -1230,6 +1331,16 @@ pub(crate) fn record(doc: &Toml) -> Result<Option<Record>> {
                 .to_owned(),
         ),
     };
+    let scope = match table.get("tools") {
+        None => Scope::default(),
+        Some(item) => {
+            let names: Vec<&str> = item
+                .as_array()
+                .and_then(|array| array.iter().map(Value::as_str).collect())
+                .with_context(|| format!("pyproject.toml: {name}.tools is no array of strings"))?;
+            Scope::parse(&names).with_context(|| format!("pyproject.toml: {name}.tools"))?
+        }
+    };
     let exceptions = match table.get("exceptions") {
         None => Vec::new(),
         Some(item) => item
@@ -1246,6 +1357,7 @@ pub(crate) fn record(doc: &Toml) -> Result<Option<Record>> {
     Ok(Some(Record {
         revision,
         kind,
+        scope,
         exceptions,
     }))
 }

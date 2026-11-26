@@ -437,7 +437,6 @@ fn is_satisfied(satisfied: Satisfied, current: Option<&Observed>, suggested: &st
     };
     match (satisfied, current, &suggested) {
         (Satisfied::Equals, current, suggested) => current == suggested,
-        (Satisfied::NonEmpty, current, _) => !current.is_empty(),
         (Satisfied::Contains, Observed::Items(have), Observed::Items(want)) => want.is_subset(have),
         (Satisfied::Contains, _, _) => false,
     }
@@ -458,6 +457,18 @@ fn shown(root: &Path, path: &Path) -> PathBuf {
 }
 
 impl Report {
+    /// Drops the advice and the kept choices of each tool that the project does not hold in
+    /// `scope`.
+    pub(crate) fn keep(&mut self, scope: &super::profile::Scope) {
+        let held = |name: &str| {
+            [Tool::Ruff, Tool::Ty, Tool::Pytest]
+                .into_iter()
+                .any(|tool| tool.name() == name && scope.holds(tool))
+        };
+        self.suggestions.retain(|advice| held(advice.tool));
+        self.policies.retain(|policy| held(policy.tool));
+    }
+
     /// The pytest release, and what doctor could not read of pytest's settings. The profile sets
     /// every pytest value, so no pytest record is conditional.
     fn pytest(&mut self, pytest: &Pytest) {

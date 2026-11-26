@@ -33,6 +33,8 @@ const MANIFEST: &str = "manifest.json";
 pub(crate) struct Applied {
     pub(crate) revision: i64,
     pub(crate) kind: Option<String>,
+    /// The tools whose settings the project holds. `None` when it holds the whole profile.
+    pub(crate) tools: Option<Vec<&'static str>>,
     pub(crate) changes: Vec<Change>,
     pub(crate) locks: Vec<Lock>,
     /// Files restored from the journal of an apply that did not finish.
@@ -60,9 +62,12 @@ impl Applied {
         if !self.changes.is_empty() {
             let _ = writeln!(
                 out,
-                "Applied profile revision {}, kind {}, to {PYPROJECT}.",
+                "Applied profile revision {}, kind {}{}, to {PYPROJECT}.",
                 self.revision,
-                self.kind.as_deref().unwrap_or_default()
+                self.kind.as_deref().unwrap_or_default(),
+                self.tools
+                    .as_ref()
+                    .map_or_else(String::new, |tools| format!(", tools {}", tools.join(", ")))
             );
         }
         for change in &self.changes {
@@ -97,9 +102,11 @@ pub(crate) fn run(
     profile: &Profile,
     files: &[PathBuf],
     kind: Option<&str>,
+    tools: &[String],
 ) -> Result<Applied> {
     let recovered = Journal::recover(root)?;
-    let mut full = plan::compute(root, catalog, profile, files, Request { kind, stamp: true })?;
+    let request = |stamp| Request { kind, tools, stamp };
+    let mut full = plan::compute(root, catalog, profile, files, request(true))?;
     full.check_tools(root, super::validate::Fetch::Online);
     if !full.unverified.is_empty() {
         bail!(
@@ -126,18 +133,13 @@ pub(crate) fn run(
         return Ok(Applied {
             revision: full.revision,
             kind: full.kind,
+            tools: full.tools,
             changes: Vec::new(),
             locks: Vec::new(),
             recovered,
         });
     }
-    let settings = plan::compute(
-        root,
-        catalog,
-        profile,
-        files,
-        Request { kind, stamp: false },
-    )?;
+    let settings = plan::compute(root, catalog, profile, files, request(false))?;
     let locks: Vec<Lock> = full
         .locks
         .iter()
@@ -152,7 +154,7 @@ pub(crate) fn run(
     touched.extend(locks.iter().map(|lock| lock.file.clone()));
     let journal = Journal::begin(root, &touched)?;
     let result = write(
-        root, catalog, profile, files, kind, &full, &settings, &locks,
+        root, catalog, profile, files, request, &full, &settings, &locks,
     );
     match result {
         Ok(()) => {
@@ -160,6 +162,7 @@ pub(crate) fn run(
             Ok(Applied {
                 revision: full.revision,
                 kind: full.kind,
+                tools: full.tools,
                 changes: full.changes,
                 locks,
                 recovered,
@@ -179,12 +182,12 @@ pub(crate) fn run(
     clippy::too_many_arguments,
     reason = "the write needs both plans and what made them"
 )]
-fn write(
+fn write<'a>(
     root: &Path,
     catalog: &Catalog,
     profile: &Profile,
     files: &[PathBuf],
-    kind: Option<&str>,
+    request: impl Fn(bool) -> Request<'a>,
     full: &Plan,
     settings: &Plan,
     locks: &[Lock],
@@ -215,28 +218,9 @@ fn write(
         replace(&path, &owned.after)?;
     }
     for lock in locks {
-        let (program, args) = lock.command.split_first().context("a lock has a command")?;
-        let output = Command::new(program)
-            .args(args)
-            .current_dir(root)
-            .stdin(Stdio::null())
-            .output()
-            .with_context(|| format!("cannot run {}", lock.command.join(" ")))?;
-        if !output.status.success() {
-            bail!(
-                "{} failed: {}",
-                lock.command.join(" "),
-                crate::output::hosts_only(String::from_utf8_lossy(&output.stderr).trim())
-            );
-        }
+        refresh(root, &lock.command)?;
     }
-    let mut check = plan::compute(
-        root,
-        catalog,
-        profile,
-        files,
-        Request { kind, stamp: false },
-    )?;
+    let mut check = plan::compute(root, catalog, profile, files, request(false))?;
     check.check_locks(root)?;
     let left = check.drift();
     ensure!(
@@ -244,14 +228,105 @@ fn write(
         "drift remains after the write:\n  {}",
         left.join("\n  ")
     );
-    let stamped = plan::compute(root, catalog, profile, files, Request { kind, stamp: true })?;
+    let stamped = plan::compute(root, catalog, profile, files, request(true))?;
     if Some(&stamped.after) != stamped.before.as_ref() {
         replace(&file, &stamped.after)?;
     }
-    if let Some(release) = profile.formats_toml(stamped.kind.as_deref()) {
+    if let Some(release) = profile.formats_toml(stamped.kind.as_deref(), &stamped.scope) {
         format_toml(root, &release)?;
     }
     Ok(())
+}
+
+/// Runs `command`, which writes a lock file. When uv cannot lock because an index gives no upload
+/// time for a package, the error names every such package, so one edit lets the next apply pass.
+fn refresh(root: &Path, command: &[String]) -> Result<()> {
+    let output = lock_run(root, command, &[])?;
+    if output.status.success() {
+        return Ok(());
+    }
+    let stderr = String::from_utf8_lossy(&output.stderr).into_owned();
+    let shown = command.join(" ");
+    let cause = crate::output::hosts_only(stderr.trim());
+    let undated = undated(root, command, &stderr)?;
+    let Some(first) = undated.first() else {
+        bail!("{shown} failed: {cause}");
+    };
+    bail!(
+        "{shown} failed, because an index gives no upload time for {}, so uv cannot tell whether an upload is older than exclude-newer. Name each of them in exclude-newer-package of [tool.uv], as in {first} = false, and run xpd doctor --apply again. uv said: {cause}",
+        undated.join(", ")
+    );
+}
+
+/// Runs the lock command `command` with `extra` arguments.
+fn lock_run(root: &Path, command: &[String], extra: &[String]) -> Result<std::process::Output> {
+    let (program, args) = command.split_first().context("a lock has a command")?;
+    Command::new(program)
+        .args(args)
+        .args(extra)
+        .current_dir(root)
+        .stdin(Stdio::null())
+        .output()
+        .with_context(|| format!("cannot run {}", command.join(" ")))
+}
+
+/// The packages that keep `command` from locking because their index gives no upload time. uv
+/// stops at the first one, so this runs the command again with the ones found so far exempt,
+/// until uv names no new one.
+fn undated(root: &Path, command: &[String], stderr: &str) -> Result<Vec<String>> {
+    let mut found = missing_upload_dates(stderr);
+    let mut known = 0;
+    while found.len() > known {
+        known = found.len();
+        let exempt: Vec<String> = found
+            .iter()
+            .flat_map(|name| {
+                [
+                    "--exclude-newer-package".to_owned(),
+                    format!("{name}=false"),
+                ]
+            })
+            .collect();
+        let output = lock_run(root, command, &exempt)?;
+        if output.status.success() {
+            break;
+        }
+        for name in missing_upload_dates(&String::from_utf8_lossy(&output.stderr)) {
+            if !found.contains(&name) {
+                found.push(name);
+            }
+        }
+    }
+    Ok(found)
+}
+
+/// The packages that uv's messages in `stderr` name as missing an upload date, each once, by
+/// the name at the start of the file uv names, such as `pkg` of `pkg-1.0.0-py3-none-any.whl`.
+fn missing_upload_dates(stderr: &str) -> Vec<String> {
+    let mut names = Vec::new();
+    for line in stderr.lines() {
+        let Some((before, _)) = line.split_once("` is missing an upload date") else {
+            continue;
+        };
+        let Some((_, file)) = before.rsplit_once('`') else {
+            continue;
+        };
+        let wheel = Path::new(file)
+            .extension()
+            .is_some_and(|extension| extension.eq_ignore_ascii_case("whl"));
+        let stem = if wheel {
+            file.split('-').next()
+        } else {
+            file.rsplit_once('-').map(|(name, _)| name)
+        };
+        let Some(name) = stem.map(|name| name.replace('_', "-").to_lowercase()) else {
+            continue;
+        };
+        if !names.contains(&name) {
+            names.push(name);
+        }
+    }
+    names
 }
 
 /// Formats `pyproject.toml` with Tombi at `release`, the profile's TOML formatter, so the file

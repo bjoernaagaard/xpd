@@ -1,17 +1,16 @@
-id: lazy-import
+id: uppercase-x-parameter
 language: python
 rule:
-  any:
-    - pattern: __lazy_modules__ = $X
-    - all:
-        - any:
-            - kind: ERROR
-            - kind: expression_statement
-        - regex: ^lazy$
-        - precedes:
-            any:
-              - kind: import_statement
-              - kind: import_from_statement
+  kind: parameters
+  has:
+    any:
+      - kind: identifier
+        regex: ^X$
+      - any:
+          - kind: typed_parameter
+          - kind: default_parameter
+          - kind: typed_default_parameter
+        has: { kind: identifier, regex: ^X$ }
 ---
 id: pydantic-model
 language: python
@@ -71,6 +70,11 @@ rule:
     - precedes:
         stopBy: end
         has: { stopBy: end, kind: identifier, pattern: $N }
+    - not:
+        inside:
+          stopBy: end
+          kind: module
+          has: { kind: comment, regex: '^#\s*%%' }
     - not:
         any:
           - has: { kind: else_clause }

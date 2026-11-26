@@ -174,7 +174,7 @@ impl fmt::Display for Key {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Deserialize, Serialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum Trigger {
-    LazyImport,
+    UppercaseXParameter,
     PydanticModel,
     PydanticValidateCall,
     Division,
@@ -197,7 +197,7 @@ pub enum Trigger {
 
 impl Trigger {
     pub const ALL: [Self; 16] = [
-        Self::LazyImport,
+        Self::UppercaseXParameter,
         Self::PydanticModel,
         Self::PydanticValidateCall,
         Self::Division,
@@ -236,8 +236,6 @@ pub enum Satisfied {
     /// The effective value equals the suggested one.
     #[default]
     Equals,
-    /// Any non-empty value is a deliberate policy, such as a list of modules for `ban-lazy`.
-    NonEmpty,
     /// The effective table or list holds every key of the suggested table.
     Contains,
 }
@@ -679,6 +677,16 @@ impl Catalog {
         self.ruff_rules()
             .find(|rule| rule.name.as_deref() == Some(name))
             .map_or(name, |rule| rule.key.id.as_str())
+    }
+
+    /// The selector that doctor writes for `selector`: the name of the rule whose code it is,
+    /// which Ruff's `RUF201` asks for in preview mode, or `selector` itself when it names a group
+    /// of rules, such as `D1`.
+    pub fn ruff_selector<'a>(&'a self, selector: &'a str) -> &'a str {
+        self.ruff_rules()
+            .find(|rule| rule.key.id == selector && !rule.is_removed())
+            .and_then(|rule| rule.name.as_deref())
+            .unwrap_or(selector)
     }
 
     /// The selector a Ruff redirect maps `selector` to, `Some(selector)` when no redirect

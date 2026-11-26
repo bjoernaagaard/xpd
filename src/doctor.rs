@@ -58,9 +58,14 @@ const AMBIGUOUS: u8 = 2;
 /// The URLs of the packaged catalog, such as the source link of each record with its anchor,
 /// print whole, because they are xpd's own text. Every other URL, from the project or from a
 /// tool's message, is redacted, even on the same host.
-pub(crate) fn run(format: Format, mode: Mode, kind: Option<&str>) -> Result<ExitCode> {
+pub(crate) fn run(
+    format: Format,
+    mode: Mode,
+    kind: Option<&str>,
+    tools: &[String],
+) -> Result<ExitCode> {
     let mut out = String::new();
-    let code = report(format, mode, kind, &mut out)
+    let code = report(format, mode, kind, tools, &mut out)
         .map_err(|error| anyhow!(redact(&format!("{error:#}"))));
     let own = crate::output::urls(catalog::DECISIONS);
     print!("{}", crate::output::redact_except(&out, &own));
@@ -68,16 +73,26 @@ pub(crate) fn run(format: Format, mode: Mode, kind: Option<&str>) -> Result<Exit
 }
 
 /// Runs doctor, and writes what it prints to `out`.
-fn report(format: Format, mode: Mode, kind: Option<&str>, out: &mut String) -> Result<ExitCode> {
+fn report(
+    format: Format,
+    mode: Mode,
+    kind: Option<&str>,
+    tools: &[String],
+    out: &mut String,
+) -> Result<ExitCode> {
     let root = std::env::current_dir()?;
     let catalog = catalog::Catalog::packaged()?;
     let profile = profile::Profile::packaged(&catalog)?;
     let mut files: Vec<PathBuf> = crate::source::python_files(std::slice::from_ref(&root))?;
     files.sort();
-    let request = plan::Request { kind, stamp: true };
+    let request = plan::Request {
+        kind,
+        tools,
+        stamp: true,
+    };
     match mode {
         Mode::Apply => {
-            let applied = apply::run(&root, &catalog, &profile, &files, kind)?;
+            let applied = apply::run(&root, &catalog, &profile, &files, kind, tools)?;
             match format {
                 Format::Json => writeln!(out, "{}", serde_json::to_string_pretty(&applied)?)?,
                 Format::Text => out.push_str(&applied.to_text()),
@@ -106,7 +121,8 @@ fn report(format: Format, mode: Mode, kind: Option<&str>, out: &mut String) -> R
         Mode::Report => {
             let mut plan = plan::compute(&root, &catalog, &profile, &files, request)?;
             plan.check_tools(&root, validate::Fetch::Offline);
-            let report = advise(&root, &files, &catalog)?;
+            let mut report = advise(&root, &files, &catalog)?;
+            report.keep(&plan.scope);
             match format {
                 Format::Json => {
                     let output = Output {
@@ -173,6 +189,7 @@ pub(crate) fn drift(root: &Path, files: &[PathBuf]) -> Option<Result<Drift>> {
         let profile = profile::Profile::packaged(&catalog)?;
         let request = plan::Request {
             kind: None,
+            tools: &[],
             stamp: true,
         };
         let mut plan = plan::compute(root, &catalog, &profile, files, request)?;

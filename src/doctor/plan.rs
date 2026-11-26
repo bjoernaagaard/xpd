@@ -23,7 +23,7 @@ use super::catalog::{Catalog, Level, Tool};
 use super::edit;
 use super::packaging;
 use super::placement::Destination;
-use super::profile::{self, Exception, LockStyle, Presence, Profile, Tracked, Values};
+use super::profile::{self, Exception, LockStyle, Presence, Profile, Scope, Tracked, Values};
 use super::pytest::{self, Release};
 use super::ruff;
 use super::ty;
@@ -67,6 +67,8 @@ const DEV: [&str; 2] = ["dependency-groups", "dev"];
 pub(crate) struct Request<'a> {
     /// The kind named on the command line, which replaces the recorded one.
     pub(crate) kind: Option<&'a str>,
+    /// The tools named on the command line, which replace the recorded ones. Empty for none.
+    pub(crate) tools: &'a [String],
     /// Whether the plan records the profile revision and kind in `[tool.xpd.profile]`.
     pub(crate) stamp: bool,
 }
@@ -160,6 +162,8 @@ pub(crate) struct Plan {
     pub(crate) kind_evidence: Option<String>,
     /// What the kind means, from the profile.
     pub(crate) kind_summary: Option<String>,
+    /// The tools whose settings the project holds. `None` when it holds the whole profile.
+    pub(crate) tools: Option<Vec<&'static str>>,
     pub(crate) file: PathBuf,
     pub(crate) changes: Vec<Change>,
     pub(crate) conflicts: Vec<Conflict>,
@@ -184,6 +188,9 @@ pub(crate) struct Plan {
     /// Whether the catalog already found a setting that the pinned Ruff or ty rejects.
     #[serde(skip)]
     rejected: bool,
+    /// The part of the profile that the project holds.
+    #[serde(skip)]
+    pub(crate) scope: Scope,
 }
 
 /// The plan for the project at `root`, whose Python files are `files`.
@@ -221,6 +228,11 @@ pub(crate) fn compute(
         .unwrap_or_default();
     let suggestion = suggest_kind(original.as_ref(), root, files);
     let (kind, kind_from) = choose_kind(request.kind, &record, suggestion.as_ref(), profile)?;
+    let scope = if request.tools.is_empty() {
+        record.scope.clone()
+    } else {
+        Scope::parse(request.tools).context("--tools")?
+    };
     let mut doc: DocumentMut = before
         .as_deref()
         .unwrap_or_default()
@@ -239,6 +251,7 @@ pub(crate) fn compute(
             .map(|kind| kind.summary.clone()),
         kind,
         kind_from,
+        tools: scope.names(),
         file: PathBuf::from(PYPROJECT),
         changes: Vec::new(),
         conflicts: Vec::new(),
@@ -249,13 +262,15 @@ pub(crate) fn compute(
         before,
         after: String::new(),
         owned: Vec::new(),
-        pins: profile.pins(tracked(root)?),
+        pins: profile.pins(tracked(root)?, &scope),
         rejected: false,
+        scope,
     };
     let facts = planned_facts(
         pytest_facts(root, original.as_ref()),
         profile,
         plan.kind.as_deref(),
+        &plan.scope,
     );
     let values = profile.values(plan.kind.as_deref());
     plan.locations(root, original.as_ref(), profile);
@@ -276,24 +291,16 @@ pub(crate) fn compute(
         catalog,
         plan: &mut plan,
     };
-    edits.ruff(&values, &required, &accepted);
-    edits.ty(&values, &accepted);
-    let wanted_pins = edits.plan.pins.clone();
-    let pins = edits.pins(&wanted_pins, facts);
-    let dependencies = pins
-        .or(edits.pytest(&values, profile, facts, &accepted))
-        .or(edits.packaging(&profile.packaging));
+    let dependencies = edits.held(&values, profile, facts, &required, &accepted);
     if request.stamp {
         edits.stamp(profile, &record);
     }
-    edits.verify(&required, &accepted);
+    let scope = edits.plan.scope.clone();
+    if scope.holds(Tool::Ruff) {
+        edits.verify(&required, &accepted);
+    }
     plan.after = doc.to_string();
-    plan.packaging(root, profile);
-    plan.python_version(root, profile)?;
-    plan.owned_files(root, profile, original.as_ref())?;
-    plan.locks(root, profile, files, dependencies);
-    plan.ignored_locks(root);
-    plan.locked_pins(root, profile);
+    plan.beside(root, profile, original.as_ref(), files, dependencies)?;
     plan.diff = plan.diffs();
     Ok(plan)
 }
@@ -366,7 +373,12 @@ fn choose_kind(
 
 /// The pytest facts once the plan is written: a kind that keeps `pyproject.toml` to tool settings
 /// gets no dependency, and a kind that gets the profile's pin of pytest uses that release.
-fn planned_facts(mut facts: PytestFacts, profile: &Profile, kind: Option<&str>) -> PytestFacts {
+fn planned_facts(
+    mut facts: PytestFacts,
+    profile: &Profile,
+    kind: Option<&str>,
+    scope: &Scope,
+) -> PytestFacts {
     if kind
         .and_then(|kind| profile.kind(kind))
         .is_some_and(|kind| kind.tool_only)
@@ -374,6 +386,7 @@ fn planned_facts(mut facts: PytestFacts, profile: &Profile, kind: Option<&str>) 
         facts.lists = false;
     }
     if facts.lists
+        && scope.holds(Tool::Pytest)
         && let Some(pinned) = profile
             .dev_pins
             .iter()
@@ -396,6 +409,28 @@ impl Plan {
             text.push_str(&diff(&name, owned.before.as_deref(), &owned.after));
         }
         text
+    }
+
+    /// What the plan holds beside the edits of `pyproject.toml`: the packaging conflicts and
+    /// `.python-version` of a project that holds the whole profile, the owned files and the
+    /// locks. `dependencies` says whether an edit changed a dependency list.
+    fn beside(
+        &mut self,
+        root: &Path,
+        profile: &Profile,
+        doc: Option<&Toml>,
+        files: &[PathBuf],
+        dependencies: Lists,
+    ) -> Result<()> {
+        if self.scope.whole() {
+            self.packaging(root, profile);
+            self.python_version(root, profile)?;
+        }
+        self.owned_files(root, profile, doc)?;
+        self.locks(root, profile, files, dependencies);
+        self.ignored_locks(root);
+        self.locked_pins(root, profile);
+        Ok(())
     }
 
     /// Whether the project differs from the profile in any way: a value, a lock, a conflict or
@@ -513,7 +548,7 @@ impl Plan {
     /// A conflict for each setting of `doc` that the pinned Ruff or ty rejects.
     fn reject(&mut self, doc: Option<&Toml>, catalog: &Catalog) {
         for problem in doc
-            .map(|doc| validate::problems(doc, catalog))
+            .map(|doc| validate::problems(doc, catalog, &self.scope))
             .unwrap_or_default()
         {
             self.rejected = true;
@@ -585,7 +620,7 @@ impl Plan {
     /// conflict for each other place where the tool of an owned file would read its settings.
     fn owned_files(&mut self, root: &Path, profile: &Profile, doc: Option<&Toml>) -> Result<()> {
         let backend = profile.packaging.backend(root);
-        for owned in profile.owned(self.kind.as_deref()) {
+        for owned in profile.owned(self.kind.as_deref(), &self.scope) {
             if owned
                 .backend
                 .as_deref()
@@ -811,6 +846,9 @@ impl Plan {
         for (nested, tools) in nested(root) {
             let shown = nested.strip_prefix(root).unwrap_or(&nested).to_path_buf();
             for tool in tools {
+                if !self.scope.holds(tool) {
+                    continue;
+                }
                 let message = match tool {
                     Tool::Ruff => format!(
                         "Ruff reads {} for the files below it instead of {PYPROJECT} at the root. Move its settings into [tool.ruff] of the root {PYPROJECT}, with per-file-ignores for its files.",
@@ -833,7 +871,7 @@ impl Plan {
     /// The files that keep a tool's settings outside the tool's table in `pyproject.toml`.
     fn locations(&mut self, root: &Path, doc: Option<&Toml>, profile: &Profile) {
         for name in [".ruff.toml", "ruff.toml"] {
-            if root.join(name).is_file() {
+            if self.scope.holds(Tool::Ruff) && root.join(name).is_file() {
                 self.conflict(
                     name,
                     None,
@@ -841,7 +879,7 @@ impl Plan {
                 );
             }
         }
-        if root.join("ty.toml").is_file() {
+        if self.scope.holds(Tool::Ty) && root.join("ty.toml").is_file() {
             self.conflict(
                 "ty.toml",
                 None,
@@ -855,7 +893,7 @@ impl Plan {
                 Some(marker) => fs::read_to_string(&path)
                     .is_ok_and(|text| text.lines().any(|line| line.trim() == marker)),
             };
-            if holds {
+            if holds && self.scope.holds(Tool::Pytest) {
                 self.conflict(
                     name,
                     None,
@@ -864,7 +902,10 @@ impl Plan {
             }
         }
         if let Some(doc) = doc {
-            if let Some(base) = toml::get(doc, &["tool", "ruff", "extend"]).and_then(Item::as_str) {
+            if let Some(base) = toml::get(doc, &["tool", "ruff", "extend"])
+                .and_then(Item::as_str)
+                .filter(|_| self.scope.holds(Tool::Ruff))
+            {
                 let line = toml::line(doc, &["tool", "ruff", "extend"]);
                 self.conflict(
                     PYPROJECT,
@@ -935,14 +976,21 @@ impl Plan {
     ) -> Vec<Exception> {
         let mut accepted: Vec<Exception> = Vec::new();
         for exception in exceptions {
-            let (status, message) =
-                match verdict(values, required, forbid, facts, exception, &accepted) {
-                    Ok(()) => {
-                        accepted.push(exception.clone());
-                        ("valid", None)
-                    }
-                    Err((status, message)) => (status, Some(message)),
-                };
+            let (status, message) = match verdict(
+                values,
+                required,
+                forbid,
+                facts,
+                exception,
+                &accepted,
+                &self.scope,
+            ) {
+                Ok(()) => {
+                    accepted.push(exception.clone());
+                    ("valid", None)
+                }
+                Err((status, message)) => (status, Some(message)),
+            };
             self.exceptions.push(ExceptionState {
                 tool: exception.tool.clone(),
                 id: exception.id.clone(),
@@ -1051,7 +1099,7 @@ impl Plan {
     /// a conflict when it rejects them, or the reason it could not run. A setting that the catalog
     /// already rejects needs no run.
     pub(crate) fn check_tools(&mut self, root: &Path, fetch: validate::Fetch) {
-        if self.rejected {
+        if self.rejected || !self.scope.holds(Tool::Ruff) {
             return;
         }
         let release = super::catalog::RUFF_RELEASE;
@@ -1076,7 +1124,7 @@ impl Plan {
     /// that drifts is not run, because its settings are about to change. Neither is a project
     /// with no `uv.lock`, such as one of standalone scripts, which has no environment of its own.
     pub(crate) fn check_pytest(&mut self, root: &Path) {
-        if self.drifts() || !root.join("uv.lock").is_file() {
+        if self.drifts() || !root.join("uv.lock").is_file() || !self.scope.holds(Tool::Pytest) {
             return;
         }
         match validate::pytest_verdict(root) {
@@ -1172,7 +1220,11 @@ impl Plan {
             (Some(kind), _, _) => format!("kind {kind}"),
             (None, _, _) => "no kind".to_owned(),
         };
-        let _ = writeln!(out, "Profile revision {}, {kind}", self.revision);
+        let tools = self
+            .tools
+            .as_ref()
+            .map_or_else(String::new, |tools| format!(", tools {}", tools.join(", ")));
+        let _ = writeln!(out, "Profile revision {}, {kind}{tools}", self.revision);
         if let Some(summary) = &self.kind_summary {
             let _ = writeln!(out, "  {summary}");
         }
@@ -1321,6 +1373,7 @@ fn verdict(
     facts: PytestFacts,
     exception: &Exception,
     accepted: &[Exception],
+    scope: &Scope,
 ) -> Result<(), (&'static str, String)> {
     let invalid = |message: String| Err(("invalid", message));
     let redundant = |message: String| Err(("redundant", message));
@@ -1338,6 +1391,12 @@ fn verdict(
             ));
         }
     };
+    if !scope.holds(tool) {
+        return redundant(format!(
+            "the project holds only the tools that tools names, and {} is not one of them",
+            tool.name()
+        ));
+    }
     let wanted = [&values.pytest, &values.pytest_before_nine]
         .into_iter()
         .any(|wanted| wanted.addopts.iter().any(|arg| arg == id));
@@ -1893,6 +1952,35 @@ impl Edits<'_> {
         found
     }
 
+    /// The edits for each part of the profile that the project holds: the settings of each tool
+    /// and its pins, and the packaging values when it holds the whole profile. Returns whether a
+    /// dependency list changed.
+    fn held(
+        &mut self,
+        values: &Values,
+        profile: &Profile,
+        facts: PytestFacts,
+        required: &[String],
+        accepted: &[Exception],
+    ) -> Lists {
+        let scope = self.plan.scope.clone();
+        if scope.holds(Tool::Ruff) {
+            self.ruff(values, required, accepted);
+        }
+        if scope.holds(Tool::Ty) {
+            self.ty(values, accepted);
+        }
+        let wanted_pins = self.plan.pins.clone();
+        let mut dependencies = self.pins(&wanted_pins, facts);
+        if scope.holds(Tool::Pytest) {
+            dependencies = dependencies.or(self.pytest(values, profile, facts, accepted));
+        }
+        if scope.whole() {
+            dependencies = dependencies.or(self.packaging(&profile.packaging));
+        }
+        dependencies
+    }
+
     /// The Ruff settings, selection, ignores and banned APIs of the profile. Every rule of the
     /// profile runs, outside the files and rules that the profile's reasons and the project's
     /// exceptions name.
@@ -1922,7 +2010,7 @@ impl Edits<'_> {
             let (enabled, _) = self.resolve();
             let path: Vec<String> = if enabled.contains(&exception.id) {
                 if let Some(array) = edit::array(self.doc, RUFF_LINT, "ignore") {
-                    edit::push(array, &exception.id);
+                    edit::push(array, self.catalog.ruff_selector(&exception.id));
                 }
                 ["tool", "ruff", "lint", "ignore"]
                     .map(str::to_owned)
@@ -2171,7 +2259,7 @@ impl Edits<'_> {
                 continue;
             }
             if let Some(array) = edit::array(self.doc, RUFF_LINT, "ignore") {
-                edit::push(array, selector);
+                edit::push(array, self.catalog.ruff_selector(selector));
             }
             let explained = self.explain_ignore(selector);
             self.change(
@@ -2339,7 +2427,7 @@ impl Edits<'_> {
             let mut path: Vec<&str> = RUFF_LINT.to_vec();
             path.push("per-file-ignores");
             if let Some(array) = edit::array(self.doc, &path, &pattern) {
-                edit::push(array, &code);
+                edit::push(array, self.catalog.ruff_selector(&code));
             }
             path.push(&pattern);
             let item = self.rule_name(&code);
@@ -3036,16 +3124,23 @@ impl Edits<'_> {
         changed
     }
 
-    /// Records the revision and kind in `[tool.xpd.profile]`.
+    /// Records the revision, the kind and the tools in `[tool.xpd.profile]`.
     fn stamp(&mut self, profile: &Profile, record: &profile::Record) {
         let Some(kind) = self.plan.kind.clone() else {
             return;
         };
         if record.revision == Some(profile.revision)
             && record.kind.as_deref() == Some(kind.as_str())
+            && record.scope == self.plan.scope
         {
             return;
         }
+        let tools = |scope: &Scope| {
+            scope
+                .names()
+                .map_or_else(String::new, |names| format!(", tools {}", names.join(", ")))
+        };
+
         edit::set(
             self.doc,
             &profile::TABLE,
@@ -3058,16 +3153,25 @@ impl Edits<'_> {
             "kind",
             Value::from(kind.as_str()),
         );
+        if let Some(names) = self.plan.scope.names() {
+            let names: toml_edit::Array = names.into_iter().collect();
+            edit::set(self.doc, &profile::TABLE, "tools", Value::Array(names));
+        }
         let old = match (record.revision, &record.kind) {
             (None, None) => "none".to_owned(),
             (revision, kind) => format!(
-                "revision {}, kind {}",
+                "revision {}, kind {}{}",
                 revision.map_or_else(|| "none".to_owned(), |revision| revision.to_string()),
-                kind.as_deref().unwrap_or("none")
+                kind.as_deref().unwrap_or("none"),
+                tools(&record.scope)
             ),
         };
-        let new = format!("revision {}, kind {kind}", profile.revision);
-        let reason = "Records the profile revision and kind that the settings follow, so a newer xpd can show the next change.".to_owned();
+        let new = format!(
+            "revision {}, kind {kind}{}",
+            profile.revision,
+            tools(&self.plan.scope)
+        );
+        let reason = "Records the profile revision, the kind and the tools that the settings follow, so a newer xpd can show the next change.".to_owned();
         self.change(
             ("xpd", "profile"),
             "profile record".to_owned(),

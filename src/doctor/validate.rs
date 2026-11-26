@@ -14,6 +14,7 @@ use toml_edit::{Item, TableLike};
 use super::catalog::{self, Catalog, Key, Kind, Surface, Tool};
 use super::plan::dotted;
 use super::probe::Checker;
+use super::profile::Scope;
 use super::ruff;
 use crate::private::{self, Scratch};
 use crate::toml::{self, Toml};
@@ -40,10 +41,13 @@ pub(crate) struct Problem {
 }
 
 /// The settings of `doc` that the pinned Ruff or ty rejects, by the catalog of their keys and
-/// rules.
-pub(crate) fn problems(doc: &Toml, catalog: &Catalog) -> Vec<Problem> {
+/// rules, for each of the two that the project holds in `scope`.
+pub(crate) fn problems(doc: &Toml, catalog: &Catalog, scope: &Scope) -> Vec<Problem> {
     let mut found = Vec::new();
-    if let Some(table) = toml::get(doc, &["tool", "ruff"]).and_then(Item::as_table_like) {
+    if let Some(table) = toml::get(doc, &["tool", "ruff"])
+        .and_then(Item::as_table_like)
+        .filter(|_| scope.holds(Tool::Ruff))
+    {
         let keys = keys(catalog, Tool::Ruff, "");
         walk(
             doc,
@@ -63,7 +67,10 @@ pub(crate) fn problems(doc: &Toml, catalog: &Catalog) -> Vec<Problem> {
         );
         selectors(doc, catalog, &mut found);
     }
-    if let Some(table) = toml::get(doc, &["tool", "ty"]).and_then(Item::as_table_like) {
+    if let Some(table) = toml::get(doc, &["tool", "ty"])
+        .and_then(Item::as_table_like)
+        .filter(|_| scope.holds(Tool::Ty))
+    {
         let keys = keys(catalog, Tool::Ty, "tool.ty.");
         walk(
             doc,

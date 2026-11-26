@@ -136,9 +136,6 @@ from json import loads
 from typing import Any, Iterator
 from pydantic import BaseModel, validate_call
 
-lazy import os
-__lazy_modules__ = ["json"]
-
 def a(v: Any, *args: Any) -> int:
     return v
 
@@ -196,6 +193,9 @@ def v(x: int) -> int:
 
 def check(x: object) -> bool:
     return isinstance(x, (list, dict))
+
+def fit(X: pd.DataFrame) -> pd.DataFrame:
+    return X
 "#;
 
 impl Runner {
@@ -209,6 +209,7 @@ impl Runner {
         self.pytest_settings()?;
         self.pytest_plugins()?;
         self.profile()?;
+        self.tools()?;
         self.reviewed()?;
         self.reviewed_again()?;
         Ok(())
@@ -573,7 +574,7 @@ impl Runner {
             "effective-applied",
             &[(
                 "pyproject.toml",
-                "[project]\nname = \"effective\"\nversion = \"0.1.0\"\nrequires-python = \">=3.12\"\ndependencies = [\"pydantic\"]\n",
+                "[project]\nname = \"effective\"\nversion = \"0.1.0\"\ndescription = \"A project with every value in effect.\"\nreadme = \"README.md\"\nrequires-python = \">=3.12\"\ndependencies = [\"pydantic>=2\"]\n\n[project.urls]\nRepository = \"https://example.com/effective\"\n",
             )],
         )?;
         let (code, _, err) =
@@ -624,7 +625,7 @@ impl Runner {
     /// on itself, which the conditional records need, so `lint.preview` is no change there.
     fn grouped(&mut self) -> Result<()> {
         let activation = self.project("activation", &[
-            ("pyproject.toml", "[project]\nname = \"activation\"\nversion = \"0.1.0\"\ndependencies = [\"pydantic\"]\n\n[tool.ruff.lint]\npreview = true\nselect = [\"E4\", \"TC\"]\n"),
+            ("pyproject.toml", "[project]\nname = \"activation\"\nversion = \"0.1.0\"\ndependencies = [\"pydantic\"]\n\n[tool.ruff.lint]\npreview = true\nselect = [\"E4\", \"TC\", \"N803\"]\n"),
             ("typed/ruff.toml", "extend = \"../pyproject.toml\"\n\n[lint]\nextend-select = [\"ANN401\", \"ANN001\"]\n\n[lint.flake8-annotations]\nallow-star-arg-any = true\nignore-fully-untyped = true\n"),
             ("typed/api.py", "def double(x: int) -> int:\n    return x * 2\n"),
             ("app.py", EVERY_TRIGGER),
@@ -802,7 +803,12 @@ impl Runner {
             &[],
         );
         let report = self.doctor(&conflict, &both)?;
-        self.expect("readability conflict", &report, &[], &["ruff:PERF401"]);
+        self.expect(
+            "readability conflict: the plan adds PERF401 to the ignore list",
+            &report,
+            &["ruff:PERF401"],
+            &[],
+        );
 
         Ok(())
     }
@@ -818,6 +824,14 @@ impl Runner {
         ];
         let report = self.doctor(&boundary, &both)?;
         self.expect("Any crossing a boundary", &report, &unsound, &[]);
+        let text = self.doctor_text(&boundary, &both)?;
+        self.expect_output(
+            "Any crossing a boundary",
+            "doctor text",
+            &text,
+            &["Parse the value with a schema", "leave the value unchecked"],
+            &[],
+        );
         fs::write(
             boundary.join("pyproject.toml"),
             "[tool.ty.rules]\nunsound-return = \"error\"\nunsound-assignment = \"error\"\nunsound-yield = \"error\"\n",
@@ -935,40 +949,60 @@ impl Runner {
         let lazy = self.project("lazy", &[("app.py", "__lazy_modules__ = [\"json\"]\nimport json\n\nprint(json.dumps(1))\n"), ("pyproject.toml", "[tool.ruff]\ntarget-version = \"py311\"\n\n[tool.ruff.lint]\nextend-select = [\"TID254\"]\n")])?;
         let report = self.doctor(&lazy, &both)?;
         self.expect(
-            "import policy",
+            "lazy imports are the project's choice",
             &report,
-            &["ruff:lint.flake8-tidy-imports.ban-lazy"],
-            &["ruff:TID254"],
-        );
-        let text = self.doctor_text(&lazy, &both)?;
-        self.expect_output(
-            "import policy",
-            "doctor text",
-            &text,
-            &[
-                "If this module must load eagerly",
-                "app.py:1 __lazy_modules__",
-            ],
             &[],
+            &["ruff:lint.flake8-tidy-imports.ban-lazy", "ruff:TID254"],
+        );
+
+        let cells = self.project("cells", &[("explore.py", "# %%\nimport sys\n\nif len(sys.argv) > 1:\n    name = sys.argv[1]\n\n# %%\nprint(name)\n")])?;
+        let report = self.doctor(&cells, &both)?;
+        self.expect(
+            "a cell script binds a name for a later cell",
+            &report,
+            &[],
+            &["ty:possibly-unresolved-reference"],
         );
         fs::write(
-            lazy.join("pyproject.toml"),
-            "[tool.ruff]\ntarget-version = \"py311\"\n\n[tool.ruff.lint]\nextend-select = [\"TID254\"]\n\n[tool.ruff.lint.flake8-tidy-imports]\nban-lazy = \"all\"\n",
+            cells.join("module.py"),
+            "def pick(flag: bool) -> int:\n    if flag:\n        value = 1\n    return value\n",
         )?;
-        let ruff = self.checker("ruff", &lazy, &["."])?;
-        self.expect_output(
-            "import policy",
-            "ruff",
-            &ruff,
-            &["TID254 Use an eager import"],
+        let report = self.doctor(&cells, &both)?;
+        self.expect(
+            "a module binds a name in one branch",
+            &report,
+            &["ty:possibly-unresolved-reference"],
             &[],
         );
-        let report = self.doctor(&lazy, &both)?;
+
+        let estimator = self.project("estimator", &[("app.py", "class Scaler:\n    def fit(self, X: list[float]) -> \"Scaler\":\n        self.low = min(X)\n        return self\n"), ("pyproject.toml", "[tool.ruff.lint]\nextend-select = [\"N803\"]\n")])?;
+        let report = self.doctor(&estimator, &both)?;
         self.expect(
-            "import policy in effect",
+            "a parameter named X",
+            &report,
+            &["ruff:lint.pep8-naming.extend-ignore-names"],
+            &[],
+        );
+        let ruff = self.checker("ruff", &estimator, &["."])?;
+        self.expect_output("a parameter named X", "ruff", &ruff, &["N803"], &[]);
+        fs::write(
+            estimator.join("pyproject.toml"),
+            "[tool.ruff.lint]\nextend-select = [\"N803\"]\n\n[tool.ruff.lint.pep8-naming]\nextend-ignore-names = [\"X\"]\n",
+        )?;
+        let ruff = self.checker("ruff", &estimator, &["."])?;
+        self.expect_output(
+            "a parameter named X is allowed",
+            "ruff",
+            &ruff,
+            &[],
+            &["N803"],
+        );
+        let report = self.doctor(&estimator, &both)?;
+        self.expect(
+            "a parameter named X is allowed",
             &report,
             &[],
-            &["ruff:lint.flake8-tidy-imports.ban-lazy"],
+            &["ruff:lint.pep8-naming.extend-ignore-names"],
         );
         Ok(())
     }
@@ -1248,7 +1282,7 @@ impl Runner {
             "doctor --check",
             &out,
             &[
-                "-ignore = [\"RUF100\"]\n+ignore = [\"ANN401\", \"C901\",",
+                "-ignore = [\"RUF100\"]\n+ignore = [\"any-type\", \"complex-structure\",",
                 "+select = [\"ALL\"]",
                 "ruff RUF100 unused-noqa: off, by tool.ruff.lint.ignore = [\"RUF100\"] -> on",
                 "ruff PTH118 os-path-join: off for scripts/*.py -> on",
@@ -1386,6 +1420,88 @@ impl Runner {
     /// a script kind without scripts, an invalid file pattern, an exception for another pytest
     /// release, plugin placement, a comment in a dependency list, the Stop baseline, and an
     /// ambiguous pytest layout.
+    /// A project that holds only the settings of Ruff, ty and pytest: the apply leaves its build
+    /// backend, its hooks and uv's settings alone, writes each rule of the ignore list by its
+    /// name, so that the pinned Ruff has nothing to report on `pyproject.toml`, and the check
+    /// that follows holds the same part.
+    fn tools(&mut self) -> Result<()> {
+        let head = "[project]\nname = \"scoped\"\nversion = \"0.1.0\"\nrequires-python = \">=3.12\"\n\n[build-system]\nrequires = [\"uv_build>=0.9\"]\nbuild-backend = \"uv_build\"\n";
+        let scoped = self.project(
+            "scoped",
+            &[
+                ("pyproject.toml", head),
+                (".pre-commit-config.yaml", "repos: []\n"),
+                ("src/scoped/__init__.py", "\"\"\"A package.\"\"\"\n"),
+            ],
+        )?;
+        let bins = [Bin::Ruff, Bin::Ty, Bin::Uv];
+        let (code, _, err) = self.doctor_run(&scoped, &bins, &["--apply", "--kind", "library"])?;
+        self.check(
+            (code != 2)
+                .then(|| format!("tools: the whole profile exits {code} on uv_build: {err}")),
+        );
+        let (code, _, err) = self.doctor_run(
+            &scoped,
+            &bins,
+            &["--apply", "--kind", "library", "--tools", "ruff,ty,pytest"],
+        )?;
+        self.check((code != 0).then(|| format!("tools: --apply --tools exits {code}: {err}")));
+        let written = fs::read_to_string(scoped.join("pyproject.toml"))?;
+        self.expect_output(
+            "tools",
+            "pyproject.toml",
+            &written,
+            &[
+                "tools = [\"ruff\", \"ty\", \"pytest\"]",
+                "build-backend = \"uv_build\"",
+                "\"unnecessary-assign\"",
+                "\"ruff==0.17.4\"",
+                "\"pytest==9.2.0\"",
+            ],
+            &["exclude-newer", "tombi==", "lefthook==", "\"RET504\""],
+        );
+        for (file, wanted) in [
+            ("uv.lock", true),
+            ("conftest.py", true),
+            (".pre-commit-config.yaml", true),
+            ("lefthook.yml", false),
+            (".github/workflows/ci.yml", false),
+            ("tombi.toml", false),
+            (".python-version", false),
+        ] {
+            let exists = scoped.join(file).exists();
+            self.check((exists != wanted).then(|| {
+                format!(
+                    "tools: {file} {} after the apply",
+                    if exists { "exists" } else { "is missing" }
+                )
+            }));
+        }
+        let ruff = self.checker("ruff", &scoped, &["pyproject.toml"])?;
+        self.expect_output(
+            "tools",
+            "ruff on pyproject.toml",
+            &ruff,
+            &["All checks passed"],
+            &["RUF201", "rule-codes-in-selectors"],
+        );
+        let (code, out, _) = self.doctor_run(&scoped, &bins, &["--check", "--format", "text"])?;
+        self.check(
+            (code != 0).then(|| format!("tools: --check after the apply exits {code}:\n{out}")),
+        );
+        self.expect_output(
+            "tools",
+            "doctor --check",
+            &out,
+            &[
+                "kind library, tools ruff, ty, pytest",
+                "The project matches profile revision",
+            ],
+            &[],
+        );
+        Ok(())
+    }
+
     fn reviewed(&mut self) -> Result<()> {
         self.reviewed_pytest()?;
         self.reviewed_layout()?;

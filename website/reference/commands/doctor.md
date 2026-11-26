@@ -1,4 +1,4 @@
-Run `xpd doctor` at the root of a Python project to compare it with the profile, the one target setup for Ruff, ty, pytest, packaging, the files that are not Python, and the hooks and CI that run them, that ships with xpd. Doctor prints a unified diff of `pyproject.toml` and of each file the profile owns, with the reason for each change, the lock files the project needs, and then the conditional advice that the project's code points to. `xpd doctor --apply` writes the diff, and `xpd doctor --check` exits 1 while the project differs from the profile.
+Run `xpd doctor` at the root of a Python project to compare it with the profile, the one target setup for Ruff, ty, pytest, packaging, the files that are not Python, and the hooks and CI that run them, that ships with xpd. A project holds the whole profile, or only the settings of Ruff, ty and pytest that it names with `xpd doctor --tools`. Doctor prints a unified diff of `pyproject.toml` and of each file the profile owns, with the reason for each change, the lock files the project needs, and then the conditional advice that the project's code points to. `xpd doctor --apply` writes the diff, and `xpd doctor --check` exits 1 while the project differs from the profile.
 
 The plan reads files. It compares the effect of the project's own settings, so an extra selector in `lint.ignore` that turns off only rules the profile turns off, or a ty level above the profile's, needs no edit. A tool's default does not count, because another release of the tool can change it, so the project names each setting, rule and level itself. Doctor runs uv to check and write lock files, the pinned Ruff to confirm that it accepts the settings, and the installed Ruff and ty for the conditional advice.
 
@@ -19,7 +19,7 @@ The profile is strict: every Ruff rule runs unless a reason below turns it off, 
 
 ### Ruff selection and preview
 
-The profile owns `lint.select` and holds it at `["ALL"]`. A project whose selection lacks `ALL` gets `select = ["ALL"]` in `[tool.ruff.lint]`, and an old `select` at the top of `[tool.ruff]` goes. `preview`, `lint.preview` and `format.preview` are `true`, and `lint.explicit-preview-rules = true` goes, because it keeps each preview rule off until a selector names its code. With Ruff 0.17.4 the project then runs 887 rules.
+The profile owns `lint.select` and holds it at `["ALL"]`. A project whose selection lacks `ALL` gets `select = ["ALL"]` in `[tool.ruff.lint]`, and an old `select` at the top of `[tool.ruff]` goes. `preview`, `lint.preview` and `format.preview` are `true`, and `lint.explicit-preview-rules = true` goes, because it keeps each preview rule off until a selector names its code. With Ruff 0.17.4 the project then runs 878 rules.
 
 `lint.ignore` holds the profile's list below. A selector in `lint.ignore` or `lint.extend-ignore` that turns off any other rule goes, whether it names one rule, such as `S101`, or a group, such as `D`, unless an exception records the rule. A selector that turns off only rules of the list, such as `D100`, stays.
 
@@ -39,11 +39,16 @@ The profile owns `lint.select` and holds it at `["ALL"]`. A project whose select
 | `EM`, `TRY003` | An exception may take its message directly, also on a standard exception class. |
 | `PLR2004` | A number that explains itself may stand in a calculation or an assertion. |
 | `PLR0913`, `PLR0917` | A clear signature may have several parameters, and positional ones are judged at the API boundary. |
-| `PLR0912`, `C901` | Branches and complexity are judged in context, since a cap can reward splitting flat code into helpers. |
+| `PLR0912`, `PLR0914`, `PLR0915`, `C901` | Branches, local variables, statements and complexity are judged in context, since a cap can reward splitting flat code into helpers or inlining a named step. |
 | `FBT003` | A positional boolean is allowed where the caller cannot change the API. |
 | `TD` | Work is tracked in issues. `FIX` still reports markers such as TODO. |
+| `RET504` | A result may take a name before it is returned, since the name says what the value is. |
+| `PERF401` | A loop that appends stays a loop when its body runs over more than one line, as [`python/comprehension-multi-line`](../../rules/python/comprehension-multi-line/) asks. |
+| `DOC201`, `DOC402`, `DOC501` | PEP 257 asks for no section for a return value, a yielded value or an exception. A section that a docstring does have must still be true, which `DOC102`, `DOC202`, `DOC403` and `DOC502` check. |
+| `PD010` | `pivot` and `unstack` fail on a duplicate key, where `pivot_table` averages the duplicates without a word, as [`pandas/pivot-table-default-mean`](../../rules/pandas/pivot-table-default-mean/) reports. |
+| `PD013` | `stack` moves a column level into the index and keeps the index, which `melt` does not do. |
 
-With preview on, Ruff 0.17.4 also runs `RUF201`, which reports each rule code in the selectors of `pyproject.toml`, such as `ANN401` in `lint.ignore`, and asks for the rule's name. The profile writes the codes, so `ruff check` on `pyproject.toml` reports them, and `ruff check --fix` replaces each code with the rule's name, such as `any-type`. Doctor counts a rule's name as its code in every selector.
+With preview on, Ruff 0.17.4 also runs `RUF201`, which reports each rule code in the selectors of `pyproject.toml`, such as `ANN401` in `lint.ignore`, and asks for the rule's name. So doctor writes a selector that names one rule by the rule's name, such as `any-type`, and a selector that names a group as it is, such as `D1`. Doctor counts a rule's name as its code in every selector, so a project that still holds the codes needs no edit, and `ruff check --fix` replaces them.
 
 `lint.pydocstyle.convention = "pep257"` also turns off the docstring checks that PEP 257 does not ask for: `D212`, `D213`, `D214`, `D215`, `D404` through `D411`, `D413`, `D415`, `D416`, `D417` and `D420`.
 
@@ -176,6 +181,8 @@ The profile pins the tools that check the project, at the releases its rules and
 | lefthook | `lefthook==2.2.2` |
 | jactionlint | `jactionlint==2.6.0` |
 
+A project that holds only some tools pins what comes with them: `ruff` with Ruff, `ty` with ty, and `pytest`, `pytest-timeout`, `pytest-randomly` and `hypothesis` with pytest.
+
 `uv.lock` must lock these releases. A lock that holds another release of one of them, or none, is out of date, so `--check` exits 1 and `--apply` runs `uv lock`. A requirement for one of them in another list that the pin does not meet is a conflict, because uv locks one release for every list. The `script` kind gets no pin, since its `pyproject.toml` holds tool settings only. Run the checks with `uv run --locked ruff check`, `uv run --locked ruff format --check`, `uv check --locked` and `uv run --locked pytest`.
 
 A project gets the ShellCheck and shfmt pins when it tracks a shell script: a `.sh` or `.bash` file, or a file without a suffix whose first line runs `sh`, `bash`, `dash` or `ksh`. ShellCheck does not read zsh. It gets the nbstripout pin when it tracks a notebook. A file that Git ignores does not count.
@@ -186,7 +193,7 @@ The profile packages a project with `pyproject.toml` and uv. Doctor writes two v
 
 | Rule | What doctor does |
 | --- | --- |
-| uv waits 3 days before it takes a new upload | Sets `exclude-newer = "3 days"` in `[tool.uv]` for every kind, and refreshes the locks. For an urgent fix, name the package in `exclude-newer-package` until the upload ages in. uv also reads this for `uv lock --script`. |
+| uv waits 3 days before it takes a new upload | Sets `exclude-newer = "3 days"` in `[tool.uv]` for every kind, and refreshes the locks. For an urgent fix, name the package in `exclude-newer-package` until the upload ages in. uv also reads this for `uv lock --script`. An index that gives no upload time for a package, as a private index often does, leaves uv unable to apply the wait to it, so `uv lock` fails. Apply then names every such package, and each needs a line such as `pkg = false` in `[tool.uv.exclude-newer-package]`. |
 | A new project starts at Python 3.14 | Sets `requires-python = ">=3.14"` when `[project]` names none. An existing floor stays, so review it each year. |
 | No cap on Python | A conflict for `<`, `<=`, `~=` or `==` in `requires-python`. |
 | The build backend fits the code | `hatchling.build` for a pure Python package, `maturin` when `Cargo.toml` is at the root, and `scikit_build_core.build` when `CMakeLists.txt` is. Another backend, or a `[build-system]` without `build-backend`, is a conflict. Compare the old and new wheel before a release on the new backend. |
@@ -262,7 +269,7 @@ Doctor prints the diff, then one entry for each change. The `...` lines stand fo
 
 ```console
 $ xpd doctor --format text
-Profile revision 5, kind application, suggested because [project] has no [build-system], so uv runs it without building it
+Profile revision 6, kind application, suggested because [project] has no [build-system], so uv runs it without building it
   A program that runs from its checkout or as an installed command, locked in uv.lock.
 pyproject.toml records no profile yet.
 
@@ -304,7 +311,7 @@ pyproject.toml records no profile yet.
 ...
 +[tool.ruff.lint]
 +select = ["ALL"]
-+ignore = ["ANN401", "C901", "COM812", "COM819", "CPY", "D1", "D203", "D206", "D300", "E111", "E114", "E117", "E501", "EM", "FBT003", "ISC001", "ISC002", "PLR0912", "PLR0913", "PLR0917", "PLR2004", "Q", "TC", "TD", "TRY003", "W191"]
++ignore = ["any-type", "complex-structure", "missing-trailing-comma", "prohibited-trailing-comma", "CPY", "D1", ...]
 ...
 +[tool.ty.rules]
 +blanket-ignore-comment = "error"
@@ -317,7 +324,7 @@ pyproject.toml records no profile yet.
 +exclude-newer = "3 days"
 +
 +[tool.xpd.profile]
-+revision = 5
++revision = 6
 +kind = "application"
 ...
 +++ .github/workflows/ci.yml
@@ -339,7 +346,7 @@ xpd doctor --apply --kind application writes these changes.
 ...
 ```
 
-`xpd doctor --apply --kind application` writes this diff, runs `uv lock`, and records the revision and kind last. It also writes the owned files, and formats `pyproject.toml` with Tombi. A second `xpd doctor --check` then prints `The project matches profile revision 5.` and exits 0.
+`xpd doctor --apply --kind application` writes this diff, runs `uv lock`, and records the revision and kind last. It also writes the owned files, and formats `pyproject.toml` with Tombi. A second `xpd doctor --check` then prints `The project matches profile revision 6.` and exits 0.
 
 ## Kinds of project
 
@@ -352,7 +359,30 @@ The first apply needs a kind, which `pyproject.toml` records. Doctor suggests on
 | `pipeline` | An application that turns data into results. | `[project]` | `uv.lock` |
 | `script` | Standalone scripts. | At least one Python file with a `# /// script` block, and a `pyproject.toml` that holds the `[tool]` table and nothing else, so the scripts declare their own dependencies and the profile adds no plugin | `<script>.lock` beside each script, by `uv lock --script` |
 
-A kind can add its own Ruff, ty and pytest values to the ones every kind gets, and the profile can own whole files for a kind, such as a workflow, which the project keeps as exact copies of templates that ship with xpd. Revision 5 gives every kind the same tool values. It owns the files that [Files that are not Python](#files-that-are-not-python) and [Hooks and CI](#hooks-and-ci) list, and `conftest.py` at the root for `library`, `application` and `pipeline`. Hypothesis reads its profiles from Python only, so `conftest.py` registers the profile `slow`, which turns off the time limit per example and keeps every other check, beside the built-in `default` and `ci` profiles. Run `uv run --locked pytest --hypothesis-profile slow` for a long property run. A project without `conftest.py` gets the profile's copy. A project that keeps its own `conftest.py` must hold the line `settings.register_profile("slow", deadline=None)` with its import, and doctor reports a conflict until it does, since it never rewrites the project's own file.
+A kind can add its own Ruff, ty and pytest values to the ones every kind gets, and the profile can own whole files for a kind, such as a workflow, which the project keeps as exact copies of templates that ship with xpd. Revision 6 gives every kind the same tool values. It owns the files that [Files that are not Python](#files-that-are-not-python) and [Hooks and CI](#hooks-and-ci) list, and `conftest.py` at the root for `library`, `application` and `pipeline`. Hypothesis reads its profiles from Python only, so `conftest.py` registers the profile `slow`, which turns off the time limit per example and keeps every other check, beside the built-in `default` and `ci` profiles. Run `uv run --locked pytest --hypothesis-profile slow` for a long property run. A project without `conftest.py` gets the profile's copy. A project that keeps its own `conftest.py` must hold the line `settings.register_profile("slow", deadline=None)` with its import, and doctor reports a conflict until it does, since it never rewrites the project's own file.
+
+## Only Ruff, ty and pytest
+
+`xpd doctor --apply --kind pipeline --tools ruff,ty,pytest` holds a project to the settings of the tools it names and to nothing else of the profile. Name one, two or all three of `ruff`, `ty` and `pytest`. `pyproject.toml` records them, so `--check`, a later `--apply` and the Stop hook hold the same part.
+
+```toml
+[tool.xpd.profile]
+revision = 6
+kind = "pipeline"
+tools = ["ruff", "ty", "pytest"]
+```
+
+| Part of the profile | With `tools` |
+| --- | --- |
+| The settings of each named tool, with its exceptions and its conditional advice | Held |
+| The pins of each named tool in `dev`, and the lock that holds them | Held |
+| `conftest.py` | Held with `pytest` |
+| A second settings file of a named tool, such as `ruff.toml` | A conflict, as before |
+| Packaging: `exclude-newer`, the Python floor, the build backend, the metadata, and old files such as `.pre-commit-config.yaml` | Left alone |
+| The files that are not Python, the hooks, CI and `.python-version`, with their pins | Left alone |
+| The Tombi format of `pyproject.toml` after an apply | Not run |
+
+A named tool comes with its pin, so a project on a newer Ruff or ty moves to the release the profile was reviewed for. An exception for a tool that `tools` leaves out is `redundant`. To hold the whole profile, delete the `tools` line and run `xpd doctor`.
 
 ## Hooks and CI
 
@@ -398,11 +428,11 @@ Move the settings into `pyproject.toml`, and run doctor again.
 
 ## Record a deliberate exception
 
-A project records an exception in `pyproject.toml`, beside the revision and kind, with the reason it needs one.
+A project records an exception in `pyproject.toml`, beside the revision and kind, with the reason it needs one. A rule that fits most of the code and not one folder is the usual case, such as `T201` for the scripts that print their result, with `files = ["scripts/**"]`.
 
 ```toml
 [tool.xpd.profile]
-revision = 5
+revision = 6
 kind = "application"
 
 [[tool.xpd.profile.exceptions]]
@@ -449,16 +479,20 @@ The profile turns every Ruff rule on or off itself, so Ruff's advice is about se
 | Project decision | Ruff settings Doctor considers |
 | --- | --- |
 | Enforce typed API boundaries | `allow-star-arg-any` and `ignore-fully-untyped` in the annotation settings, where the annotation rules run. |
-| Control when imports run | `ban-lazy` for an explicit eager-import policy, where the code uses lazy imports. |
+| Keep a parameter name that an interface sets | `"X"` in `pep8-naming.extend-ignore-names`, where a function takes a parameter named `X`, as `fit(X, y)` of a scikit-learn estimator does, and `N803` runs. |
 | Keep annotations needed at runtime | `runtime-evaluated-base-classes` and `runtime-evaluated-decorators`, including Pydantic's `BaseModel` and `validate_call`, where the `TC` rules run. |
 | Diagnose an unexpected Ruff result | Doctor can suggest `ruff check --show-settings PATH` or `ruff check --show-files PATH` to inspect effective settings or included files. |
 
 | Project decision | Conditional ty advice |
 | --- | --- |
-| Check arithmetic, conditional bindings or optional values | Consider `warn` for `division-by-zero`, `possibly-unresolved-reference` or `truthiness-test-of-none-union`, according to the code. |
+| Check arithmetic, conditional bindings or optional values | Consider `warn` for `division-by-zero`, `possibly-unresolved-reference` or `truthiness-test-of-none-union`, according to the code. A script of `# %%` cells is no evidence for `possibly-unresolved-reference`, since a later cell reads what an earlier one bound. |
 | Protect typed boundaries | Consider `error` for `unsound-assignment`, `unsound-return` or `unsound-yield`. For decorators your project owns, consider `warn` for `dynamic-function-decorator-return`. |
 | Change how ty analyzes the project | Consider enabling `strict-generic-narrowing` for generic container checks, or setting `return-type-inference` to `"always"` during gradual migration. |
 | Run trusted standalone scripts with inline dependencies | Consider `project-manager.script = "uv"` with uv 0.12.3 or newer. |
+
+An `unsound` report is fixed where the value enters, with a schema that raises on a wrong value, such as `pydantic.TypeAdapter(dict[str, list[str]]).validate_python(value)` or `msgspec.convert`. A filter that drops the entries of the wrong type, a `str()` call that converts them, a cast and an `Any` annotation each make the report go away and leave the value unchecked.
+
+Doctor suggests no ban on lazy imports. A project that writes `lazy import` or `__lazy_modules__` chose them, and `lint.flake8-tidy-imports.ban-lazy` stays the project's own setting for imports that must run at once.
 
 The catalog also records which upstream defaults to leave in place and which settings inherit another decision. Each record identifies its release, reason and upstream source.
 
@@ -470,7 +504,7 @@ For a machine-readable report, run:
 xpd doctor --format json | jq '.profile.changes[] | {tool, id, path, old, new}'
 ```
 
-`profile` holds the plan: `revision`, `applied`, `kind`, `changes`, `conflicts` (each with `ambiguous`, which makes `--check` exit 2), `exceptions`, `unverified` (what doctor could not check), `locks` (each with its `state` and the `reason` it is out of date, when doctor can tell) and the `diff`. Read `tools` for version information, `suggestions` for conditional advice, `policies` for deliberate choices Doctor keeps, and `notes` for limits it encountered. `xpd doctor --check --format json` prints the plan alone, and `xpd doctor --apply --format json` prints what it wrote.
+`profile` holds the plan: `revision`, `applied`, `kind`, `tools` (the tools a project holds when it does not hold the whole profile), `changes`, `conflicts` (each with `ambiguous`, which makes `--check` exit 2), `exceptions`, `unverified` (what doctor could not check), `locks` (each with its `state` and the `reason` it is out of date, when doctor can tell) and the `diff`. Read `tools` for version information, `suggestions` for conditional advice, `policies` for deliberate choices Doctor keeps, and `notes` for limits it encountered. `xpd doctor --check --format json` prints the plan alone, and `xpd doctor --apply --format json` prints what it wrote.
 
 ## Exit status
 
