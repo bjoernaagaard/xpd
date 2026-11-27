@@ -17,9 +17,10 @@ A chart in the house style follows the plotly rules, which apply Edward Tufte's 
 ```python
 """A line chart of monthly revenue for each region, drawn with an editorial Tufte template.
 
-The template layers typography, muted axis ink, and a colorblind-safe colorway onto
-"simple_white". Each line carries its name at its last point with explicit axis padding so
-labels never collide with axes or ticks.
+The template layers typography, muted axis ink, an opaque white canvas (so dark ink stays readable
+in dark-mode interactive windows; switch to transparent only when the host swaps text ink), and a
+colorblind-safe colorway onto "simple_white". Each line carries its name at its last point with
+explicit axis padding so labels never collide with axes or ticks.
 """
 
 import pandas as pd
@@ -33,8 +34,8 @@ pio.templates["tufte"] = go.layout.Template(
         colorway=TUFTE_COLORS,
         font={"family": "Inter, system-ui, -apple-system, sans-serif", "size": 12, "color": "#1f2937"},
         title={"x": 0, "xanchor": "left", "font": {"size": 16}, "subtitle": {"font": {"size": 12, "color": "#4b5563"}}},
-        paper_bgcolor="rgba(0,0,0,0)",
-        plot_bgcolor="rgba(0,0,0,0)",
+        paper_bgcolor="#ffffff",
+        plot_bgcolor="#ffffff",
         hovermode="x unified",
         hoverlabel={"bgcolor": "#ffffff", "bordercolor": "#d1d5db", "font": {"color": "#1f2937"}},
         xaxis={"linecolor": "#6b7280", "tickcolor": "#6b7280", "automargin": True},
@@ -98,7 +99,7 @@ def summary_table(rows: list[tuple[str, float, float]]) -> go.Figure:
             "values": list(zip(*rows, strict=True)),
             "align": align,
             "format": ["", ".2f", ",d"],
-            "fill": {"color": "rgba(0,0,0,0)"},
+            "fill": {"color": "#ffffff"},
             "line": {"width": 0},
             "font": {"color": "#1f2937", "size": 12},
             "height": 28,
