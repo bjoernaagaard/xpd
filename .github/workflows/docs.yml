@@ -53,7 +53,10 @@ jobs:
       - if: runner.environment != 'self-hosted'
         uses: ./.github/actions/build-setup
       - if: runner.environment == 'self-hosted'
-        run: mise trust --quiet
+        run: |
+          mise trust --quiet
+          mise install --yes
+          mise bin-paths >> "$GITHUB_PATH"
       - run: mise run docs
         env:
           MISE_TASK_RUN_AUTO_INSTALL: "false"

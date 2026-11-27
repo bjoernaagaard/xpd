@@ -8,6 +8,8 @@ on:
       - "**"
       - "!website/**"
       - "!**.md"
+      - "!.github/workflows/ci.yml"
+      - "!.github/workflows/docs.yml"
       - README.md
       - rules/**
       - skills/**
