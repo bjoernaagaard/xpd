@@ -42,7 +42,14 @@ export default defineConfig({
         {
           label: 'Guides',
           items: [
-            ...['claude-code', 'mcp', 'gates', 'editors', 'write-a-rule', 'chart-review', 'opt-review', 'animate'].map((id) => ({ slug: `guides/${id}` })),
+            ...['claude-code', 'mcp', 'gates', 'editors', 'write-a-rule'].map((id) => ({ slug: `guides/${id}` })),
+          ],
+        },
+        {
+          label: 'Workflows',
+          collapsed: true,
+          items: [
+            ...['chart-review', 'data-prep', 'feature-review', 'harden', 'model-review', 'opt-review', 'ts-review', 'animate'].map((id) => ({ slug: `guides/${id}` })),
           ],
         },
         {

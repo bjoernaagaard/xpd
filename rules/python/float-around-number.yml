@@ -12,6 +12,14 @@ severity: warning
 message: A number from a float64 array or a Series is a float already, and so is arithmetic on it. Drop this float(), and keep it only for text, for an int that has to become a float, or for a float32.
 rule:
   pattern: float($VALUE)
+  not:
+    inside:
+      stopBy: end
+      kind: return_statement
+      inside:
+        stopBy: end
+        kind: function_definition
+        has: { field: return_type, regex: '\bfloat\b' }
   has:
     field: arguments
     has:
@@ -39,6 +47,14 @@ severity: warning
 message: A number from a float64 array or a Series is a float already, and so is arithmetic on it. Drop this float(), and keep it only for text, for an int that has to become a float, or for a float32.
 rule:
   pattern: float($VALUE)
+  not:
+    inside:
+      stopBy: end
+      kind: return_statement
+      inside:
+        stopBy: end
+        kind: function_definition
+        has: { field: return_type, regex: '\bfloat\b' }
   has:
     field: arguments
     has:

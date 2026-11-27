@@ -304,7 +304,7 @@ class QuoteError(ValueError):
     pass
 
 
-def spread(values: np.ndarray) -> float:
+def spread(values: np.ndarray):
     return float(values.std())  # xpd: same-type-conversion
 
 
@@ -312,19 +312,27 @@ def spread_without_float(values: np.ndarray) -> float:
     return values.std()
 
 
+def spread_for_ty(values: np.ndarray) -> float:
+    return float(values.std())
+
+
 def by_column(values: np.ndarray) -> list[float]:
     return list(values.mean(axis=0))
 
 
-def first_value(values: np.ndarray) -> float:
+def first_value(values: np.ndarray):
     return float(values[0])  # xpd: float-around-number
+
+
+def first_value_for_ty(values: np.ndarray) -> float:
+    return float(values[0])
 
 
 def parsed(fields: list[str]) -> float:
     return float(fields[0])
 
 
-def shape(values: np.ndarray, name: str, day: object) -> tuple[int, str, bool, float]:
+def shape(values: np.ndarray, name: str, day: object):
     return (
         int(values.size),  # xpd: same-type-conversion
         str(f"{name}:{day}"),  # xpd: same-type-conversion

@@ -11,6 +11,14 @@ severity: warning
 message: $VALUE is a float already, because np.float64 is a subclass of float. Drop the float() around it.
 rule:
   pattern: float($VALUE)
+  not:
+    inside:
+      stopBy: end
+      kind: return_statement
+      inside:
+        stopBy: end
+        kind: function_definition
+        has: { field: return_type, regex: '\bfloat\b' }
   has:
     field: arguments
     has:
@@ -42,6 +50,14 @@ severity: warning
 message: $VALUE is a float already, because np.float64 is a subclass of float. Drop the float() around it.
 rule:
   pattern: float($VALUE)
+  not:
+    inside:
+      stopBy: end
+      kind: return_statement
+      inside:
+        stopBy: end
+        kind: function_definition
+        has: { field: return_type, regex: '\bfloat\b' }
   has:
     field: arguments
     has:
