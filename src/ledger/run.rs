@@ -11,6 +11,8 @@
 //! measurement to the orchestration as an activity result. A JSON journal that an older xpd left
 //! is imported once, by the worktree that owns it, and renamed with the `.migrated` suffix.
 
+use super::ChecklistOwners;
+
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt::Write as _;
 use std::fs;
@@ -882,8 +884,7 @@ fn check_text(output: &std::process::Output) -> String {
 
 /// The findings and per-figure checklist items (`id -> tracked file`) of a run at a commit,
 /// or of the files of today for `None`.
-type Found<'f> =
-    &'f dyn Fn(&Journal, Option<&str>) -> Result<(BTreeSet<String>, BTreeMap<String, String>)>;
+type Found<'f> = &'f dyn Fn(&Journal, Option<&str>) -> Result<(BTreeSet<String>, ChecklistOwners)>;
 
 /// The findings at a commit, or in the working tree for `None`, as a map from the id that
 /// xpd 0.55.0 gave each one to its id of today.
@@ -1023,7 +1024,7 @@ fn plan(
     journal: &mut Journal,
     plan: Plan,
     known: &BTreeSet<String>,
-    checklist: &BTreeMap<String, String>,
+    checklist: &ChecklistOwners,
 ) -> Result<()> {
     let mut named: BTreeSet<&str> = journal.fixes().map(|fix| fix.id.as_str()).collect();
     for fix in &plan.fixes {
@@ -1171,7 +1172,7 @@ fn measure_gate(
         lines_after,
         timing,
         changed_files: changed,
-        checklist_before,
+        checklist_before: super::checklist_files(checklist_before),
     })
 }
 
@@ -1242,7 +1243,7 @@ fn gate(
 
 /// What `finish` measures. The fields have the names of the finish output of the
 /// orchestration.
-#[derive(Debug, Serialize)]
+#[derive(Debug)]
 struct Surveyed {
     /// The ids of the findings at the commit the run started from.
     before: BTreeSet<String>,
@@ -1251,7 +1252,7 @@ struct Surveyed {
     /// The lines of code of today in the paths of the run.
     current_lines: usize,
     /// The checklist item ids of today.
-    checklist_after: BTreeSet<String>,
+    checklist_after: ChecklistOwners,
 }
 
 /// Measures the files of today against the commit the run started from.
@@ -1266,7 +1267,7 @@ fn measure_finish(journal: &Journal, place: &Place, found: Found<'_>) -> Result<
         before,
         after,
         current_lines: count_lines(&journal.paths),
-        checklist_after: checklist.into_keys().collect(),
+        checklist_after: checklist,
     })
 }
 
@@ -1280,9 +1281,15 @@ fn unexplained<'s>(journal: &Journal, surveyed: &'s Surveyed) -> Vec<&'s str> {
 
 /// The checklist items of today that have no recorded fix or verdict.
 fn unanswered<'s>(journal: &Journal, surveyed: &'s Surveyed) -> Vec<&'s str> {
-    (surveyed.checklist_after.iter())
-        .filter(|item| !journal.answered.contains_key(*item))
-        .map(String::as_str)
+    surveyed
+        .checklist_after
+        .iter()
+        .filter(|(item, owner)| match journal.answered.get(*item) {
+            None => true,
+            Some(AnswerRecord::NotApplicable { .. }) => false,
+            Some(_) => owner.requires_na,
+        })
+        .map(|(item, _)| item.as_str())
         .collect()
 }
 
@@ -1415,7 +1422,7 @@ fn act_journal<K: Kind>(
         Action::Status => place.read(command)?,
         Action::Finish => {
             let mut journal = place.read(command)?;
-            kept = if command == "data-prep"
+            kept = if matches!(command, "data-prep" | "ts-review")
                 && let Some(open) = journal.open()
             {
                 eprintln!("xpd: the fix {} is still open", open.id);
@@ -2129,7 +2136,10 @@ mod durable_run {
         let plan = read_plan::<K>(&at.journal, text, at.store.command)?;
         let (known, checklist) = found(&at.journal, None)?;
         let measurements = Measurements {
-            known: Some(ValidatePlanOutput { known, checklist }),
+            known: Some(ValidatePlanOutput {
+                known,
+                checklist: crate::ledger::checklist_files(checklist),
+            }),
             ..at.measurements()
         };
         let planned = RunCommand::Plan {
@@ -2195,7 +2205,7 @@ mod durable_run {
             "the run is finished. `xpd {} start` starts another.",
             at.store.command
         );
-        if at.store.command == "data-prep"
+        if matches!(at.store.command, "data-prep" | "ts-review")
             && let Some(open) = at.journal.open()
         {
             eprintln!("xpd: the fix {} is still open", open.id);
@@ -2203,7 +2213,18 @@ mod durable_run {
         }
         let surveyed = measure_finish(&at.journal, at.place, found)?;
         let measurements = Measurements {
-            finish: Some(convert(&surveyed)?),
+            finish: Some(FinishOutput {
+                checklist_requires_na: surveyed
+                    .checklist_after
+                    .iter()
+                    .filter(|(_, owner)| owner.requires_na)
+                    .map(|(id, _)| id.clone())
+                    .collect(),
+                checklist_after: surveyed.checklist_after.keys().cloned().collect(),
+                before: surveyed.before.clone(),
+                after: surveyed.after.clone(),
+                current_lines: surveyed.current_lines,
+            }),
             ..at.measurements()
         };
         let (journal, receipt) = at.send(measurements, "finish", RunCommand::Finish)?;
@@ -2294,14 +2315,13 @@ pub(super) fn act<K: Kind, R>(
             ),
         }
     };
-    let found = |journal: &Journal,
-                 commit: Option<&str>|
-     -> Result<(BTreeSet<String>, BTreeMap<String, String>)> {
-        let output = surveyed(journal, commit)?;
-        let checklist = output.checklist_files();
-        let ids = output.findings.into_iter().map(|entry| entry.id).collect();
-        Ok((ids, checklist))
-    };
+    let found =
+        |journal: &Journal, commit: Option<&str>| -> Result<(BTreeSet<String>, ChecklistOwners)> {
+            let output = surveyed(journal, commit)?;
+            let checklist = output.checklist_owners();
+            let ids = output.findings.into_iter().map(|entry| entry.id).collect();
+            Ok((ids, checklist))
+        };
     #[cfg(not(feature = "ledger-durable"))]
     let (journal, kept) = act_journal::<K>(action, &place, &here, command, &found)?;
     #[cfg(feature = "ledger-durable")]

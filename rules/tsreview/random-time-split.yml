@@ -1,0 +1,15 @@
+id: random-time-split
+language: python
+severity: error
+message: Use a chronological cutoff or TimeSeriesSplit for time-ordered rows.
+rule:
+  kind: call
+  has:
+    field: function
+    any:
+      - kind: identifier
+        regex: '^(train_test_split|ShuffleSplit|KFold|sample)$'
+      - kind: attribute
+        has:
+          field: attribute
+          regex: '^(train_test_split|ShuffleSplit|KFold|sample)$'

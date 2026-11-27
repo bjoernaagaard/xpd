@@ -313,6 +313,8 @@ pub(crate) struct FinishOutput {
     pub(crate) current_lines: usize,
     #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
     pub(crate) checklist_after: BTreeSet<String>,
+    #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
+    pub(crate) checklist_requires_na: BTreeSet<String>,
 }
 
 /// One mutating command on the `commands` queue.
@@ -611,7 +613,11 @@ async fn apply_finish(ctx: &OrchestrationContext, state: &mut JournalState) -> R
         ));
     }
     let unanswered: Vec<&str> = (output.checklist_after.iter())
-        .filter(|item| !state.answered.contains_key(*item))
+        .filter(|item| match state.answered.get(*item) {
+            None => true,
+            Some(AnswerRecord::NotApplicable { .. }) => false,
+            Some(_) => output.checklist_requires_na.contains(*item),
+        })
         .map(String::as_str)
         .collect();
     if !unanswered.is_empty() {

@@ -344,5 +344,13 @@
   {
     "query": "join key unvalidated pandas merge",
     "expected": "pandas/join-key-unvalidated"
+  },
+  {
+    "query": "random-time-split",
+    "expected": "tsreview/random-time-split"
+  },
+  {
+    "query": "mape-on-intermittent",
+    "expected": "tsreview/mape-on-intermittent"
   }
 ]

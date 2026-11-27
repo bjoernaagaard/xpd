@@ -470,6 +470,11 @@ fn user_prompt(cwd: &Path, prompt: &str) -> Result<ExitCode> {
                 .to_owned(),
         );
     }
+    if !chart && ts_review_prompt(prompt) {
+        text.push(
+            "Time series task: run `xpd ts-review <paths>` with `--adapter` to measure the series, then follow the `xpd-ts-review` skill.".to_owned(),
+        );
+    }
     if data_prep_prompt(prompt) {
         text.push(
             "Data preparation task: run `xpd data-prep <paths>` with `--adapter` to measure columns. Follow the `xpd-data-prep` skill to record and gate fixes.".to_owned(),
@@ -820,6 +825,36 @@ fn chart_prompt(prompt: &str) -> bool {
         .filter(|word| WEAK.contains(word))
         .collect();
     strong || weak.len() >= 2
+}
+
+fn ts_review_prompt(prompt: &str) -> bool {
+    let prompt = prompt.to_lowercase();
+    let words: HashSet<_> = prompt
+        .split(|character: char| !character.is_alphanumeric() && character != '_')
+        .collect();
+    words.iter().any(|word| {
+        matches!(
+            *word,
+            "seasonality"
+                | "seasonalities"
+                | "seasonal"
+                | "forecast"
+                | "forecasting"
+                | "intermittent"
+                | "intermittency"
+                | "stationarity"
+                | "stationary"
+                | "mlforecast"
+                | "statsforecast"
+                | "prognose"
+        ) || word.starts_with("tidsserie")
+            || word.starts_with("sæson")
+    }) || prompt.contains("time series")
+        || (words.contains("unique_id") && (words.contains("cadence") || words.contains("gaps")))
+        || (words.contains("series")
+            && ["group", "pool", "pooled", "reconcile", "period", "weekday"]
+                .iter()
+                .any(|word| words.contains(word)))
 }
 
 fn data_prep_prompt(prompt: &str) -> bool {

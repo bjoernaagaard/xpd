@@ -47,6 +47,7 @@ use super::orchestration::{
 use super::run::{
     broken_checks, changed_files, count_lines, host_fingerprint, measure_bench, passes,
 };
+use super::{ChecklistOwner, ChecklistOwners};
 
 /// Serve the ledger runs of a PostgreSQL store: take their orchestration turns, and gate
 /// their fixes in detached worktrees of a clone of the repository.
@@ -480,7 +481,10 @@ impl Worker {
                 let worktree = self.worktree(&head)?;
                 let (known, checklist) =
                     self.findings(&worktree, command, &paths, snapshot.run.adapter.as_deref())?;
-                encode(&ValidatePlanOutput { known, checklist })
+                encode(&ValidatePlanOutput {
+                    known,
+                    checklist: super::checklist_files(checklist),
+                })
             }
             (ACT_GATE_FIX, Some(snapshot)) => {
                 encode(&self.gate(instance, &branch, command, &decode(input)?, snapshot)?)
@@ -543,7 +547,7 @@ impl Worker {
         command: &str,
         paths: &[String],
         adapter: Option<&str>,
-    ) -> Result<(BTreeSet<String>, BTreeMap<String, String>)> {
+    ) -> Result<(BTreeSet<String>, ChecklistOwners)> {
         let mut cmd = Command::new(&self.xpd);
         cmd.args([command, "--format", "json", "--limit", "0"]);
         if let Some(adapter) = adapter {
@@ -564,10 +568,10 @@ impl Worker {
         }
         let ledger: serde_json::Value =
             serde_json::from_slice(&output.stdout).context("the survey printed no JSON")?;
-        if command == "data-prep"
+        if matches!(command, "data-prep" | "ts-review")
             && let Some(error) = ledger["read"]["facts"]["error"].as_str()
         {
-            bail!("the data-prep adapter failed: {error}");
+            bail!("the {command} adapter failed: {error}");
         }
         let ids: BTreeSet<String> = (ledger["findings"].as_array())
             .context("the survey printed no findings")?
@@ -582,7 +586,13 @@ impl Worker {
         if let Some(items) = ledger["checklist"].as_array() {
             for item in items {
                 if let (Some(id), Some(file)) = (item["id"].as_str(), item["file"].as_str()) {
-                    checklist.insert(id.to_owned(), file.to_owned());
+                    checklist.insert(
+                        id.to_owned(),
+                        ChecklistOwner {
+                            file: file.to_owned(),
+                            requires_na: item["requires_na"] == true,
+                        },
+                    );
                 }
             }
         }
@@ -710,7 +720,7 @@ impl Worker {
             timing,
             paired,
             changed_files: changed,
-            checklist_before,
+            checklist_before: super::checklist_files(checklist_before),
         })
     }
 
@@ -737,6 +747,11 @@ impl Worker {
             before,
             after,
             current_lines,
+            checklist_requires_na: checklist
+                .iter()
+                .filter(|(_, owner)| owner.requires_na)
+                .map(|(id, _)| id.clone())
+                .collect(),
             checklist_after: checklist.into_keys().collect(),
         })
     }

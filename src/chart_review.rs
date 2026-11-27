@@ -577,6 +577,7 @@ fn build_checklist(
         for q in &inv.questions {
             if q.applies_to(fig.kind) && q.needs_checklist(coverage) {
                 checklist.push(ChecklistEntry {
+                    requires_na: false,
                     id: format!("{}/{}", fig.id, q.id),
                     file: fig.tracked.clone(),
                     figure: format!(

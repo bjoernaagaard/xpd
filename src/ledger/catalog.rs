@@ -59,6 +59,7 @@ impl Catalog {
             .into_iter()
             .flat_map(|(entity, file)| {
                 self.questions.iter().map(move |question| ChecklistEntry {
+                    requires_na: false,
                     id: format!("{entity}/{}", question.id),
                     file: file.clone(),
                     figure: entity.clone(),
