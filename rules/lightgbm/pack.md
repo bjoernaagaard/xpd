@@ -10,6 +10,7 @@ can find one.
 - deprecated-eval-set
 - bagging-without-frequency
 - dart-early-stopping
+- early-stop-on-test
 - boost-round-overridden
 
 ## Prediction

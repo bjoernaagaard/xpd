@@ -573,11 +573,18 @@ impl Worker {
         }
         let ledger: serde_json::Value =
             serde_json::from_slice(&output.stdout).context("the survey printed no JSON")?;
-        if matches!(command, "data-prep" | "ts-review")
+        if matches!(command, "data-prep" | "ts-review" | "model-review")
             && let Some(error) = ledger["read"]["facts"]["error"].as_str()
         {
             bail!("the {command} adapter failed: {error}");
         }
+        ensure!(
+            command != "model-review"
+                || ledger["read"]["ambiguities"]
+                    .as_array()
+                    .is_some_and(Vec::is_empty),
+            "ambiguous model bindings in the selected Python files"
+        );
         let ids: BTreeSet<String> = (ledger["findings"].as_array())
             .context("the survey printed no findings")?
             .iter()
@@ -625,12 +632,16 @@ impl Worker {
                     command: command.clone(),
                 })
                 .collect();
-            let (findings, _, feature_evidence) = self.findings(
+            let (findings, checklist, feature_evidence) = self.findings(
                 &worktree,
                 &start.command,
                 &start.paths,
                 start.adapter.as_deref(),
             )?;
+            ensure!(
+                start.command != "model-review" || !checklist.is_empty(),
+                "no models found in the selected Python files"
+            );
             let paths: Vec<PathBuf> = start.paths.iter().map(PathBuf::from).collect();
             (
                 checks,

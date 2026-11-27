@@ -470,6 +470,7 @@ fn user_prompt(cwd: &Path, prompt: &str) -> Result<ExitCode> {
                 .to_owned(),
         );
     }
+    text.extend(model_review_prompt(prompt).then(|| MODEL_REVIEW_HINT.to_owned()));
     let feature_review = feature_review_prompt(prompt);
     if feature_review {
         text.push(
@@ -529,7 +530,9 @@ fn user_prompt(cwd: &Path, prompt: &str) -> Result<ExitCode> {
             );
         }
         let library = index::load(None)?.without_download(&cwd);
-        if let Some(playbook) = index::playbook_for(&library, prompt) {
+        if let Some(playbook) = index::playbook_for(&library, prompt)
+            && playbook.name != "xpd/recipe/model-review"
+        {
             text.push(playbook_lines(&playbook));
         }
         let lowered = prompt.to_lowercase();
@@ -831,6 +834,51 @@ fn chart_prompt(prompt: &str) -> bool {
         .filter(|word| WEAK.contains(word))
         .collect();
     strong || weak.len() >= 2
+}
+
+const MODEL_REVIEW_HINT: &str = "Model validation task: run `xpd model-review <paths>` to list findings and checklist questions. Use `xpd model-review start` to record the review, follow the `xpd-model-review` skill, and read `xpd api xpd/recipe/model-review`.";
+
+fn model_review_prompt(prompt: &str) -> bool {
+    let prompt = prompt.to_lowercase();
+    if prompt
+        .split(|c: char| !c.is_alphanumeric() && c != '-')
+        .any(|word| word == "model-review")
+    {
+        return true;
+    }
+    let words: Vec<_> = prompt
+        .split(|c: char| !c.is_alphanumeric())
+        .filter(|word| !word.is_empty())
+        .collect();
+    let phrase = |parts: &[&str]| words.windows(parts.len()).any(|window| window == parts);
+    let has = |word: &str| words.contains(&word);
+    let model = [
+        "model",
+        "classifier",
+        "regressor",
+        "sklearn",
+        "xgboost",
+        "lightgbm",
+        "mapie",
+        "modellens",
+    ]
+    .into_iter()
+    .any(has);
+    model
+        && (phrase(&["model", "validation"])
+            || phrase(&["early", "stopping"])
+            || phrase(&["naive", "baseline"])
+            || phrase(&["train", "versus", "validation"])
+            || (phrase(&["cross", "validation"]) && has("leakage"))
+            || (phrase(&["test", "set"]) && (has("tune") || has("tuning")))
+            || (has("mapie") && phrase(&["interval", "coverage"]))
+            || (has("calibration")
+                && (has("classifier") || has("probabilities") || has("validation")))
+            || (has("backtest")
+                && (has("matches") || has("match"))
+                && (has("forecasts") || has("forecast") || has("use")))
+            || (phrase(&["scoring", "metric"]) && phrase(&["training", "loss"]))
+            || (has("modellens") && (has("validering") || has("kalibrering"))))
 }
 
 fn feature_review_prompt(prompt: &str) -> bool {

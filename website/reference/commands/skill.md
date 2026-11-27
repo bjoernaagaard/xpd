@@ -16,6 +16,7 @@ xpd-chart-review
 xpd-data-prep
 xpd-feature-review
 xpd-harden
+xpd-model-review
 xpd-optimize
 xpd-ts-review
 xpd-untangle

@@ -483,6 +483,17 @@ pub(crate) fn analyze(file: File<'_>, src: &str, packs: &[Pack], edits: Edits) -
         }
         let unbound = unbound_names(pack, imports.as_deref());
         for m in matches {
+            let message = if rule.id.name() == "early-stop-on-test"
+                && matches!(rule.id.package(), "xgboost" | "lightgbm")
+            {
+                let Some((x, y)) = crate::model_review::early_stop_test_pair(&m, rule.id.package())
+                else {
+                    continue;
+                };
+                format!("{} Held-out pair: {x}, {y}.", rule.config.get_message(&m))
+            } else {
+                rule.config.get_message(&m)
+            };
             let start = m.start_pos();
             let fix = level.and_then(|level| context.build(rule, &m, pack, &unbound, level));
             let issue = Issue {
@@ -494,7 +505,7 @@ pub(crate) fn analyze(file: File<'_>, src: &str, packs: &[Pack], edits: Edits) -
                     column: start.column(&m) + 1,
                 }),
                 severity: rule.severity_under(pack.style),
-                message: rule.config.get_message(&m),
+                message,
                 fix: None,
                 help: pack
                     .page(rule.id.name())

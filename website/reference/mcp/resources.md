@@ -107,3 +107,7 @@ The saved log of a local render job.
 ## skill://xpd-feature-review/
 
 Review feature mechanisms, cutoff and fold value with [`xpd feature-review`](../../commands/feature-review/).
+
+## skill://xpd-model-review/
+
+Review model validation, baseline comparisons and calibration. The skill describes how to record the review and cite pipeline gate evidence.

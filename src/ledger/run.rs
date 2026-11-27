@@ -665,7 +665,10 @@ pub(super) fn judge_fix(evidence: &GateEvidence<'_>) -> Result<Compared, String>
         .findings
         .iter()
         .any(|id| !evidence.after.contains(id));
-    let strict_removal = matches!(evidence.command, "chart-review" | "feature-review");
+    let strict_removal = matches!(
+        evidence.command,
+        "chart-review" | "feature-review" | "model-review"
+    );
     if !evidence.findings.is_empty()
         && !finding_removed
         && (strict_removal || evidence.goal.is_none())
@@ -925,26 +928,27 @@ fn validate_start_adapter(
     here: &Path,
     adapter: Option<&str>,
 ) -> Result<()> {
-    if command == "feature-review"
+    if matches!(command, "feature-review" | "model-review")
         && let Some(spec) = adapter
-        && let Some(words) = shlex::split(spec)
-        && let [word] = words.as_slice()
-        && Path::new(word)
-            .extension()
-            .is_some_and(|ext| ext.eq_ignore_ascii_case("py"))
     {
-        let file = here
-            .join(word)
-            .canonicalize()
-            .with_context(|| format!("cannot read feature adapter {word}"))?;
-        let relative = file
-            .strip_prefix(&place.top)
-            .context("recorded feature adapter must be in the repository")?;
-        let relative = relative
-            .to_str()
-            .context("feature adapter path must be UTF-8")?;
-        git::output(&place.top, &["ls-files", "--error-unmatch", "--", relative])
-            .with_context(|| format!("commit the feature adapter {relative} before starting"))?;
+        let candidate = here.join(spec);
+        let is_python = candidate
+            .extension()
+            .is_some_and(|ext| ext.eq_ignore_ascii_case("py"));
+        let single_word = shlex::split(spec).is_some_and(|words| words.len() == 1);
+        if is_python && (candidate.is_file() || single_word) {
+            let file = candidate
+                .canonicalize()
+                .with_context(|| format!("cannot read Python adapter {spec}"))?;
+            let relative = file
+                .strip_prefix(&place.top)
+                .context("recorded Python adapter must be in the repository")?;
+            let relative = relative
+                .to_str()
+                .context("Python adapter path must be UTF-8")?;
+            git::output(&place.top, &["cat-file", "-e", &format!("HEAD:{relative}")])
+                .with_context(|| format!("commit the Python adapter {relative} before starting"))?;
+        }
     }
     Ok(())
 }
@@ -1539,8 +1543,10 @@ fn act_journal<K: Kind>(
         Action::Status => place.read(command)?,
         Action::Finish => {
             let mut journal = place.read(command)?;
-            kept = if matches!(command, "data-prep" | "ts-review" | "feature-review")
-                && let Some(open) = journal.open()
+            kept = if matches!(
+                command,
+                "data-prep" | "ts-review" | "feature-review" | "model-review"
+            ) && let Some(open) = journal.open()
             {
                 eprintln!("xpd: the fix {} is still open", open.id);
                 false
@@ -2336,7 +2342,7 @@ mod durable_run {
         );
         if matches!(
             at.store.command,
-            "data-prep" | "ts-review" | "feature-review"
+            "data-prep" | "ts-review" | "feature-review" | "model-review"
         ) && let Some(open) = at.journal.open()
         {
             eprintln!("xpd: the fix {} is still open", open.id);
@@ -2475,15 +2481,17 @@ pub(super) fn act<K: Kind, R: Serialize>(
     );
     let here = std::env::current_dir()?;
     let place = Place::find(command)?;
+    let starting = matches!(action, Action::Start { .. });
     if let Action::Start { adapter, .. } = &action {
         validate_start_adapter(command, &place, &here, adapter.as_deref())?;
     }
     let surveyed = |journal: &Journal, commit: Option<&str>| -> Result<SurveyOutput<K, R>> {
         let top = Some(place.top.as_path());
         let adapter = journal.adapter.as_deref();
-        let measured_head = (command == "feature-review" && commit.is_none())
-            .then(|| place.head())
-            .transpose()?;
+        let measured_head = (matches!(command, "feature-review" | "model-review")
+            && commit.is_none())
+        .then(|| place.head())
+        .transpose()?;
         match commit.or(measured_head.as_deref()) {
             None => {
                 let files = Tree {
@@ -2515,6 +2523,10 @@ pub(super) fn act<K: Kind, R: Serialize>(
     let found = |journal: &Journal, commit: Option<&str>| -> Result<SurveyedFindings> {
         let output = surveyed(journal, commit)?;
         let checklist = output.checklist_owners();
+        ensure!(
+            command != "model-review" || !starting || !checklist.is_empty(),
+            "no models found in the selected Python files"
+        );
         let ids = output.findings.into_iter().map(|entry| entry.id).collect();
         let feature_evidence = (command == "feature-review")
             .then(|| FeatureEvidence::from_read(&serde_json::to_value(output.read)?))

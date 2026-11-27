@@ -147,7 +147,9 @@ pub(crate) struct Entry<K> {
     /// first id.
     pub(crate) id: String,
     #[serde(skip_serializing_if = "Option::is_none")]
-    source_rule: Option<&'static str>,
+    pub(crate) source_rule: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) model: Option<String>,
     /// The id that xpd 0.55.0 and older gave this finding, from [`legacy_id`]. A run that one
     /// of them recorded cites these ids, and its import rewrites each one to `id`.
     #[serde(skip)]
@@ -176,6 +178,7 @@ impl<K> Entry<K> {
         let fresh = if self.fresh == Some(true) { " new" } else { "" };
         let rule = self
             .source_rule
+            .as_deref()
             .map_or_else(String::new, |rule| format!("[{rule}] "));
         format!(
             "{}{fresh}  {}  {rule}{}",
@@ -211,7 +214,8 @@ pub(crate) fn named<K: Kind>(mut findings: Vec<Finding<K>>) -> Vec<Entry<K>> {
             *nth += 1;
             Entry {
                 id: id(&finding.kind.name(), &finding.key, *nth),
-                source_rule: finding.kind.source_rule(),
+                source_rule: finding.kind.source_rule().map(str::to_owned),
+                model: None,
                 legacy_id: legacy_id(&finding.kind.name(), &finding.key, *nth),
                 fresh: None,
                 finding,

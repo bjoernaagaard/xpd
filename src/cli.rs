@@ -355,6 +355,8 @@ enum Cmd {
     TsReview(crate::ts_review::TsReviewArgs),
     /// Review domain mechanisms, cutoff safety and measured feature value.
     FeatureReview(crate::feature_review::FeatureReviewArgs),
+    /// Review model validation, baseline comparisons and calibration.
+    ModelReview(crate::model_review::ModelReviewArgs),
     Untangle(crate::untangle::UntangleArgs),
     Optimize(crate::optimize::OptimizeArgs),
     Harden(crate::harden::HardenArgs),
@@ -491,6 +493,7 @@ pub fn run() -> ExitCode {
         Cmd::DataPrep(args) => command_result(args.run(default_format)),
         Cmd::TsReview(args) => command_result(args.run(default_format)),
         Cmd::FeatureReview(args) => command_result(args.run(default_format)),
+        Cmd::ModelReview(args) => command_result(args.run(default_format)),
         Cmd::Untangle(args) => command_result(args.run(default_format)),
         Cmd::Harden(args) => command_result(args.run(default_format)),
         Cmd::Optimize(args) => command_result(args.run(default_format)),

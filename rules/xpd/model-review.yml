@@ -1,0 +1,105 @@
+facts:
+  - id: "refit-folds"
+    text: "Refit the complete estimator from scratch inside each fold using the training rows."
+    how: "Fit a clone or call the project fold fitter with only permitted inputs and report counts, fold labels, splitter and scorer."
+  - id: "baseline-score"
+    text: "Compare the model with a naive baseline on the same validation rows."
+    how: "Refit the declared baseline on identical train rows, apply the same scorer and validation rows, and report both scores and model minus baseline."
+  - id: "score-spread"
+    text: "Show how much the validation score varies across folds."
+    how: "Report raw fold scores, unweighted mean, population standard deviation and range without interpreting the spread as a confidence interval."
+  - id: "train-gap"
+    text: "Measure the train-to-validation score gap using the same fitted model and scorer."
+    how: "Report signed train score minus validation score per fold using the higher-is-better scorer convention."
+  - id: "probability-calibration"
+    text: "Check whether predicted probabilities agree with observed frequencies on held-out rows."
+    how: "Report binary Brier loss and equal-width reliability bin counts, mean probability and event rate from validation predictions and the stated positive class."
+  - id: "interval-coverage"
+    text: "Compare held-out conformal interval coverage with the requested target at each confidence level."
+    how: "Count lower <= actual <= upper per fold and level and pool covered and eligible counts across folds to compute coverage minus target; report finite mean interval width."
+  - id: "partition-evidence"
+    text: "Check whether the measured partitions keep groups apart and preserve the required time direction."
+    how: "Report positional overlap, shared group counts and timestamp boundaries for the declared partition roles."
+  - id: "pattern-adapter"
+    text: "Feed measured facts through the selected Python or command adapter."
+    how: "Run in the selected tree using chart-review process conventions and validate a model facts document before listing it."
+questions:
+  - id: "validation-scheme"
+    text: "Why does this validation scheme match how the model is used?"
+    look: "Inspect prediction-time inputs, deployment population, group boundary, dates, horizon and fold evidence."
+  - id: "baseline"
+    text: "What is the naive baseline and why is it usable at prediction time?"
+    look: "Inspect its inputs and paired scores on the exact same folds."
+  - id: "metric-and-loss"
+    text: "Why do the objective, score and operating threshold suit the decision?"
+    look: "Inspect response type, sign, units and cost of errors."
+  - id: "selection"
+    text: "Where were features, tuning and early stopping chosen before the final score?"
+    look: "Inspect the fit boundary, availability of features, holdout reuse and choices across runs."
+  - id: "probability-calibration"
+    text: "Where was probability calibration fitted and how close are held-out probabilities to event rates?"
+    look: "Inspect fold roles, Brier loss, bins and support."
+  - id: "interval-coverage"
+    text: "Were conformity scores learned away from validation and do the intervals cover enough cases at useful widths?"
+    look: "Inspect partition roles, levels, counts and difficult folds."
+  - id: "first-failure"
+    text: "Which failure would the owner notice first and where would you see it?"
+    look: "Inspect hard folds, affected cases and what action the owner takes."
+  - id: "pipeline-evidence"
+    text: "Which existing pipeline proofs apply and what did they report at this commit?"
+    look: "Inspect the contract and MCP report or state why the contract does not apply."
+mcp_gates:
+  - data-is-profiled
+  - split-covers-every-row
+  - split-is-seeded
+  - inputs-are-file-columns
+  - dataflow-connects
+  - one-pipeline
+  - check-reports-no-error
+  - cross-validated
+  - reproducible
+  - refit-matches-model
+  - refit-matches-scores
+  - saved-model-predicts
+  - versions-recorded
+  - indexed-api-calls
+  - discovery-is-recorded
+rules:
+  sklearn/auc-from-labels: metric-response
+  sklearn/cross-val-on-fitted-data: validation-leakage
+  sklearn/fit-before-split: validation-leakage
+  sklearn/fit-on-test: validation-leakage
+  sklearn/groups-ignored: split-mismatch
+  sklearn/leave-one-out-score: metric-response
+  sklearn/metadata-routing: split-mismatch
+  sklearn/metric-arguments-swapped: metric-response
+  sklearn/missing-groups: split-mismatch
+  sklearn/missing-random-state: validation-reproducibility
+  sklearn/prefit-before-cross-validation: validation-leakage
+  sklearn/random-state-without-shuffle: validation-reproducibility
+  sklearn/scaled-target-without-inverse: metric-response
+  sklearn/scaler-fit-before-split: validation-leakage
+  sklearn/score-on-training-rows: validation-leakage
+  sklearn/stateful-function-transformer: validation-leakage
+  sklearn/transformed-target-pair: metric-response
+  sklearn/tune-on-test: test-set-tuning
+  sklearn/unknown-scoring-name: metric-response
+  mapie/alpha-as-confidence-level: conformal-configuration
+  mapie/calibrate-on-training-rows: conformal-leakage
+  mapie/coverage-on-seen-rows: conformal-leakage
+  mapie/predict-function-returns-labels: metric-response
+  mapie/prefit-estimator-not-fitted: conformal-configuration
+  mapie/quantile-estimator-loss: metric-loss-mismatch
+  mapie/risk-control-method: conformal-configuration
+  mapie/shuffled-time-series-split: split-mismatch
+  mapie/unseeded-resampling: validation-reproducibility
+  lightgbm/bagging-without-frequency: boosting-validation
+  lightgbm/boost-round-overridden: boosting-validation
+  lightgbm/dart-early-stopping: boosting-validation
+  lightgbm/deprecated-eval-set: boosting-validation
+  xgboost/native-predict-after-early-stopping: boosting-validation
+  xgboost/quantile-eval-without-train-ref: boosting-validation
+  xgboost/removed-fit-keywords: boosting-validation
+  xgboost/reused-early-stopping-callback: boosting-validation
+  xgboost/early-stop-on-test: test-set-tuning
+  lightgbm/early-stop-on-test: test-set-tuning
