@@ -28,6 +28,10 @@ const BANNED_PHRASES = [
 const FORBIDDEN_CHARS = [
   ['\u2014', 'em dash'],
   ['\u2013', 'en dash'],
+  ['\u2018', 'curly single quote'],
+  ['\u2019', 'curly apostrophe'],
+  ['\u201c', 'curly double quote'],
+  ['\u201d', 'curly double quote'],
   [';', 'semicolon'],
   ['\u00b7', 'middle dot'],
   ['\u2192', 'arrow'],

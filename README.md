@@ -1,14 +1,15 @@
 # xpd
 
-Run `uvx xpd check .` to catch slow or wrong Python library code without running Python, and add `--fix` to rewrite what can be fixed automatically. `xpd` ships rule packs for pandas, Polars, NumPy, SciPy, scikit-learn, scikit-lego, MAPIE, Category Encoders, linearmodels, arch, skfolio, pymoo, plotly, Apache Hamilton, and core Python.
+Run `uvx xpd check .` to catch slow or wrong Python library code without running Python, and add `--fix` to rewrite what can be fixed automatically. `xpd` ships rule packs for pandas, Polars, NumPy, SciPy, scikit-learn, scikit-lego, MAPIE, Category Encoders, LightGBM, XGBoost, statsmodels, linearmodels, arch, CVXPY, skfolio, pymoo, Nixtla forecasting libraries, plotly, Apache Hamilton, and core Python.
 
 Read the full documentation at <https://bjoernaagaard.github.io/xpd/>.
 
 ```mermaid
 flowchart LR
-    Code["Python files"] --> Check["Lint and fix (xpd check, hook, lsp)"]
+    Code["Python and TSX files"] --> Check["Lint and fix (xpd check, hook, lsp)"]
     Code --> Search["Search APIs and playbooks (xpd find, api)"]
-    Code --> Refactor["Analyze and verify refactors (xpd graph, untangle, optimize, equiv)"]
+    Code --> Ledgers["Recorded ledgers (chart-review, data-prep, ts-review, feature-review, untangle, optimize, harden)"]
+    Code --> Verify["Dataflow and proof (xpd graph, profile, equiv, refit)"]
     Code --> Agent["Connect agents (xpd mcp, plugin, animate)"]
 ```
 
@@ -80,12 +81,13 @@ Run `xpd <command> -h` or read the [command reference](https://bjoernaagaard.git
 
 | Area | Commands | What they do |
 | --- | --- | --- |
-| Lint and review | `check`, `rules`, `chart-review`, `hook` | Lint files, list rules, audit charts against Tufte's book, and guard agent edits |
+| Lint and guard | `check`, `rules`, `hook`, `lsp` | Lint files, list rules, guard agent edits, and serve editor diagnostics |
+| Code ledgers | `untangle`, `optimize`, `harden` | Audit structural coupling, measured CPU or memory waste, and reliability or flaky tests |
+| Domain ledgers | `chart-review`, `data-prep`, `ts-review`, `feature-review` | Audit charts and tables, data prep and scaling, time series structure, and model feature mechanisms |
 | Library lookup | `find`, `api`, `index` | Search indexed library symbols, rules, and playbooks for a task |
-| Code analysis | `graph`, `graph map`, `graph impact`, `untangle`, `optimize`, `outline` | Trace dataflow, plan pandas to Polars migrations, and measure structural or performance debt |
-| Python verification | `profile`, `equiv`, `refit` | Profile tabular files, prove refactors equivalent, and verify scikit-learn model refits |
-| Authoring and media | `rules new`, `rules test`, `rules run`, `animate` | Author custom ast-grep rules and render editable Manim animations |
-| Integrations | `mcp`, `lsp`, `doctor`, `skill`, `completions` | Run the MCP server, editor LSP, Ruff and ty profile doctor, and shell completions |
+| Dataflow and proof | `graph`, `graph map`, `graph impact`, `profile`, `equiv`, `refit` | Trace dataflow, plan pandas to Polars migrations, profile files, and prove refactors or model refits |
+| Authoring and media | `rules new`, `rules test`, `rules run`, `rules outline`, `animate` | Author custom ast-grep rules, map modules, and render editable Manim animations |
+| Integrations | `mcp`, `doctor`, `skill`, `completions` | Run the MCP server, Ruff and ty profile doctor, bundled skills, and shell completions |
 
 ## Connect agents and editors
 
