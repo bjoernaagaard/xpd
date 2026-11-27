@@ -59,6 +59,10 @@ duroxide-pg = { version = "=0.2.0", optional = true }
 
 [target.'cfg(target_os = "linux")'.dependencies]
 openssl = { version = "0.10", features = ["vendored"] }
+openssl-sys = { version = "0.9", features = ["vendored"] }
+
+[target.'cfg(target_os = "linux")'.build-dependencies]
+openssl-sys = { version = "0.9", features = ["vendored"] }
 
 [features]
 default = []
@@ -125,8 +129,8 @@ enum_glob_use = "allow"                  # use Enum::* inside a function that ma
 # Whole-program optimisation, for a smaller binary and faster startup on the hook's hot path.
 [profile.release]
 opt-level = "s"
-lto = true
-codegen-units = 1
+lto = "thin"
+codegen-units = 16
 strip = true
 
 [profile.dev.package."*"]

@@ -2,10 +2,6 @@
 # It publishes the wheels that the run on main built for the same commit to PyPI with trusted
 # publishing, and attaches them to a GitHub Release. A release therefore compiles once, and the
 # tag waits only for the upload. Started from `maturin generate-ci github` (maturin 1.16).
-#
-# When one job fails for a reason outside the code, such as a timed out artifact upload, rerun the
-# failed job on the run's page before tagging. A push that changes no file starts no run here,
-# because of its path filters.
 name: Release
 
 on:
@@ -28,10 +24,9 @@ on:
 permissions:
   contents: read
 
-# Each branch or tag gets its own queue, and a new run waits for the running one to finish.
 concurrency:
   group: release-${{ github.ref }}
-  cancel-in-progress: false
+  cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/') }} # jactionlint ignore=concurrency-cancels-release
 
 jobs:
   # mise.toml pins Rust. Runners ship older toolchains, so every build installs this one.
@@ -41,110 +36,70 @@ jobs:
     timeout-minutes: 5
     outputs:
       rust: ${{ steps.read.outputs.rust }}
-      platforms: ${{ steps.read.outputs.platforms }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - id: read
         run: |
           python3 - <<'PYTHON' >> "$GITHUB_OUTPUT"
-          import json
           import tomllib
           from pathlib import Path
 
           rust = tomllib.loads(Path("mise.toml").read_text())["tools"]["rust"]
           print("rust=" + (rust if isinstance(rust, str) else rust["version"]))
-          platforms = json.loads(Path(".github/wheel-platforms.json").read_text())
-          print("platforms=" + json.dumps(platforms))
           PYTHON
 
-  linux:
+  wheels:
+    name: ${{ matrix.name }}
     if: ${{ !startsWith(github.ref, 'refs/tags/') }}
     needs: [toolchain]
-    runs-on: ubuntu-22.04
-    timeout-minutes: 30
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 20
     strategy:
+      fail-fast: true
       matrix:
-        platform: ${{ fromJSON(needs.toolchain.outputs.platforms) }}
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - name: Build wheels
-        # The cache comes only from runs on main, which run reviewed code, as bas also accepts.
-        uses: PyO3/maturin-action@e83996d129638aa358a18fbd1dfb82f0b0fb5d3b # v1.51.0 # jactionlint ignore=cache-poisoning
-        with:
-          target: ${{ matrix.platform }}
-          rust-toolchain: ${{ needs.toolchain.outputs.rust }}
-          # zig builds on the runner, which has cmake and libclang for llama.cpp. The manylinux
-          # containers have no libclang that bindgen can use.
-          args: --release --out dist --zig
-          sccache: 'true'
-          manylinux: auto
-      - uses: ./.github/actions/smoke
-        if: matrix.platform == 'x86_64'
-      - name: Upload wheels
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: wheels-linux-${{ matrix.platform }}
-          path: dist
-
-  musllinux:
-    if: ${{ !startsWith(github.ref, 'refs/tags/') }}
-    needs: [toolchain]
-    runs-on: ubuntu-22.04
-    timeout-minutes: 30
-    strategy:
-      matrix:
-        platform: ${{ fromJSON(needs.toolchain.outputs.platforms) }}
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - name: Build wheels
-        # The cache comes only from runs on main, which run reviewed code, as bas also accepts.
-        uses: PyO3/maturin-action@e83996d129638aa358a18fbd1dfb82f0b0fb5d3b # v1.51.0 # jactionlint ignore=cache-poisoning
-        with:
-          target: ${{ matrix.platform }}
-          rust-toolchain: ${{ needs.toolchain.outputs.rust }}
-          # zig builds on the runner, which has cmake and libclang for llama.cpp. The manylinux
-          # containers have no libclang that bindgen can use.
-          args: --release --out dist --zig
-          sccache: 'true'
-          manylinux: musllinux_1_2
-      - name: Upload wheels
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: wheels-musllinux-${{ matrix.platform }}
-          path: dist
-
-  windows:
-    if: ${{ !startsWith(github.ref, 'refs/tags/') }}
-    needs: [toolchain]
-    runs-on: ${{ matrix.platform.runner }}
-    timeout-minutes: 30
-    strategy:
-      matrix:
-        platform:
-          - runner: windows-latest
+        include:
+          - name: linux (x86_64)
+            runner: ubuntu-22.04
+            target: x86_64
+            args: --release --out dist --zig
+            manylinux: auto
+            artifact: wheels-linux-x86_64
+            smoke: true
+          - name: linux (aarch64)
+            runner: ubuntu-22.04
+            target: aarch64
+            args: --release --out dist --zig
+            manylinux: auto
+            artifact: wheels-linux-aarch64
+            smoke: false
+          - name: musllinux (x86_64)
+            runner: ubuntu-22.04
+            target: x86_64
+            args: --release --out dist --zig
+            manylinux: musllinux_1_2
+            artifact: wheels-musllinux-x86_64
+            smoke: false
+          - name: musllinux (aarch64)
+            runner: ubuntu-22.04
+            target: aarch64
+            args: --release --out dist --zig
+            manylinux: musllinux_1_2
+            artifact: wheels-musllinux-aarch64
+            smoke: false
+          - name: windows (x64)
+            runner: windows-latest
             target: x64
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - name: Build wheels
-        # The cache comes only from runs on main, which run reviewed code, as bas also accepts.
-        uses: PyO3/maturin-action@e83996d129638aa358a18fbd1dfb82f0b0fb5d3b # v1.51.0 # jactionlint ignore=cache-poisoning
-        with:
-          target: ${{ matrix.platform.target }}
-          rust-toolchain: ${{ needs.toolchain.outputs.rust }}
-          args: --release --out dist
-          sccache: 'true'
-      - uses: ./.github/actions/smoke
-      - name: Upload wheels
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: wheels-windows-${{ matrix.platform.target }}
-          path: dist
-
-  macos:
-    if: ${{ !startsWith(github.ref, 'refs/tags/') }}
-    needs: [toolchain]
-    runs-on: macos-latest
-    timeout-minutes: 30
+            args: --release --out dist
+            manylinux: ""
+            artifact: wheels-windows-x64
+            smoke: true
+          - name: macos (aarch64)
+            runner: macos-latest
+            target: aarch64
+            args: --release --out dist
+            manylinux: ""
+            artifact: wheels-macos-aarch64
+            smoke: true
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Build wheels
@@ -153,15 +108,17 @@ jobs:
         env:
           MACOSX_DEPLOYMENT_TARGET: "11.0"
         with:
-          target: aarch64
+          target: ${{ matrix.target }}
           rust-toolchain: ${{ needs.toolchain.outputs.rust }}
-          args: --release --out dist
+          args: ${{ matrix.args }}
           sccache: 'true'
+          manylinux: ${{ matrix.manylinux }}
       - uses: ./.github/actions/smoke
+        if: matrix.smoke
       - name: Upload wheels
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: wheels-macos-aarch64
+          name: ${{ matrix.artifact }}
           path: dist
 
   sdist:

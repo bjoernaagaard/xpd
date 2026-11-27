@@ -5924,6 +5924,7 @@ dependencies = [
  "lsp-server",
  "lsp-types",
  "openssl",
+ "openssl-sys",
  "rayon",
  "regex",
  "salsa",

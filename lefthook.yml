@@ -47,6 +47,11 @@ pre-commit:
       run: jactionlint {staged_files}
 
 pre-push:
+  parallel: true
   jobs:
     - name: deny
       run: cargo deny check
+    - name: sample marks
+      run: python3 .github/scripts/check_sample_marks.py
+    - name: rule conflicts
+      run: cargo build --quiet && python3 .github/scripts/check_rule_conflicts.py --xpd target/debug/xpd
