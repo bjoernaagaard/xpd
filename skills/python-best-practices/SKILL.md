@@ -78,6 +78,15 @@ def total(rows: list[Row]) -> float:
 - No mutable module level state. A cache belongs to an object, or behind
   `functools.cache` on a function.
 - Name a module after what it holds. No `utils`, `helpers`, `common` or `misc`.
+- **A public name is a search query.** Give it two to four words, one of them a word of
+  the domain, so that one search finds its definition: `load_orders`, not `load`, and
+  `clean_title`, not `clean`. Stop at the shortest name that no other module defines.
+- **One definition per name, and one spelling per concept.** Move shared code to one
+  module named after it and import it. Pick `org_id` or `organization_id` and use it
+  everywhere. Rename a function in the commit that changes what it does.
+- **Write each name out whole.** No event name, settings key or module path built with an
+  f-string, such as `f"github.{entity}.{action}"`, and no `getattr` or `import_module`
+  with a built name. A dict from each value to its full name keeps every name searchable.
 - Imports sit at the top of the file, absolute, one module per line. No wildcard
   imports. An import inside a function needs a comment with its reason, and on 3.15
   `lazy import` replaces most of them.
@@ -213,6 +222,9 @@ def table(models: list[Model], catalog: Catalog) -> list[dict[str, object]]:
   (`"""Return the rows that changed since the last sync."""`). Add more only for what the
   signature cannot say: the exceptions callers should catch, units, side effects.
   Don't repeat the parameter names and types.
+- **The docstring holds the words a search uses**, spelled out with spaces. A search for
+  "session expired" does not find `SessionExpiryChecker`, and it finds
+  `"""Return whether the user session has expired."""`.
 
 ## 9. Proof that it works
 
@@ -273,6 +285,8 @@ def table(models: list[Model], catalog: Catalog) -> list[dict[str, object]]:
 | Layout, quotes, import order, unused names, mutable defaults (`B006`), bare `except`, a `lambda` bound to a name (`E731`), an import inside a function (`PLC0415`), access to another object's private member (`SLF001`) | `ruff format`, `ruff check` |
 | Types, `None` handling, missing annotations in strict mode | the project's type checker |
 | Module level names with an underscore, a `utils` or `config` module | `xpd check`: `python/module-private-name`, `python/vague-module-name` |
+| A public function named only with a verb, a name built with an f-string | `xpd check`: `python/generic-verb-name`, `python/interpolated-key` |
+| A public name that two modules define, and the rest of the rules about search | `xpd discover` |
 | An error message that starts with a value, a `warnings.warn` deprecation in place of `@deprecated` | `xpd check`: `python/error-message-prefix`, `python/deprecated-without-decorator` |
 | Calls and environment reads at import | `xpd check`: `python/import-side-effect` |
 | `**` merges, unpacked comprehensions, two `for` clauses | `xpd check`: `python/comprehension-merges-dicts`, `python/unpacked-comprehension`, `python/comprehension-two-fors` |

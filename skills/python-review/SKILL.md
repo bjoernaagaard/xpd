@@ -114,6 +114,10 @@ The first two groups are where real bugs live.
 - An error message that starts with a value, so a log line does not search back to the raise
   (`python/error-message-prefix`), and a deprecation that only warns at run time in place of
   `@deprecated` (`python/deprecated-without-decorator`).
+- A public function named only with a verb, such as `load` or `clean`
+  (`python/generic-verb-name`), a public name that another module also defines, and an event
+  name, settings key or module path built with an f-string (`python/interpolated-key`). Each
+  makes a search land on the wrong definition or on none. `xpd discover` lists them together.
 - A module that configures a library, sets up logging or reads the environment when it is
   imported (`python/import-side-effect`).
 - An import inside a function without a stated reason.
