@@ -15,6 +15,9 @@ use serde::{Deserialize, Serialize};
 
 use duroxide::{OrchestrationContext, RetryPolicy};
 
+use super::feature_evidence::{
+    FeatureEvidence, gate_invalidation, invalidate_answers, plan_invalidation,
+};
 pub(super) use super::run::{AnswerRecord, Answered, Compared, Goal, Timing};
 use super::run::{GateEvidence, judge_fix};
 
@@ -130,6 +133,8 @@ pub(crate) struct JournalState {
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub(crate) answered: BTreeMap<String, AnswerRecord>,
     pub(crate) finished: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(super) feature_evidence: Option<FeatureEvidence>,
 }
 
 /// The stage that comes next, with what to do in it.
@@ -272,6 +277,8 @@ pub(crate) struct BaselineOutput {
     pub(crate) adapter: Option<String>,
     pub(crate) was: usize,
     pub(crate) was_lines: usize,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(super) feature_evidence: Option<FeatureEvidence>,
 }
 
 /// What `ValidatePlan` returns: the finding ids and per-figure checklist items of the working tree.
@@ -280,6 +287,8 @@ pub(crate) struct ValidatePlanOutput {
     pub(crate) known: BTreeSet<String>,
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub(crate) checklist: BTreeMap<String, String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(super) feature_evidence: Option<FeatureEvidence>,
 }
 
 /// What `GateFix` measures for one fix. The judgment itself stays pure, in
@@ -303,6 +312,10 @@ pub(crate) struct GateOutput {
     pub(crate) changed_files: BTreeSet<String>,
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub(crate) checklist_before: BTreeMap<String, String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(super) feature_before: Option<FeatureEvidence>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(super) feature_after: Option<FeatureEvidence>,
 }
 
 /// What `FinishRun` surveys at the end of a run.
@@ -315,6 +328,8 @@ pub(crate) struct FinishOutput {
     pub(crate) checklist_after: BTreeSet<String>,
     #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
     pub(crate) checklist_requires_na: BTreeSet<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(super) feature_evidence: Option<FeatureEvidence>,
 }
 
 /// One mutating command on the `commands` queue.
@@ -441,6 +456,12 @@ async fn apply_plan(
         .schedule_activity_with_retry_typed(ACT_VALIDATE_PLAN, &state.paths, transient())
         .await
         .map_err(|error| format!("the plan survey failed: {error}"))?;
+    let invalidated = plan_invalidation(
+        state.feature_evidence.as_ref(),
+        known.feature_evidence.as_ref(),
+        &answered,
+    )
+    .map_err(|error| error.to_string())?;
     let mut named: BTreeSet<&str> = state.fixes().map(|fix| fix.id.as_str()).collect();
     for fix in &fixes {
         if !named.insert(fix.id.as_str()) {
@@ -485,19 +506,25 @@ async fn apply_plan(
             return Err(format!("the checklist of today has no item {item}"));
         }
     }
-    for item in accepted {
+    for item in &accepted {
         if item.reason.trim().is_empty() {
             return Err(format!(
                 "the accepted finding {} has no reason",
                 item.finding
             ));
         }
-        state.accepted.insert(item.finding, item.reason);
     }
-    for item in answered {
+    for item in &answered {
         if item.reason.trim().is_empty() {
             return Err(format!("the answered item {} has no reason", item.item));
         }
+    }
+    invalidate_answers(&mut state.answered, &invalidated);
+    state.feature_evidence = known.feature_evidence;
+    for item in accepted {
+        state.accepted.insert(item.finding, item.reason);
+    }
+    for item in answered {
         let (id, record) = item.into_pair();
         state.answered.insert(id, record);
     }
@@ -548,6 +575,13 @@ async fn apply_gate(
             output.commit, head
         ));
     }
+    let invalidated = gate_invalidation(
+        state.feature_evidence.as_ref(),
+        output.feature_before.as_ref(),
+        output.feature_after.as_ref(),
+        &output.changed_files,
+    )
+    .map_err(|error| error.to_string())?;
     let judged = {
         let fix = state.fix_mut(id)?;
         judge(command, fix, &output)
@@ -571,7 +605,14 @@ async fn apply_gate(
             let commit = output.commit;
             state.current.clone_from(&commit);
             state.current_lines = output.lines_after;
-            for item in questions {
+            if output.feature_after.is_some() {
+                invalidate_answers(&mut state.answered, &invalidated);
+                state.feature_evidence = output.feature_after;
+            }
+            for item in questions
+                .into_iter()
+                .filter(|_| command != "feature-review")
+            {
                 state.answered.insert(
                     item,
                     AnswerRecord::Fixed {
@@ -612,11 +653,23 @@ async fn apply_finish(ctx: &OrchestrationContext, state: &mut JournalState) -> R
             unexplained.join(", ")
         ));
     }
+    let invalidated = plan_invalidation(
+        state.feature_evidence.as_ref(),
+        output.feature_evidence.as_ref(),
+        &[],
+    )
+    .map_err(|error| error.to_string())?;
     let unanswered: Vec<&str> = (output.checklist_after.iter())
-        .filter(|item| match state.answered.get(*item) {
-            None => true,
-            Some(AnswerRecord::NotApplicable { .. }) => false,
-            Some(_) => output.checklist_requires_na.contains(*item),
+        .filter(|item| {
+            match state
+                .answered
+                .get(*item)
+                .filter(|_| !invalidated.contains(*item))
+            {
+                None => true,
+                Some(AnswerRecord::NotApplicable { .. }) => false,
+                Some(_) => output.checklist_requires_na.contains(*item),
+            }
         })
         .map(String::as_str)
         .collect();
@@ -627,6 +680,7 @@ async fn apply_finish(ctx: &OrchestrationContext, state: &mut JournalState) -> R
         ));
     }
     state.current_lines = output.current_lines;
+    state.feature_evidence = output.feature_evidence;
     state.finished = true;
     Ok(())
 }
@@ -650,6 +704,7 @@ pub(crate) async fn ledger_run(ctx: OrchestrationContext, input: String) -> Resu
             checks: baseline.checks,
             bench: baseline.bench,
             adapter: baseline.adapter,
+            feature_evidence: baseline.feature_evidence,
             was: baseline.was,
             was_lines: baseline.was_lines,
             current_lines: baseline.was_lines,

@@ -1,0 +1,90 @@
+{
+  "target": "day_ahead_price",
+  "prediction_cutoff": "11:00 UTC before delivery",
+  "development": {
+    "snapshot": "illustrative-development",
+    "holdout": "next delivery year"
+  },
+  "baseline": [
+    "hour"
+  ],
+  "inputs": {
+    "hour": "Delivery hour",
+    "price": "Published price",
+    "load": "Load forecast",
+    "wind": "Wind forecast",
+    "forecast": "Current known forecast",
+    "zone": "Market zone"
+  },
+  "features": [
+    {
+      "id": "historical_price",
+      "name": "Historical price",
+      "kind": "feature",
+      "owner": "features.py",
+      "column": "historical_price",
+      "node": "historical_price",
+      "rolling": {
+        "source": "price",
+        "group_keys": [
+          "zone"
+        ],
+        "prior_only": true
+      }
+    },
+    {
+      "id": "current_forecast",
+      "name": "Current forecast",
+      "kind": "feature",
+      "owner": "features.py",
+      "column": "current_forecast",
+      "node": "current_forecast",
+      "rolling": {
+        "source": "forecast",
+        "group_keys": [
+          "zone"
+        ],
+        "prior_only": false
+      }
+    },
+    {
+      "id": "grouped_history",
+      "name": "Grouped history",
+      "kind": "feature",
+      "owner": "features.py",
+      "column": "grouped_history",
+      "node": "grouped_history",
+      "rolling": {
+        "source": "price",
+        "group_keys": [
+          "zone"
+        ],
+        "prior_only": true
+      }
+    },
+    {
+      "id": "residual_load",
+      "name": "Residual load",
+      "kind": "feature",
+      "owner": "features.py",
+      "column": "residual_load",
+      "node": "residual_load"
+    },
+    {
+      "id": "residual_load_copy",
+      "name": "Residual load copy",
+      "kind": "feature",
+      "owner": "features.py",
+      "column": "residual_load_copy",
+      "node": "residual_load_copy"
+    },
+    {
+      "id": "total_supply",
+      "name": "Total supply",
+      "kind": "feature",
+      "owner": "features.py",
+      "column": "total_supply",
+      "node": "total_supply"
+    }
+  ]
+}

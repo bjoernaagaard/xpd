@@ -12,6 +12,9 @@
 //! is imported once, by the worktree that owns it, and renamed with the `.migrated` suffix.
 
 use super::ChecklistOwners;
+use super::feature_evidence::{FeatureEvidence, plan_invalidation};
+#[cfg(not(feature = "ledger-durable"))]
+use super::feature_evidence::{gate_invalidation, invalidate_answers};
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt::Write as _;
@@ -274,6 +277,8 @@ struct Journal {
     /// Optional runtime figure adapter recorded at start and run at every stage.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     adapter: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    feature_evidence: Option<FeatureEvidence>,
     /// How many findings the base had.
     was: usize,
     /// Total lines of code in `paths` at the start commit.
@@ -660,10 +665,10 @@ pub(super) fn judge_fix(evidence: &GateEvidence<'_>) -> Result<Compared, String>
         .findings
         .iter()
         .any(|id| !evidence.after.contains(id));
-    let chart_review = evidence.command == "chart-review";
+    let strict_removal = matches!(evidence.command, "chart-review" | "feature-review");
     if !evidence.findings.is_empty()
         && !finding_removed
-        && (chart_review || evidence.goal.is_none())
+        && (strict_removal || evidence.goal.is_none())
     {
         return Err("None of the findings the fix was to remove is gone.".to_owned());
     }
@@ -682,7 +687,7 @@ pub(super) fn judge_fix(evidence: &GateEvidence<'_>) -> Result<Compared, String>
     }
     check_design_questions(evidence)?;
     if let Some(goal) = evidence.goal
-        && (chart_review || !finding_removed)
+        && (strict_removal || !finding_removed)
     {
         let (lines_before, lines_after) = evidence.lines;
         if matches!(goal, Goal::Shorter | Goal::Both) && lines_after >= lines_before {
@@ -884,7 +889,9 @@ fn check_text(output: &std::process::Output) -> String {
 
 /// The findings and per-figure checklist items (`id -> tracked file`) of a run at a commit,
 /// or of the files of today for `None`.
-type Found<'f> = &'f dyn Fn(&Journal, Option<&str>) -> Result<(BTreeSet<String>, ChecklistOwners)>;
+type Found<'f> = &'f dyn Fn(&Journal, Option<&str>) -> Result<SurveyedFindings>;
+
+pub(super) type SurveyedFindings = (BTreeSet<String>, ChecklistOwners, Option<FeatureEvidence>);
 
 /// The findings at a commit, or in the working tree for `None`, as a map from the id that
 /// xpd 0.55.0 gave each one to its id of today.
@@ -910,6 +917,36 @@ fn normalize_adapter(
         }
     }
     Ok(Some(adapter))
+}
+
+fn validate_start_adapter(
+    command: &str,
+    place: &Place,
+    here: &Path,
+    adapter: Option<&str>,
+) -> Result<()> {
+    if command == "feature-review"
+        && let Some(spec) = adapter
+        && let Some(words) = shlex::split(spec)
+        && let [word] = words.as_slice()
+        && Path::new(word)
+            .extension()
+            .is_some_and(|ext| ext.eq_ignore_ascii_case("py"))
+    {
+        let file = here
+            .join(word)
+            .canonicalize()
+            .with_context(|| format!("cannot read feature adapter {word}"))?;
+        let relative = file
+            .strip_prefix(&place.top)
+            .context("recorded feature adapter must be in the repository")?;
+        let relative = relative
+            .to_str()
+            .context("feature adapter path must be UTF-8")?;
+        git::output(&place.top, &["ls-files", "--error-unmatch", "--", relative])
+            .with_context(|| format!("commit the feature adapter {relative} before starting"))?;
+    }
+    Ok(())
 }
 
 /// A new journal for the paths, which are given from the folder `here`.
@@ -966,6 +1003,7 @@ fn start(
             .collect(),
         bench,
         adapter,
+        feature_evidence: None,
         was: 0,
         was_lines: lines,
         current_lines: lines,
@@ -974,8 +1012,22 @@ fn start(
         answered: BTreeMap::new(),
         finished: false,
     };
-    journal.was = found(&journal, None)?.0.len();
+    let (findings, _, evidence) = found(&journal, None)?;
+    journal.was = findings.len();
+    journal.feature_evidence = evidence;
     Ok(journal)
+}
+
+fn require_feature_head(journal: &Journal, place: &Place) -> Result<()> {
+    if journal.feature_evidence.is_some() {
+        place.clean()?;
+        ensure!(
+            place.head()? == journal.current,
+            "feature review must measure the last kept commit {}",
+            journal.current
+        );
+    }
+    Ok(())
 }
 
 /// Reads the plan file, or stdin for `-`. `file` is given from the folder `here`.
@@ -1127,6 +1179,10 @@ struct Measured {
     timing: Option<(Timing, Timing)>,
     changed_files: BTreeSet<String>,
     checklist_before: BTreeMap<String, String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    feature_before: Option<FeatureEvidence>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    feature_after: Option<FeatureEvidence>,
 }
 
 /// Measures the commit that is checked out against the commit the run stands at.
@@ -1150,8 +1206,8 @@ fn measure_gate(
             .iter()
             .map(|check| (check.command.as_str(), check.passed)),
     );
-    let (before, checklist_before) = found(journal, Some(&journal.current))?;
-    let (after, _) = found(journal, None)?;
+    let (before, checklist_before, feature_before) = found(journal, Some(&journal.current))?;
+    let (after, checklist_after, feature_after) = found(journal, None)?;
     let changed = changed_files(&place.top, &journal.current, &commit)?;
     let lines_before = journal.current_lines;
     let lines_after = count_lines(&journal.paths);
@@ -1171,9 +1227,33 @@ fn measure_gate(
         lines_before,
         lines_after,
         timing,
+        checklist_before: gate_checklist_files(
+            command,
+            checklist_before,
+            &checklist_after,
+            &changed,
+        ),
         changed_files: changed,
-        checklist_before: super::checklist_files(checklist_before),
+        feature_before,
+        feature_after,
     })
+}
+
+pub(super) fn gate_checklist_files(
+    command: &str,
+    before: ChecklistOwners,
+    after: &ChecklistOwners,
+    changed: &BTreeSet<String>,
+) -> BTreeMap<String, String> {
+    let mut files = super::checklist_files(before);
+    if command == "feature-review" {
+        for (id, file) in &mut files {
+            if let Some(owner) = after.get(id).filter(|owner| changed.contains(&owner.file)) {
+                file.clone_from(&owner.file);
+            }
+        }
+    }
+    files
 }
 
 /// Gates the fix `id` at the commit that is checked out. Returns whether the fix is kept.
@@ -1187,6 +1267,12 @@ fn gate(
 ) -> Result<bool> {
     check_gate(journal, id)?;
     let measured = measure_gate(journal, place, found, command)?;
+    let stale = gate_invalidation(
+        journal.feature_evidence.as_ref(),
+        measured.feature_before.as_ref(),
+        measured.feature_after.as_ref(),
+        &measured.changed_files,
+    )?;
     let (judged, questions) = {
         let fix = journal.fix_mut(id)?;
         let judged = judge_fix(&GateEvidence {
@@ -1219,7 +1305,14 @@ fn gate(
             let commit = measured.commit;
             journal.current.clone_from(&commit);
             journal.current_lines = measured.lines_after;
-            for item in questions {
+            if measured.feature_after.is_some() {
+                invalidate_answers(&mut journal.answered, &stale);
+                journal.feature_evidence = measured.feature_after;
+            }
+            for item in questions
+                .into_iter()
+                .filter(|_| command != "feature-review")
+            {
                 journal.answered.insert(
                     item,
                     AnswerRecord::Fixed {
@@ -1253,6 +1346,8 @@ struct Surveyed {
     current_lines: usize,
     /// The checklist item ids of today.
     checklist_after: ChecklistOwners,
+    feature_evidence: Option<FeatureEvidence>,
+    stale: BTreeSet<String>,
 }
 
 /// Measures the files of today against the commit the run started from.
@@ -1261,13 +1356,20 @@ fn measure_finish(journal: &Journal, place: &Place, found: Found<'_>) -> Result<
         bail!("the fix {} is still open", open.id);
     }
     place.clean()?;
-    let (before, _) = found(journal, Some(&journal.base))?;
-    let (after, checklist) = found(journal, None)?;
+    let (before, _, _) = found(journal, Some(&journal.base))?;
+    let (after, checklist, feature_evidence) = found(journal, None)?;
+    let stale = plan_invalidation(
+        journal.feature_evidence.as_ref(),
+        feature_evidence.as_ref(),
+        &[],
+    )?;
     Ok(Surveyed {
         before,
         after,
         current_lines: count_lines(&journal.paths),
         checklist_after: checklist,
+        feature_evidence,
+        stale,
     })
 }
 
@@ -1284,10 +1386,16 @@ fn unanswered<'s>(journal: &Journal, surveyed: &'s Surveyed) -> Vec<&'s str> {
     surveyed
         .checklist_after
         .iter()
-        .filter(|(item, owner)| match journal.answered.get(*item) {
-            None => true,
-            Some(AnswerRecord::NotApplicable { .. }) => false,
-            Some(_) => owner.requires_na,
+        .filter(|(item, owner)| {
+            match journal
+                .answered
+                .get(*item)
+                .filter(|_| !surveyed.stale.contains(*item))
+            {
+                None => true,
+                Some(AnswerRecord::NotApplicable { .. }) => false,
+                Some(_) => owner.requires_na,
+            }
         })
         .map(|(item, _)| item.as_str())
         .collect()
@@ -1348,6 +1456,7 @@ fn finish(journal: &mut Journal, place: &Place, found: Found<'_>) -> Result<bool
         return Ok(false);
     }
     journal.current_lines = surveyed.current_lines;
+    journal.feature_evidence = surveyed.feature_evidence.clone();
     report_finish(journal, &surveyed);
     journal.finished = true;
     Ok(true)
@@ -1394,7 +1503,15 @@ fn act_journal<K: Kind>(
             let mut journal = place.read(command)?;
             let text = plan_text(here, &file)?;
             let read = read_plan::<K>(&journal, &text, command)?;
-            let (known, checklist) = found(&journal, None)?;
+            require_feature_head(&journal, place)?;
+            let (known, checklist, evidence) = found(&journal, None)?;
+            let stale = plan_invalidation(
+                journal.feature_evidence.as_ref(),
+                evidence.as_ref(),
+                &read.answered,
+            )?;
+            invalidate_answers(&mut journal.answered, &stale);
+            journal.feature_evidence = evidence;
             plan(&mut journal, read, &known, &checklist)?;
             journal
         }
@@ -1422,12 +1539,13 @@ fn act_journal<K: Kind>(
         Action::Status => place.read(command)?,
         Action::Finish => {
             let mut journal = place.read(command)?;
-            kept = if matches!(command, "data-prep" | "ts-review")
+            kept = if matches!(command, "data-prep" | "ts-review" | "feature-review")
                 && let Some(open) = journal.open()
             {
                 eprintln!("xpd: the fix {} is still open", open.id);
                 false
             } else {
+                require_feature_head(&journal, place)?;
                 finish(&mut journal, place, found)?
             };
             journal
@@ -1470,8 +1588,8 @@ mod durable_run {
     };
     use super::{
         Action, Found, Journal, Outcome, Place, Renamed, check_gate, measure_finish, measure_gate,
-        plan_text, read_plan, report_finish, report_unanswered, report_unexplained, start,
-        unanswered, unexplained,
+        plan_text, read_plan, report_finish, report_unanswered, report_unexplained,
+        require_feature_head, start, unanswered, unexplained,
     };
 
     /// How long a command waits for the receipt of the run. Every measurement is taken before
@@ -1800,6 +1918,15 @@ mod durable_run {
                     .unwrap_or("the run turned the command away")
             ),
         }
+    }
+
+    pub(super) fn feature_journal(place: &Place) -> Result<Option<Journal>> {
+        let store = Store::open(place, "feature-review")?;
+        let latest = store.latest()?;
+        latest
+            .as_ref()
+            .map(|_| open_run(latest.as_ref(), store.command).map(|(_, journal)| journal))
+            .transpose()
     }
 
     /// The run that is open, as a journal, with its generation.
@@ -2134,11 +2261,13 @@ mod durable_run {
         found: Found<'_>,
     ) -> Result<(Journal, bool)> {
         let plan = read_plan::<K>(&at.journal, text, at.store.command)?;
-        let (known, checklist) = found(&at.journal, None)?;
+        require_feature_head(&at.journal, at.place)?;
+        let (known, checklist, feature_evidence) = found(&at.journal, None)?;
         let measurements = Measurements {
             known: Some(ValidatePlanOutput {
                 known,
                 checklist: crate::ledger::checklist_files(checklist),
+                feature_evidence,
             }),
             ..at.measurements()
         };
@@ -2205,12 +2334,15 @@ mod durable_run {
             "the run is finished. `xpd {} start` starts another.",
             at.store.command
         );
-        if matches!(at.store.command, "data-prep" | "ts-review")
-            && let Some(open) = at.journal.open()
+        if matches!(
+            at.store.command,
+            "data-prep" | "ts-review" | "feature-review"
+        ) && let Some(open) = at.journal.open()
         {
             eprintln!("xpd: the fix {} is still open", open.id);
             return Ok((at.journal, false));
         }
+        require_feature_head(&at.journal, at.place)?;
         let surveyed = measure_finish(&at.journal, at.place, found)?;
         let measurements = Measurements {
             finish: Some(FinishOutput {
@@ -2224,6 +2356,7 @@ mod durable_run {
                 before: surveyed.before.clone(),
                 after: surveyed.after.clone(),
                 current_lines: surveyed.current_lines,
+                feature_evidence: surveyed.feature_evidence.clone(),
             }),
             ..at.measurements()
         };
@@ -2256,9 +2389,67 @@ mod durable_run {
     }
 }
 
+pub(super) struct RecordedFeatureList {
+    pub(super) paths: Vec<PathBuf>,
+    pub(super) adapter: Option<String>,
+    feature_evidence: Option<FeatureEvidence>,
+    answered: BTreeMap<String, AnswerRecord>,
+}
+
+impl RecordedFeatureList {
+    pub(super) fn open(top: &Path) -> Result<Option<Self>> {
+        let place = Place {
+            top: top.to_path_buf(),
+            journal: git_path(top, "xpd-feature-review.json")?,
+        };
+        #[cfg(not(feature = "ledger-durable"))]
+        let journal = place
+            .journal
+            .is_file()
+            .then(|| place.read("feature-review"))
+            .transpose()?;
+        #[cfg(feature = "ledger-durable")]
+        let journal = durable_run::feature_journal(&place)?;
+        Ok(journal.map(|journal| Self {
+            paths: journal
+                .paths
+                .into_iter()
+                .map(|path| top.join(path))
+                .collect(),
+            adapter: journal.adapter,
+            feature_evidence: journal.feature_evidence,
+            answered: journal.answered,
+        }))
+    }
+
+    pub(super) fn annotate(
+        &self,
+        read: Option<&impl Serialize>,
+        checklist: &mut [super::ChecklistEntry],
+    ) -> Result<()> {
+        let stale = if let Some(read) = read {
+            let evidence = FeatureEvidence::from_read(&serde_json::to_value(read)?)?;
+            plan_invalidation(self.feature_evidence.as_ref(), Some(&evidence), &[])?
+        } else {
+            BTreeSet::new()
+        };
+        for item in checklist
+            .iter_mut()
+            .filter(|item| !stale.contains(&item.id))
+        {
+            item.answer = self
+                .answered
+                .get(&item.id)
+                .map(serde_json::to_value)
+                .transpose()?;
+        }
+        Ok(())
+    }
+}
+
 /// Runs one stage of a run of `K`'s command, and prints the run with the stage that comes
 /// next. `survey` is the survey of that command, as [`super::Select::print_with`] takes it.
-pub(super) fn act<K: Kind, R>(
+pub(super) fn act<K: Kind, R: Serialize>(
     action: Action,
     format: Format,
     survey: impl Fn(
@@ -2284,10 +2475,16 @@ pub(super) fn act<K: Kind, R>(
     );
     let here = std::env::current_dir()?;
     let place = Place::find(command)?;
+    if let Action::Start { adapter, .. } = &action {
+        validate_start_adapter(command, &place, &here, adapter.as_deref())?;
+    }
     let surveyed = |journal: &Journal, commit: Option<&str>| -> Result<SurveyOutput<K, R>> {
         let top = Some(place.top.as_path());
         let adapter = journal.adapter.as_deref();
-        match commit {
+        let measured_head = (command == "feature-review" && commit.is_none())
+            .then(|| place.head())
+            .transpose()?;
+        match commit.or(measured_head.as_deref()) {
             None => {
                 let files = Tree {
                     top,
@@ -2315,13 +2512,15 @@ pub(super) fn act<K: Kind, R>(
             ),
         }
     };
-    let found =
-        |journal: &Journal, commit: Option<&str>| -> Result<(BTreeSet<String>, ChecklistOwners)> {
-            let output = surveyed(journal, commit)?;
-            let checklist = output.checklist_owners();
-            let ids = output.findings.into_iter().map(|entry| entry.id).collect();
-            Ok((ids, checklist))
-        };
+    let found = |journal: &Journal, commit: Option<&str>| -> Result<SurveyedFindings> {
+        let output = surveyed(journal, commit)?;
+        let checklist = output.checklist_owners();
+        let ids = output.findings.into_iter().map(|entry| entry.id).collect();
+        let feature_evidence = (command == "feature-review")
+            .then(|| FeatureEvidence::from_read(&serde_json::to_value(output.read)?))
+            .transpose()?;
+        Ok((ids, checklist, feature_evidence))
+    };
     #[cfg(not(feature = "ledger-durable"))]
     let (journal, kept) = act_journal::<K>(action, &place, &here, command, &found)?;
     #[cfg(feature = "ledger-durable")]

@@ -1,0 +1,6 @@
+id: rolling-includes-current
+language: python
+severity: error
+message: Shift the declared prior-only input before a trailing rolling reduction.
+rule:
+  pattern: $INPUT.rolling($$$WINDOW)

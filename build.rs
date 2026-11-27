@@ -113,7 +113,8 @@ fn write(target: &Path, source: &str) -> Result<()> {
 fn pack_source(pack: &Path) -> Result<(String, BTreeMap<String, String>)> {
     let module = utf8_name(pack)?;
     ensure!(
-        is_module_name(module) && !module.bytes().any(|byte| byte.is_ascii_uppercase()),
+        module == "feature-review"
+            || (is_module_name(module) && !module.bytes().any(|byte| byte.is_ascii_uppercase())),
         "rules/{module}: the folder name must be a Python module name"
     );
     let mut manifest = String::from("None");

@@ -215,6 +215,7 @@ impl PackageCheck {
 
 /// Which files a pack's rules run on. A rule runs only on a file of the rule's own language.
 pub(crate) enum Gate {
+    FeatureReview,
     /// Python files that import the pack's module, and Python files with the pack's `alsoOn`
     /// setting. The rule matches such an import.
     Import {
@@ -356,7 +357,9 @@ impl Pack {
                 );
             }
         }
-        let gate = if manifest.every_file {
+        let gate = if module == "feature-review" {
+            Gate::FeatureReview
+        } else if manifest.every_file {
             Gate::EveryFile
         } else {
             // Only a Python file can import the module, so another rule would never run.
@@ -449,7 +452,7 @@ impl Pack {
     pub(crate) fn unused_suppression(&self) -> Option<&Rule> {
         match self.gate {
             Gate::Suppressions => self.rules.first(),
-            Gate::Import { .. } | Gate::EveryFile => None,
+            Gate::Import { .. } | Gate::EveryFile | Gate::FeatureReview => None,
         }
     }
 
@@ -470,7 +473,7 @@ impl Pack {
                     && (also.is_some() || src.contains(self.module.as_str()))
             }
             Gate::EveryFile => self.has_rules_for(language),
-            Gate::Suppressions => false,
+            Gate::Suppressions | Gate::FeatureReview => false,
         }
     }
 
@@ -486,7 +489,7 @@ impl Pack {
                         || self.stand_in(root).is_some())
             }
             Gate::EveryFile => true,
-            Gate::Suppressions => false,
+            Gate::Suppressions | Gate::FeatureReview => false,
         }
     }
 

@@ -1,0 +1,6 @@
+id: duplicate-feature-computation
+language: python
+severity: warning
+message: Reuse the arithmetic computed by the earlier feature node.
+rule:
+  kind: return_statement

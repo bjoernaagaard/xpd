@@ -1,0 +1,8 @@
+id: target-encoder-before-outer-cv
+language: python
+severity: error
+message: Fit the target encoder inside outer cross-validation.
+rule:
+  any:
+    - pattern: $ENCODER.fit_transform($$$ARGUMENTS)
+    - pattern: $ENCODER.transform($$$ARGUMENTS)

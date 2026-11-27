@@ -353,6 +353,8 @@ enum Cmd {
     DataPrep(crate::data_prep::DataPrepArgs),
     /// Review time series, seasonalities, and groups before forecasting.
     TsReview(crate::ts_review::TsReviewArgs),
+    /// Review domain mechanisms, cutoff safety and measured feature value.
+    FeatureReview(crate::feature_review::FeatureReviewArgs),
     Untangle(crate::untangle::UntangleArgs),
     Optimize(crate::optimize::OptimizeArgs),
     Harden(crate::harden::HardenArgs),
@@ -488,6 +490,7 @@ pub fn run() -> ExitCode {
         Cmd::ChartReview(args) => command_result(args.run(default_format)),
         Cmd::DataPrep(args) => command_result(args.run(default_format)),
         Cmd::TsReview(args) => command_result(args.run(default_format)),
+        Cmd::FeatureReview(args) => command_result(args.run(default_format)),
         Cmd::Untangle(args) => command_result(args.run(default_format)),
         Cmd::Harden(args) => command_result(args.run(default_format)),
         Cmd::Optimize(args) => command_result(args.run(default_format)),

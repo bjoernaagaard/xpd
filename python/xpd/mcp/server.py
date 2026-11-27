@@ -41,6 +41,8 @@ unless you can say why the code is right. `xpd check --fix` writes the safe fixe
 `xpd api <pack>/<rule>` explains a rule.
 - When you make, change or review a chart, in plotly or any other library, run \
 `xpd chart-review <file>` and answer each question of Tufte's book that it prints.
+- For model feature engineering, run `xpd feature-review` and follow \
+{skill_uris["xpd-feature-review"]}.
 - After you add, move or rename a step or a Hamilton node, run `xpd graph <file>`, and reuse \
 columns that exist instead of computing their formulas again.
 - Before you choose methods for a data file, run `xpd profile <file>`.

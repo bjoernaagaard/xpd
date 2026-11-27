@@ -14,6 +14,7 @@ xpd
 xpd-animate
 xpd-chart-review
 xpd-data-prep
+xpd-feature-review
 xpd-harden
 xpd-optimize
 xpd-ts-review

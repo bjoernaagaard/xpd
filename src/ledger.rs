@@ -24,9 +24,11 @@ use crate::git;
 use crate::style::Style;
 use crate::workspace::Workspace;
 
+pub(crate) mod adapter;
 mod catalog;
 #[cfg(feature = "ledger-durable")]
 mod durable;
+mod feature_evidence;
 pub(crate) mod gix_source;
 #[cfg(feature = "ledger-durable")]
 mod orchestration;
@@ -58,6 +60,10 @@ pub(crate) trait Kind:
     const COMMAND: &'static str;
     const GOALS: &'static [Goal] = &[Goal::Shorter, Goal::Faster, Goal::Both, Goal::Design];
 
+    fn source_rule(self) -> Option<&'static str> {
+        None
+    }
+
     fn group(self) -> Self::Group;
 
     /// The line that the text prints above the kinds of `group`.
@@ -79,6 +85,8 @@ pub(crate) struct Place {
     pub(crate) line: Option<usize>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) end_line: Option<usize>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) column: Option<usize>,
 }
 
 impl Place {
@@ -87,6 +95,7 @@ impl Place {
             path: path.to_owned(),
             line: None,
             end_line: None,
+            column: None,
         }
     }
 
@@ -137,6 +146,8 @@ pub(crate) struct Entry<K> {
     /// their paths. Of two findings that are alike in one file, the first in the file has the
     /// first id.
     pub(crate) id: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    source_rule: Option<&'static str>,
     /// The id that xpd 0.55.0 and older gave this finding, from [`legacy_id`]. A run that one
     /// of them recorded cites these ids, and its import rewrites each one to `id`.
     #[serde(skip)]
@@ -163,8 +174,11 @@ impl<K> Entry<K> {
             places.push(format!("{} more", finding.places.len() - PLACES_SHOWN));
         }
         let fresh = if self.fresh == Some(true) { " new" } else { "" };
+        let rule = self
+            .source_rule
+            .map_or_else(String::new, |rule| format!("[{rule}] "));
         format!(
-            "{}{fresh}  {}  {}",
+            "{}{fresh}  {}  {rule}{}",
             self.id,
             places.join(", "),
             finding.evidence
@@ -197,6 +211,7 @@ pub(crate) fn named<K: Kind>(mut findings: Vec<Finding<K>>) -> Vec<Entry<K>> {
             *nth += 1;
             Entry {
                 id: id(&finding.kind.name(), &finding.key, *nth),
+                source_rule: finding.kind.source_rule(),
                 legacy_id: legacy_id(&finding.kind.name(), &finding.key, *nth),
                 fresh: None,
                 finding,
@@ -235,6 +250,8 @@ pub(crate) struct ChecklistEntry {
     pub(crate) look: String,
     #[serde(skip_serializing_if = "std::ops::Not::not")]
     pub(crate) requires_na: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) answer: Option<serde_json::Value>,
 }
 
 /// What a ledger survey returns: what it read, its mechanical findings, and any checklist items.
@@ -468,18 +485,38 @@ impl<K: Kind> Select<K> {
             return run::act(action, self.format.unwrap_or(default), survey);
         }
         let top = repository(&self.paths[0]);
+        let recorded = if K::COMMAND == "feature-review" {
+            top.as_deref()
+                .map(run::RecordedFeatureList::open)
+                .transpose()?
+                .flatten()
+        } else {
+            None
+        };
+        let paths = recorded
+            .as_ref()
+            .filter(|_| self.paths == [Path::new(".")])
+            .map_or(self.paths.as_slice(), |run| run.paths.as_slice());
+        let explicit = adapter;
+        let adapter = explicit.or_else(|| recorded.as_ref().and_then(|run| run.adapter.as_deref()));
         let files = Tree {
             top: top.as_deref(),
             shown_from: None,
         };
-        let output = survey(
-            &self.paths,
+        let mut output = survey(
+            paths,
             files,
             top.as_deref(),
             "HEAD",
             adapter,
             AdapterPolicy::BestEffort,
         )?;
+        if let Some(run) = &recorded {
+            run.annotate(
+                explicit.is_none().then_some(&output.read),
+                &mut output.checklist,
+            )?;
+        }
         let before = match &self.since {
             Some(commit) => {
                 let top = top.as_deref().with_context(|| {
@@ -497,7 +534,7 @@ impl<K: Kind> Select<K> {
                 } else {
                     commit.clone()
                 };
-                let then = at_commit(&self.paths, top, &commit, |then, files, resolved| {
+                let then = at_commit(paths, top, &commit, |then, files, resolved| {
                     Ok(survey(
                         then,
                         files,
@@ -662,6 +699,11 @@ impl<K: Kind, R> Ledger<K, R> {
             for item in &self.checklist {
                 if item.page == 0 {
                     let _ = writeln!(text, "  {}  {}", item.id, item.text);
+                    if let Some(answer) = &item.answer {
+                        let verdict = answer["verdict"].as_str().unwrap_or_default();
+                        let reason = answer["reason"].as_str().unwrap_or_default();
+                        let _ = writeln!(text, "    {verdict}: {reason}");
+                    }
                     continue;
                 }
                 let _ = writeln!(
