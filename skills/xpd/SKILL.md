@@ -37,6 +37,8 @@ Use `xpd` whenever you write or change Python code.
   `status`, and `finish` until every defect and checklist item is resolved. Run
   `xpd chart-review --questions --format json` to inspect the full 57-question catalog. The
   `xpd-chart-review` skill holds the steps.
+- For model data preparation, use `xpd data-prep <paths>` with a column adapter and
+  follow the `xpd-data-prep` skill.
 - `xpd find "<task>"`: discover separately ranked symbols, rules and recipes before choosing a library.
   Defaults are five symbols, three rules and three recipes. `--limit` sets the maximum per
   kind and `--kind` selects one. JSON has `symbols`, `rules` and `recipes` lists.

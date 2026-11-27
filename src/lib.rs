@@ -10,6 +10,7 @@ mod chart_review;
 mod check;
 mod cli;
 mod commands;
+mod data_prep;
 mod docs;
 pub mod doctor;
 mod embed;

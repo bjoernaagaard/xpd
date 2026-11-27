@@ -1,0 +1,22 @@
+id: polars-join-key-unvalidated
+language: python
+severity: warning
+message: Check cardinality for explicitly paired or computed join keys and pass validate= where supported.
+rule:
+  pattern: $LEFT.join($$$ARGS)
+  has:
+    field: arguments
+    has:
+      any:
+        - { kind: keyword_argument, has: { field: name, regex: '^(left_on|right_on)$' } }
+        - all:
+            - kind: keyword_argument
+            - has: { field: name, regex: '^on$' }
+            - has: { field: value, regex: '(\bcol\(|\.cast\(|\.str\.)' }
+  not:
+    has:
+      field: arguments
+      has:
+        any:
+          - { kind: keyword_argument, has: { field: name, regex: '^validate$' } }
+          - { regex: '^how\s*=\s*["''](cross|semi|anti)["'']$' }

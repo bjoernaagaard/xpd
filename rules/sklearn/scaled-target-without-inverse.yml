@@ -1,0 +1,21 @@
+id: scaled-target-without-inverse
+language: python
+severity: error
+message: Wrap the target transform in a TransformedTargetRegressor or explicitly restore the target scale before scoring.
+rule:
+  any:
+    - pattern: $V = $SCALER.fit_transform($Y)
+    - pattern: $V = $SCALER.fit_transform($Y.reshape($$$ARGS))
+    - pattern: $V = $LOG($Y)
+  not:
+    inside:
+      stopBy: end
+      kind: module
+      has:
+        stopBy: end
+        kind: call
+        has: { field: function, regex: '(^|\.)(TransformedTargetRegressor|exp|expm1|inverse_transform)$' }
+constraints:
+  Y: { regex: '^(y|target|label)(_(train|test|val))?$' }
+  SCALER: { regex: '(?i)scal|PowerTransformer|QuantileTransformer' }
+  LOG: { regex: '(^|\.)(log|log1p)$' }

@@ -349,6 +349,8 @@ enum Cmd {
         format: Option<Format>,
     },
     ChartReview(crate::chart_review::ChartReviewArgs),
+    /// Audit the preparation of features and targets, from raw data through scaling.
+    DataPrep(crate::data_prep::DataPrepArgs),
     Untangle(crate::untangle::UntangleArgs),
     Optimize(crate::optimize::OptimizeArgs),
     Harden(crate::harden::HardenArgs),
@@ -482,6 +484,7 @@ pub fn run() -> ExitCode {
             format,
         } => command_result(graph(&paths, format.unwrap_or(default_format))),
         Cmd::ChartReview(args) => command_result(args.run(default_format)),
+        Cmd::DataPrep(args) => command_result(args.run(default_format)),
         Cmd::Untangle(args) => command_result(args.run(default_format)),
         Cmd::Harden(args) => command_result(args.run(default_format)),
         Cmd::Optimize(args) => command_result(args.run(default_format)),

@@ -564,6 +564,11 @@ impl Worker {
         }
         let ledger: serde_json::Value =
             serde_json::from_slice(&output.stdout).context("the survey printed no JSON")?;
+        if command == "data-prep"
+            && let Some(error) = ledger["read"]["facts"]["error"].as_str()
+        {
+            bail!("the data-prep adapter failed: {error}");
+        }
         let ids: BTreeSet<String> = (ledger["findings"].as_array())
             .context("the survey printed no findings")?
             .iter()

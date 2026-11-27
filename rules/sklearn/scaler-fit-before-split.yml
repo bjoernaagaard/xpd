@@ -1,0 +1,36 @@
+id: scaler-fit-before-split
+language: python
+severity: info
+message: Split the rows before fitting this scaler or imputer, or fit it inside a Pipeline.
+rule:
+  all:
+    - any:
+        - pattern: $S.fit($X)
+        - pattern: $S.fit_transform($X)
+    - any:
+        - inside:
+            stopBy: end
+            kind: expression_statement
+            precedes:
+              stopBy: end
+              has:
+                stopBy: end
+                any:
+                  - pattern: $SPLIT($X, $$$REST)
+                  - pattern: $SPLIT($X)
+        - inside:
+            kind: assignment
+            all:
+              - has: { field: left, pattern: $PREPARED }
+              - inside:
+                  kind: expression_statement
+                  precedes:
+                    stopBy: end
+                    has:
+                      stopBy: end
+                      any:
+                        - pattern: $SPLIT($PREPARED, $$$REST)
+                        - pattern: $SPLIT($PREPARED)
+constraints:
+  SPLIT: { regex: '(^|\.)train_test_split$' }
+  S: { regex: '(?i)scal|imput|QuantileTransformer|PowerTransformer' }

@@ -1,0 +1,35 @@
+id: prefit-before-cross-validation
+language: python
+severity: error
+message: Fit preprocessing within each fold by passing an unfitted Pipeline to cross-validation.
+rule:
+  pattern: $V = $S.fit_transform($X)
+  inside:
+    kind: expression_statement
+    precedes:
+      stopBy: end
+      has:
+        stopBy: end
+        any:
+          - kind: call
+            all:
+              - has: { field: function, regex: '(^|\.)(cross_val_score|cross_validate)$' }
+              - has:
+                  field: arguments
+                  has:
+                    any:
+                      - { nthChild: 2, pattern: $V }
+                      - { pattern: X=$V }
+          - pattern: $GRID($$$ARGS).fit($V, $$$FIT)
+          - all:
+              - pattern: $SEARCH.fit($V, $$$FIT)
+              - inside:
+                  stopBy: end
+                  kind: module
+                  has:
+                    stopBy: end
+                    pattern: $SEARCH = $GRID($$$ARGS)
+constraints:
+  GRID: { regex: '(^|\.)GridSearchCV$' }
+  S: { not: { regex: '(?i)pipeline|^pipe$' } }
+  V: { not: { regex: '^(y|target|label)(_|$)' } }

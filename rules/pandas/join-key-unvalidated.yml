@@ -1,0 +1,16 @@
+id: join-key-unvalidated
+language: python
+severity: warning
+message: Pass validate= with the expected cardinality for the explicitly paired join keys.
+rule:
+  pattern: $LEFT.merge($$$ARGS)
+  has:
+    field: arguments
+    has: { kind: keyword_argument, has: { field: name, regex: '^(left_on|right_on)$' } }
+  not:
+    has:
+      field: arguments
+      has:
+        any:
+          - { kind: keyword_argument, has: { field: name, regex: '^validate$' } }
+          - { regex: '^how\s*=\s*["''](cross|left_anti|right_anti)["'']$' }

@@ -9,7 +9,7 @@
 
 mod inventory;
 mod python;
-mod runtime;
+pub(crate) mod runtime;
 mod tsx;
 
 use std::collections::BTreeSet;

@@ -1,0 +1,25 @@
+id: silent-dtype-coercion
+language: python
+severity: warning
+message: Check invalid or fractional values before casting so they are not silently changed or replaced.
+rule:
+  kind: call
+  any:
+    - all:
+        - has: { field: function, regex: '(^|\.)to_numeric$' }
+        - has: { field: arguments, has: { regex: '^errors\s*=\s*["'']coerce["'']$' } }
+    - all:
+        - has: { field: function, regex: '\.astype$' }
+        - has: { field: arguments, has: { regex: '^errors\s*=\s*["'']ignore["'']$' } }
+    - pattern: $TO($$$INPUT).astype($INT)
+    - all:
+        - pattern: $SERIES.astype($INT)
+        - inside:
+            stopBy: end
+            kind: expression_statement
+            follows:
+              stopBy: end
+              has: { pattern: $SERIES = $TO($$$INPUT) }
+constraints:
+  INT: { regex: '^(int|["'']u?int(8|16|32|64)?["'']|(np|numpy)\.u?int(8|16|32|64))$' }
+  TO: { regex: '(^|\.)to_numeric$' }

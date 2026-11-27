@@ -3,7 +3,7 @@ Use `xpd hook` as the hook command for Claude Code, Codex, or any Agent Plugins 
 | Event | Action |
 | --- | --- |
 | `SessionStart` | Saves HEAD, uncommitted blob IDs, and profile baseline, then prints a short project brief |
-| `UserPromptSubmit` | Routes matching prompts to `chart-review`, `profile`, `untangle`, `harden`, `optimize`, `equiv`, a playbook, or open issues |
+| `UserPromptSubmit` | Routes matching prompts to `chart-review`, `data-prep`, `profile`, `untangle`, `harden`, `optimize`, `equiv`, a playbook, or open issues |
 | `PostToolUse` | Lints edited files (plus single-file `xpd graph` checks) and reports issues immediately |
 | `Stop` | Lints every Python file changed in the session and blocks the turn while errors, warnings, or new profile drift remain |
 
@@ -41,6 +41,7 @@ flowchart TD
 
 | Sample prompt | Output |
 | --- | --- |
+| `"prepare this csv for a model"` | `xpd data-prep` hint |
 | `"improve my charts"` | `xpd chart-review` hint |
 | `"what is in sales.csv?"` | `xpd profile sales.csv` hint |
 | `"untangle this codebase"` | `xpd untangle` and `xpd-untangle` hint |

@@ -470,6 +470,11 @@ fn user_prompt(cwd: &Path, prompt: &str) -> Result<ExitCode> {
                 .to_owned(),
         );
     }
+    if data_prep_prompt(prompt) {
+        text.push(
+            "Data preparation task: run `xpd data-prep <paths>` with `--adapter` to measure columns. Follow the `xpd-data-prep` skill to record and gate fixes.".to_owned(),
+        );
+    }
     text.extend(data_files(&cwd, prompt).iter().map(|file| {
         format!(
             "Data file task: `xpd profile {file}` prints the type, the \
@@ -815,6 +820,60 @@ fn chart_prompt(prompt: &str) -> bool {
         .filter(|word| WEAK.contains(word))
         .collect();
     strong || weak.len() >= 2
+}
+
+fn data_prep_prompt(prompt: &str) -> bool {
+    let lowered = prompt.to_lowercase();
+    let words: HashSet<&str> = lowered
+        .split(|character: char| !character.is_alphanumeric())
+        .collect();
+    let preparation = [
+        "prepare",
+        "clean",
+        "cleaning",
+        "impute",
+        "imputer",
+        "scaler",
+        "scale",
+        "scaling",
+        "leakage",
+        "outlier",
+        "outliers",
+        "preprocessing",
+        "forbered",
+        "rens",
+        "manglende",
+        "deduplicate",
+        "skewed",
+        "sentinel",
+    ];
+    let data = [
+        "data",
+        "dataset",
+        "dataframe",
+        "column",
+        "columns",
+        "target",
+        "csv",
+        "parquet",
+        "pandas",
+        "polars",
+        "datasættet",
+        "kolonnerne",
+        "features",
+    ];
+    let split = lowered.contains("train test split")
+        || lowered.contains("train-test split")
+        || lowered.contains("test set");
+    (preparation.iter().any(|word| words.contains(word))
+        || lowered.contains("missing values")
+        || lowered.contains("-999"))
+        && data.iter().any(|word| words.contains(word))
+        || split
+            && ["imputer", "scaler", "leakage"]
+                .iter()
+                .any(|word| words.contains(word))
+        || lowered.contains("join keys") && words.contains("deduplicate")
 }
 
 fn animation_prompt(prompt: &str) -> bool {

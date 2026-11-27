@@ -59,6 +59,9 @@ pub(crate) enum Action {
         /// A Python adapter file or shell command that emits runtime measurements.
         #[arg(long, value_name = "ADAPTER")]
         adapter: Option<String>,
+        /// Target column for data-prep.
+        #[arg(long, value_name = "COLUMN")]
+        target: Option<String>,
         /// Replace a run that is not finished.
         #[arg(long)]
         restart: bool,
@@ -915,7 +918,7 @@ fn start(
     paths: &[PathBuf],
     checks: Vec<String>,
     bench: Option<(String, usize)>,
-    adapter: Option<String>,
+    adapter: (Option<String>, Option<String>),
     found: Found<'_>,
 ) -> Result<Journal> {
     place.clean()?;
@@ -933,7 +936,9 @@ fn start(
             })
         })
         .collect::<Result<Vec<_>>>()?;
+    let (adapter, target) = adapter;
     let adapter = normalize_adapter(place, here, adapter)?;
+    let adapter = crate::data_prep::record_target(adapter, target)?;
     let base = place.head()?;
     let lines = count_lines(&paths);
     let bench = bench
@@ -1359,6 +1364,7 @@ fn act_journal<K: Kind>(
             bench,
             bench_runs,
             adapter,
+            target,
             restart,
         } => {
             if let Ok(old) = place.read(command) {
@@ -1373,7 +1379,7 @@ fn act_journal<K: Kind>(
                 &paths,
                 checks,
                 bench.map(|cmd| (cmd, bench_runs)),
-                adapter,
+                (adapter, target),
                 found,
             )?
         }
@@ -1409,7 +1415,14 @@ fn act_journal<K: Kind>(
         Action::Status => place.read(command)?,
         Action::Finish => {
             let mut journal = place.read(command)?;
-            kept = finish(&mut journal, place, found)?;
+            kept = if command == "data-prep"
+                && let Some(open) = journal.open()
+            {
+                eprintln!("xpd: the fix {} is still open", open.id);
+                false
+            } else {
+                finish(&mut journal, place, found)?
+            };
             journal
         }
     };
@@ -1953,6 +1966,7 @@ mod durable_run {
             bench,
             bench_runs,
             adapter,
+            target,
             restart,
         } = action
         {
@@ -1962,6 +1976,7 @@ mod durable_run {
                 checks,
                 bench,
                 adapter,
+                target,
                 restart,
             };
             return start_run(&store, place, here, latest.as_ref(), started, found);
@@ -1980,7 +1995,7 @@ mod durable_run {
             Action::Approve { fix } => approve_run(at, fix),
             Action::Drop { fix, reason } => drop_run(at, fix, reason),
             Action::Gate { fix } => gate_run(&at, &fix, found),
-            Action::Finish => finish_run(&at, found),
+            Action::Finish => finish_run(at, found),
         }
     }
 
@@ -2004,6 +2019,7 @@ mod durable_run {
         checks: Vec<String>,
         bench: Option<(String, usize)>,
         adapter: Option<String>,
+        target: Option<String>,
         restart: bool,
     }
 
@@ -2056,14 +2072,15 @@ mod durable_run {
             started.paths,
             started.checks,
             started.bench,
-            started.adapter,
+            (started.adapter, started.target),
             found,
         )?;
         #[cfg(feature = "ledger-distributed")]
         if matches!(store.config, ProviderConfig::Postgres { .. })
-            && let Some(adapter) = &journal.adapter
-            && place.top.join(adapter).is_file()
-            && crate::git::output(&place.top, &["ls-files", "--error-unmatch", adapter]).is_err()
+            && let Some(spec) = &journal.adapter
+            && let Some(adapter) = crate::data_prep::adapter_command(spec)?
+            && place.top.join(&adapter).is_file()
+            && crate::git::output(&place.top, &["ls-files", "--error-unmatch", &adapter]).is_err()
         {
             bail!(
                 "adapter {adapter} is untracked in git; commit it before starting a distributed run"
@@ -2172,12 +2189,18 @@ mod durable_run {
         Ok((journal, false))
     }
 
-    fn finish_run(at: &At<'_>, found: Found<'_>) -> Result<(Journal, bool)> {
+    fn finish_run(at: At<'_>, found: Found<'_>) -> Result<(Journal, bool)> {
         ensure!(
             !at.journal.finished,
             "the run is finished. `xpd {} start` starts another.",
             at.store.command
         );
+        if at.store.command == "data-prep"
+            && let Some(open) = at.journal.open()
+        {
+            eprintln!("xpd: the fix {} is still open", open.id);
+            return Ok((at.journal, false));
+        }
         let surveyed = measure_finish(&at.journal, at.place, found)?;
         let measurements = Measurements {
             finish: Some(convert(&surveyed)?),
@@ -2227,6 +2250,17 @@ pub(super) fn act<K: Kind, R>(
     ) -> Result<SurveyOutput<K, R>>,
 ) -> Result<ExitCode> {
     let command = K::COMMAND;
+    ensure!(
+        command == "data-prep"
+            || !matches!(
+                &action,
+                Action::Start {
+                    target: Some(_),
+                    ..
+                }
+            ),
+        "--target is only available for xpd data-prep"
+    );
     let here = std::env::current_dir()?;
     let place = Place::find(command)?;
     let surveyed = |journal: &Journal, commit: Option<&str>| -> Result<SurveyOutput<K, R>> {
