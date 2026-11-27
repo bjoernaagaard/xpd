@@ -43,12 +43,12 @@ export default defineConfig({
           label: 'Guides',
           items: [
             ...['claude-code', 'mcp', 'gates', 'editors', 'write-a-rule', 'chart-review', 'opt-review', 'animate'].map((id) => ({ slug: `guides/${id}` })),
-            {
-              label: 'Tufte examples',
-              collapsed: true,
-              items: [{ autogenerate: { directory: 'guides/tufte-examples' } }],
-            },
           ],
+        },
+        {
+          label: 'Gallery',
+          collapsed: true,
+          items: [{ autogenerate: { directory: 'guides/tufte-examples' } }],
         },
         {
           label: 'Rules',

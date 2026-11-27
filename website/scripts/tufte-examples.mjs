@@ -125,6 +125,14 @@ function generateExample(question, paths, xpd, python, version, order) {
       editUrl: yaml(editUrl(`website/examples/tufte/${id}.py`)),
       sidebar: { order },
     }, `import TufteExample from '../../../../components/TufteExample.astro';\n\n<TufteExample {...${JSON.stringify(props)}} />`));
+    return {
+      id,
+      principle: question.principle,
+      page: example.book.page,
+      question: example.question,
+      beforeCaption: example.before.caption,
+      afterCaption: example.after.caption,
+    };
   } catch (error) {
     throw new Error(`${id} (${source}): ${error.message}`, { cause: error });
   }
@@ -141,10 +149,13 @@ export function generateTufteExamples(xpd, python, ids) {
     Object.values(paths).forEach((folder) => mkdirSync(folder));
     const version = step(python, [pythonHelper, 'bundle', paths.assets]).trim();
     console.log('Principle | Before findings | Before failed facts | After findings | After failed facts');
-    for (const [index, question] of questions.entries()) generateExample(question, paths, xpd, python, version, index + 1);
-    const index = questions.map(({ id, principle }) => `- [${principle.replaceAll('[', '\\[').replaceAll(']', '\\]')}](./${id}/)`).join('\n');
-    writeFileSync(join(paths.pages, 'index.md'), page({ title: yaml('Tufte examples'), editUrl: false, sidebar: { order: 0 } },
-      `Compare two Plotly displays of the same data for each principle. The examples follow the order of Tufte's book.\n\n${index}`));
+    const items = questions.map((question, index) => generateExample(question, paths, xpd, python, version, index + 1));
+    writeFileSync(join(paths.pages, 'index.mdx'), page({
+      title: yaml('Gallery'),
+      description: yaml('Compare before and after Plotly displays for all 57 principles from Tufte\'s book.'),
+      editUrl: false,
+      sidebar: { label: 'All before and after charts', order: 0 },
+    }, `import TufteGallery from '../../../../components/TufteGallery.astro';\n\n<TufteGallery {...${JSON.stringify({ items, version })}} />`));
     const targets = [
       [paths.pages, join(website, 'src', 'content', 'docs', gallery)],
       [paths.assets, join(website, 'public', 'tufte-examples')],

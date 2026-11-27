@@ -1,0 +1,386 @@
+---
+interface GalleryItem {
+  id: string;
+  principle: string;
+  page: number;
+  question: string;
+  beforeCaption: string;
+  afterCaption: string;
+}
+
+const { items, version } = Astro.props as { items: GalleryItem[]; version: string };
+const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+const assets = `${base}/tufte-examples`;
+---
+<p>Compare before and after Plotly displays for all {items.length} principles from Edward Tufte's <cite>The Visual Display of Quantitative Information</cite>, in book order.</p>
+
+<div class="gallery-controls">
+  <label for="gallery-filter" class="sr-only">Filter principles</label>
+  <input id="gallery-filter" type="search" placeholder="Filter by principle, question, or page..." autocomplete="off" />
+  <span id="gallery-count" class="gallery-count">{items.length} principles</span>
+</div>
+
+<div class="gallery-list" data-plotly-bundle={`${assets}/plotly-${version}.min.js`}>
+  {items.map((item) => (
+    <article class="gallery-card" data-search={`${item.principle} ${item.question} p.${item.page} ${item.id}`.toLowerCase()}>
+      <header class="gallery-card-header">
+        <h2 id={item.id}><a href={`${base}/guides/tufte-examples/${item.id}/`}>{item.principle}</a></h2>
+        <span class="gallery-meta">p. {item.page}</span>
+      </header>
+      <p class="gallery-question">{item.question}</p>
+      <div class="gallery-pair">
+        <figure>
+          <span class="variant-label">Before</span>
+          <div class="chart" data-plotly-spec={`${assets}/${item.id}/before.json`} data-plotly-variant="before" aria-hidden="true"></div>
+          <figcaption>{item.beforeCaption}</figcaption>
+        </figure>
+        <figure>
+          <span class="variant-label">After</span>
+          <div class="chart" data-plotly-spec={`${assets}/${item.id}/after.json`} data-plotly-variant="after" aria-hidden="true"></div>
+          <figcaption>{item.afterCaption}</figcaption>
+        </figure>
+      </div>
+      <p class="gallery-link"><a href={`${base}/guides/tufte-examples/${item.id}/`}>Values, quote, and Python code</a></p>
+    </article>
+  ))}
+</div>
+
+<style>
+  .sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+  }
+
+  .gallery-controls {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-block: 1rem 1.5rem;
+  }
+
+  #gallery-filter {
+    flex: 1;
+    padding: 0.5rem 0.75rem;
+    border-radius: 6px;
+    border: 1px solid var(--sl-color-gray-5);
+    background: var(--sl-color-bg);
+    color: var(--sl-color-text);
+    font: inherit;
+  }
+
+  .gallery-count {
+    font-size: 0.875rem;
+    color: var(--sl-color-gray-3);
+    white-space: nowrap;
+  }
+
+  .gallery-list {
+    display: flex;
+    flex-direction: column;
+    gap: 2.5rem;
+  }
+
+  .gallery-card {
+    padding-block-start: 1.5rem;
+    border-top: 1px solid var(--sl-color-gray-6);
+  }
+
+  .gallery-card[hidden] {
+    display: none;
+  }
+
+  .gallery-card-header {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 1rem;
+  }
+
+  .gallery-card-header h2 {
+    margin: 0;
+    font-size: 1.25rem;
+  }
+
+  .gallery-card-header h2 a {
+    text-decoration: none;
+    color: inherit;
+  }
+
+  .gallery-card-header h2 a:hover {
+    text-decoration: underline;
+  }
+
+  .gallery-meta {
+    font-size: 0.85rem;
+    color: var(--sl-color-gray-3);
+    white-space: nowrap;
+  }
+
+  .gallery-question {
+    margin: 0.35rem 0 0.75rem;
+    color: var(--sl-color-gray-2);
+    font-size: 0.95rem;
+  }
+
+  .gallery-pair {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(290px, 1fr));
+    gap: 1.25rem;
+    align-items: start;
+  }
+
+  .gallery-pair figure {
+    margin: 0;
+  }
+
+  .variant-label {
+    display: inline-block;
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--sl-color-gray-3);
+    margin-block-end: 0.25rem;
+  }
+
+  .chart {
+    width: 100%;
+    min-height: 220px;
+    border-radius: 6px;
+    overflow: hidden;
+  }
+
+  .gallery-pair figcaption {
+    margin-block-start: 0.4rem;
+    font-size: 0.875rem;
+    color: var(--sl-color-gray-2);
+  }
+
+  .gallery-link {
+    margin: 0.6rem 0 0;
+    font-size: 0.875rem;
+  }
+</style>
+
+<script>
+  type Trace = Record<string, any>;
+  type FigureSpec = {
+    data: Trace[];
+    layout: Record<string, any>;
+    frames?: { name: string }[];
+  };
+
+  type Plotly = {
+    newPlot: (chart: HTMLElement, spec: FigureSpec & { config: object }) => Promise<unknown>;
+    react: (chart: HTMLElement, data: Trace[], layout: Record<string, any>, config: object) => Promise<unknown>;
+    relayout: (chart: HTMLElement, layout: object) => Promise<unknown>;
+  };
+
+  let bundle: Promise<Plotly> | undefined;
+
+  function loadPlotly(src: string) {
+    bundle ??= new Promise((resolve, reject) => {
+      const script = document.createElement('script');
+      script.src = src;
+      script.onload = () => resolve((window as Window & { Plotly: Plotly }).Plotly);
+      script.onerror = reject;
+      document.head.append(script);
+    });
+    return bundle;
+  }
+
+  const isDarkTheme = () => document.documentElement.dataset.theme === 'dark';
+
+  const DARK_INKS = new Set([
+    'black', '#000', '#000000', '#111', '#111111', '#1f2937', '#222', '#222222',
+    '#242424', '#333', '#333333', '#353535', 'rgb(36,36,36)', 'rgb(0,0,0)',
+  ]);
+
+  function normalizeInk(color: unknown, dark: boolean, fg: string) {
+    if (!dark || typeof color !== 'string') return color;
+    return DARK_INKS.has(color.trim().toLowerCase().replaceAll(' ', '')) ? fg : color;
+  }
+
+  function hasExplicitTintedBg(spec: FigureSpec, variant: string) {
+    if (variant !== 'before') return false;
+    const layout = spec.layout ?? {};
+    const tmplBg = layout.template?.layout?.plot_bgcolor;
+    const explicitBg = layout.plot_bgcolor ?? layout.paper_bgcolor;
+    const isTinted = (bg: unknown) =>
+      typeof bg === 'string' && !['white', '#fff', '#ffffff', 'rgba(0,0,0,0)', 'transparent'].includes(bg.trim().toLowerCase());
+    return isTinted(explicitBg) || isTinted(tmplBg);
+  }
+
+  function applyTheme(spec: FigureSpec, variant: string, dimensions: { width: number; height: number }) {
+    const dark = isDarkTheme();
+    const layout = structuredClone(spec.layout ?? {});
+    const data = structuredClone(spec.data ?? []);
+    const frames = spec.frames ?? [];
+    const frameControls = frames.length ? { updatemenus: [], sliders: [] } : {};
+
+    if (hasExplicitTintedBg(spec, variant)) {
+      return { data, layout: { ...layout, ...frameControls, ...dimensions } };
+    }
+
+    const fg = dark ? '#e6e8ec' : '#1f2937';
+    const muted = dark ? '#9ca3af' : '#4b5563';
+    const axisLine = dark ? '#6b7280' : '#4b5563';
+    const grid = dark ? 'rgba(255,255,255,0.12)' : 'rgba(15,23,42,0.08)';
+    const hoverBg = dark ? '#1f232b' : '#ffffff';
+    const hoverBorder = dark ? '#374151' : '#d1d5db';
+    const tableHeaderBg = dark ? 'rgba(255,255,255,0.06)' : 'rgba(15,23,42,0.04)';
+    const tableRule = dark ? 'rgba(255,255,255,0.18)' : 'rgba(15,23,42,0.14)';
+
+    layout.paper_bgcolor = 'rgba(0,0,0,0)';
+    layout.plot_bgcolor = 'rgba(0,0,0,0)';
+    layout.font = { ...layout.font, color: fg };
+    if (layout.title && typeof layout.title === 'object') {
+      layout.title.font = { ...layout.title.font, color: fg };
+      if (layout.title.subtitle && typeof layout.title.subtitle === 'object') {
+        layout.title.subtitle.font = { ...layout.title.subtitle.font, color: muted };
+      }
+    }
+    layout.hoverlabel = {
+      ...layout.hoverlabel,
+      bgcolor: hoverBg,
+      bordercolor: hoverBorder,
+      font: { ...layout.hoverlabel?.font, color: fg },
+    };
+    if (layout.legend && typeof layout.legend === 'object') {
+      layout.legend.bgcolor = 'rgba(0,0,0,0)';
+      layout.legend.font = { ...layout.legend.font, color: fg };
+    }
+
+    const axisKeys = new Set<string>(Object.keys(layout).filter((k) => /^(?:x|y)axis\d*$/.test(k)));
+    const hasCartesian = data.some((t) => !['table', 'pie', 'indicator', 'sunburst', 'scatter3d'].includes(t.type ?? 'scatter'));
+    if (hasCartesian) {
+      axisKeys.add('xaxis');
+      axisKeys.add('yaxis');
+    }
+    for (const key of axisKeys) {
+      const axis = { ...(layout[key] ?? {}) };
+      axis.automargin = axis.automargin ?? true;
+      axis.linecolor = normalizeInk(axis.linecolor ?? axisLine, dark, axisLine);
+      axis.tickcolor = normalizeInk(axis.tickcolor ?? axisLine, dark, axisLine);
+      axis.tickfont = { ...axis.tickfont, color: muted };
+      if (axis.title && typeof axis.title === 'object') {
+        axis.title = { ...axis.title, font: { ...axis.title.font, color: muted } };
+      } else if (typeof axis.title === 'string') {
+        axis.title = { text: axis.title, font: { color: muted } };
+      }
+      if (axis.showgrid && !axis.gridcolor) axis.gridcolor = grid;
+      if (axis.zerolinecolor) axis.zerolinecolor = normalizeInk(axis.zerolinecolor, dark, grid);
+      layout[key] = axis;
+    }
+
+    if (Array.isArray(layout.annotations)) {
+      layout.annotations = layout.annotations.map((ann: Record<string, any>) => ({
+        ...ann,
+        font: { ...ann.font, color: normalizeInk(ann.font?.color ?? fg, dark, fg) },
+      }));
+    }
+    if (Array.isArray(layout.shapes)) {
+      layout.shapes = layout.shapes.map((shape: Record<string, any>) => {
+        if (!shape.line?.color) return shape;
+        return { ...shape, line: { ...shape.line, color: normalizeInk(shape.line.color, dark, axisLine) } };
+      });
+    }
+
+    for (const trace of data) {
+      if (trace.type === 'table') {
+        const keepBeforeTable = variant === 'before' && (Array.isArray(trace.cells?.fill?.color) || (trace.cells?.line?.width ?? 0) >= 2);
+        if (keepBeforeTable) {
+          trace.header = { ...trace.header, font: { ...trace.header?.font, color: '#1f2937' } };
+          trace.cells = { ...trace.cells, font: { ...trace.cells?.font, color: '#1f2937' } };
+        } else {
+          trace.header = {
+            ...trace.header,
+            fill: { color: tableHeaderBg },
+            line: { color: tableRule, width: trace.header?.line?.width ?? 1 },
+            font: { ...trace.header?.font, color: fg },
+          };
+          trace.cells = {
+            ...trace.cells,
+            fill: { color: 'rgba(0,0,0,0)' },
+            line: { color: tableRule, width: trace.cells?.line?.width ?? 0 },
+            font: { ...trace.cells?.font, color: fg },
+          };
+        }
+      } else {
+        if (trace.line?.color) trace.line.color = normalizeInk(trace.line.color, dark, fg);
+        if (trace.marker?.color) trace.marker.color = normalizeInk(trace.marker.color, dark, fg);
+        if (trace.textfont?.color) trace.textfont.color = normalizeInk(trace.textfont.color, dark, fg);
+      }
+    }
+
+    return { data, layout: { ...layout, ...frameControls, ...dimensions } };
+  }
+
+  const list = document.querySelector<HTMLElement>('.gallery-list');
+  const bundleSrc = list?.dataset.plotlyBundle;
+  const rendered = new Map<HTMLElement, { spec: FigureSpec; variant: string; size: () => { width: number; height: number } }>();
+  const config = { displayModeBar: false, responsive: true };
+
+  async function renderChart(chart: HTMLElement) {
+    if (!bundleSrc || chart.dataset.plotlyStarted) return;
+    chart.dataset.plotlyStarted = '';
+    try {
+      const [plotly, response] = await Promise.all([loadPlotly(bundleSrc), fetch(chart.dataset.plotlySpec!)]);
+      if (!response.ok) throw new Error(`Plotly figure request failed: ${response.status}`);
+      const spec: FigureSpec = await response.json();
+      const variant = chart.dataset.plotlyVariant ?? 'after';
+      const { width = 700, height = 450 } = spec.layout ?? {};
+      const hasTable = spec.data.some(({ type }) => type === 'table');
+      const size = () => {
+        const available = Math.max(240, Math.min(width, chart.clientWidth || 340));
+        const chartHeight = Math.max(Math.min(height, 280), Math.round(available * height / width));
+        return { width: available, height: hasTable ? Math.min(height, 360) : chartHeight };
+      };
+      const initial = applyTheme(spec, variant, size());
+      await plotly.newPlot(chart, { ...spec, data: initial.data, layout: initial.layout, config });
+      chart.dataset.plotlyReady = '';
+      rendered.set(chart, { spec, variant, size });
+    } catch (error) {
+      console.error(error);
+    }
+  }
+
+  const observer = new IntersectionObserver((entries) => {
+    for (const entry of entries) {
+      if (entry.isIntersecting) {
+        observer.unobserve(entry.target);
+        void renderChart(entry.target as HTMLElement);
+      }
+    }
+  }, { rootMargin: '400px 0px' });
+
+  document.querySelectorAll<HTMLElement>('.gallery-list .chart').forEach((chart) => observer.observe(chart));
+
+  new MutationObserver(() => {
+    if (!bundleSrc) return;
+    void loadPlotly(bundleSrc).then((plotly) => {
+      for (const [chart, entry] of rendered) {
+        const updated = applyTheme(entry.spec, entry.variant, entry.size());
+        void plotly.react(chart, updated.data, updated.layout, config);
+      }
+    });
+  }).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+
+  const filter = document.querySelector<HTMLInputElement>('#gallery-filter');
+  const count = document.querySelector<HTMLElement>('#gallery-count');
+  const cards = [...document.querySelectorAll<HTMLElement>('.gallery-card')];
+  filter?.addEventListener('input', () => {
+    const query = filter.value.trim().toLowerCase();
+    let visible = 0;
+    for (const card of cards) {
+      const match = !query || (card.dataset.search ?? '').includes(query);
+      card.hidden = !match;
+      if (match) visible++;
+    }
+    if (count) count.textContent = `${visible} of ${cards.length} principles`;
+  });
+</script>
