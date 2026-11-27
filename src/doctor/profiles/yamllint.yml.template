@@ -1,6 +1,0 @@
-ignore-from-file: .gitignore
-
-rules:
-  key-duplicates: enable
-  new-line-at-end-of-file: enable
-  trailing-spaces: enable

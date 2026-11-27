@@ -3,41 +3,21 @@
 //!
 //! ```toml
 //! [tool.xpd.profile]
-//! revision = 7
+//! revision = 8
 //! kind = "application"
 //! tools = ["ruff", "ty", "pytest"]
 //!
 //! [[tool.xpd.profile.exceptions]]
 //! tool = "ruff"
-//! id = "PTH118"
+//! id = "F401"
 //! files = ["scripts/**"]
-//! reason = "The scripts pass str paths to a library that rejects Path objects."
+//! reason = "Importing the plugin registers it."
 //! ```
 //!
 //! The profile names each value, and the record of the same id in `decisions.jsonl` explains
-//! it. Ruff's `select` and `ignore` decide every rule of the pinned release, so each rule has a
-//! `profile` record, on or off, and a setting is explained by the record of the setting that
-//! holds it. A profile revision changes whenever a value changes, and the schema changes only
-//! when the shape of `profile.toml` or of the project's record changes.
-//!
-//! The base values apply to every kind of project, and a kind can add its own values in the
-//! same shape. A kind also states which of `[project]`, `[build-system]` and scripts with inline
-//! metadata it needs, and which files the profile owns for it. An owned file is a native template
-//! in `src/doctor/profiles/`, listed in [`TEMPLATES`], that the project keeps as an exact copy,
-//! or, with `holds`, a file the project also writes itself, which must hold that line and is the
-//! template when the project has none, or, with `insert`, a file of lines such as `.gitignore`,
-//! which must hold every line of the template and gets the missing ones at its top. `rivals` and
-//! `tables` name the other files and `pyproject.toml` tables where the same tool would read its
-//! settings, which the project must not have, and `backend` the build backend that a project
-//! needs for the profile to own the file. A kind with `python-version` pins its Python in
-//! `.python-version`.
-//!
-//! `[dev]` `pins` names the tools a project runs with `uv run`. Each goes into
-//! `[dependency-groups] dev` as an exact pin at its release in `[pins]`, and `uv.lock` locks that
-//! release. `shell` and `notebooks` name the tools that only a project with shell scripts, or
-//! with notebooks, gets. `[pytest.plugin-names]` holds the names under which `-p` loads each
-//! plugin, by its `pytest11` entry point or its module: `-p no:<name>` turns off a plugin of the
-//! profile, and `-p <name>` loads a plugin that the profile removes.
+//! it. Each selected Ruff rule has a profile record. The project kind determines its
+//! packaging metadata, lock files and initial pre-commit configuration. Existing hooks belong
+//! to the project. The dev group pins the tools used in the project environment.
 //!
 //! A project that records `tools` holds only the settings of those tools, with their pins, their
 //! lock and the owned files that name one of them as their `tool`. `[dev.tools]` names the pins
@@ -190,74 +170,15 @@ pub(crate) struct Owned {
     pub(crate) tool: Option<Tool>,
 }
 
-/// Which files a project tracks that only some tools check.
-#[derive(Debug, Clone, Copy, Default)]
-pub(crate) struct Tracked {
-    /// Shell scripts that `ShellCheck` and `shfmt` read: a `.sh` or `.bash` file, or a file without
-    /// a suffix whose first line runs `sh`, `bash`, `dash` or `ksh`.
-    pub(crate) shell: bool,
-    /// Jupyter notebooks.
-    pub(crate) notebooks: bool,
-}
-
 /// The templates of owned files, each by its file name in `src/doctor/profiles/`.
 const TEMPLATES: &[(&str, &str)] = &[
     (
-        "conftest.py.template",
-        include_str!("profiles/conftest.py.template"),
+        "pre-commit-script.yaml.template",
+        include_str!("profiles/pre-commit-script.yaml.template"),
     ),
     (
-        "editorconfig.template",
-        include_str!("profiles/editorconfig.template"),
-    ),
-    (
-        "gitattributes.template",
-        include_str!("profiles/gitattributes.template"),
-    ),
-    (
-        "gitignore.template",
-        include_str!("profiles/gitignore.template"),
-    ),
-    (
-        "tombi.toml.template",
-        include_str!("profiles/tombi.toml.template"),
-    ),
-    (
-        "rumdl.toml.template",
-        include_str!("profiles/rumdl.toml.template"),
-    ),
-    (
-        "yamllint.yml.template",
-        include_str!("profiles/yamllint.yml.template"),
-    ),
-    (
-        "lefthook.yml.template",
-        include_str!("profiles/lefthook.yml.template"),
-    ),
-    (
-        "lefthook-script.yml.template",
-        include_str!("profiles/lefthook-script.yml.template"),
-    ),
-    ("ci.yml.template", include_str!("profiles/ci.yml.template")),
-    (
-        "ci-script.yml.template",
-        include_str!("profiles/ci-script.yml.template"),
-    ),
-    (
-        "dependabot.yml.template",
-        include_str!("profiles/dependabot.yml.template"),
-    ),
-    (
-        "dependabot-actions.yml.template",
-        include_str!("profiles/dependabot-actions.yml.template"),
-    ),
-    (
-        "jactionlint.yaml.template",
-        include_str!("profiles/jactionlint.yaml.template"),
-    ),
-    (
-        "release.yml.template",
-        include_str!("profiles/release.yml.template"),
+        "pre-commit.yaml.template",
+        include_str!("profiles/pre-commit.yaml.template"),
     ),
 ];
 
@@ -627,10 +548,6 @@ pub(crate) struct Profile {
     /// The tools pinned exactly in `[dependency-groups] dev`, each with its release from
     /// `[pins]`, which `uv.lock` must lock.
     pub(crate) dev_pins: Vec<(String, String)>,
-    /// The pins that only a project with shell scripts gets.
-    pub(crate) shell_pins: Vec<(String, String)>,
-    /// The pins that only a project with notebooks gets.
-    pub(crate) notebook_pins: Vec<(String, String)>,
     /// The pins that come with each tool, for a project that holds only some tools.
     pub(crate) tool_pins: Vec<(Tool, Vec<String>)>,
     pub(crate) kinds: Vec<KindSpec>,
@@ -673,8 +590,6 @@ impl Profile {
             );
         }
         let dev_pins = dev_pins(top, pins, "pins")?;
-        let shell_pins = dev_pins_of(top, pins, "shell")?;
-        let notebook_pins = dev_pins_of(top, pins, "notebooks")?;
         let by_tool = table(table(top, "dev")?, "tools").context("dev")?;
         let tool_pins = [Tool::Ruff, Tool::Ty, Tool::Pytest]
             .into_iter()
@@ -737,8 +652,6 @@ impl Profile {
         Ok(Self {
             revision: integer(top, "revision")?,
             dev_pins,
-            shell_pins,
-            notebook_pins,
             tool_pins,
             kinds,
             base: Values::read(top)?,
@@ -799,12 +712,7 @@ impl Profile {
                 "src/doctor/profiles/{template} is no file of the profile"
             );
             for (name, release) in releases(text) {
-                let pinned = self
-                    .dev_pins
-                    .iter()
-                    .chain(&self.shell_pins)
-                    .chain(&self.notebook_pins)
-                    .find(|(pin, _)| *pin == name);
+                let pinned = self.dev_pins.iter().find(|(pin, _)| *pin == name);
                 if let Some((_, pinned)) = pinned {
                     ensure!(
                         *pinned == release,
@@ -846,7 +754,7 @@ impl Profile {
             ensure!(
                 catalog
                     .ruff_rules()
-                    .any(|rule| rule.name.as_deref() == Some(*selector)),
+                    .any(|rule| super::ruff::selects(selector, rule)),
                 "ruff {} has no rule named {selector}, which lint.unfixable lists",
                 catalog::RUFF_RELEASE
             );
@@ -859,7 +767,7 @@ impl Profile {
         for rule in catalog.ruff_rules() {
             let listed = unfixable
                 .iter()
-                .any(|selector| rule.name.as_deref() == Some(*selector));
+                .any(|selector| super::ruff::selects(selector, rule));
             for (xpd, stance) in &rule.xpd {
                 match stance {
                     Stance::Ignore => ensure!(
@@ -868,7 +776,7 @@ impl Profile {
                         rule.key
                     ),
                     Stance::Unfixable => ensure!(
-                        listed && on.contains(&rule.key.id),
+                        listed || !on.contains(&rule.key.id),
                         "{} must not rewrite code that xpd's {xpd} reads, and lint.unfixable lacks it",
                         rule.key
                     ),
@@ -1011,9 +919,9 @@ impl Profile {
         }
     }
 
-    /// The tools that a project which tracks `tracked` and holds `scope` pins in
+    /// The tools that a project which holds `scope` pins in
     /// `[dependency-groups] dev`. A project that holds only some tools pins what comes with them.
-    pub(crate) fn pins(&self, tracked: Tracked, scope: &Scope) -> Vec<(String, String)> {
+    pub(crate) fn pins(&self, scope: &Scope) -> Vec<(String, String)> {
         if !scope.whole() {
             let held: Vec<&String> = self
                 .tool_pins
@@ -1028,29 +936,7 @@ impl Profile {
                 .cloned()
                 .collect();
         }
-        let mut pins = self.dev_pins.clone();
-        if tracked.shell {
-            pins.extend(self.shell_pins.iter().cloned());
-        }
-        if tracked.notebooks {
-            pins.extend(self.notebook_pins.iter().cloned());
-        }
-        pins
-    }
-
-    /// The release of Tombi that formats `pyproject.toml` after an apply, when the profile owns
-    /// `tombi.toml` for the kind `kind` in a project that holds `scope`.
-    pub(crate) fn formats_toml(&self, kind: Option<&str>, scope: &Scope) -> Option<String> {
-        self.owned(kind, scope)
-            .iter()
-            .any(|file| file.path == "tombi.toml")
-            .then(|| {
-                self.dev_pins
-                    .iter()
-                    .find(|(name, _)| name == "tombi")
-                    .map(|(_, release)| release.clone())
-            })
-            .flatten()
+        self.dev_pins.clone()
     }
 
     /// The files the profile owns for the kind `kind` in a project that holds `scope`.
@@ -1182,19 +1068,6 @@ fn owned_file(name: &str, item: &Item) -> Result<Owned> {
 /// The tools that `[dev]` names under `key`, each with its release in `[pins]`.
 fn dev_pins(top: &dyn TableLike, pins: &dyn TableLike, key: &str) -> Result<Vec<(String, String)>> {
     with_releases(strings(table(top, "dev")?, key).context("dev")?, pins, key)
-}
-
-/// The tools that `[dev]` may name under `key`, each with its release in `[pins]`.
-fn dev_pins_of(
-    top: &dyn TableLike,
-    pins: &dyn TableLike,
-    key: &str,
-) -> Result<Vec<(String, String)>> {
-    with_releases(
-        optional_strings(table(top, "dev")?, key).context("dev")?,
-        pins,
-        key,
-    )
 }
 
 fn with_releases(

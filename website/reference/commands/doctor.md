@@ -1,4 +1,4 @@
-Run `xpd doctor` at a Python project root to diff `pyproject.toml`, tool configs, and lock files against xpd's strict Ruff, ty, pytest, packaging, and CI profile. Add `--apply` to write the changes and lock files, or `--check` to exit `1` on drift in CI and the agent `Stop` hook.
+Run `xpd doctor` at a Python project root to diff `pyproject.toml`, tool configs, and lock files against xpd's strict Ruff, ty, pytest, packaging, and pre-commit profile. Add `--apply` to write the changes and lock files, or `--check` to exit `1` on drift in CI and the agent `Stop` hook.
 
 ```mermaid
 flowchart LR
@@ -14,13 +14,13 @@ Every setting in the profile has a pinned release, rationale, and upstream sourc
 
 | Area | What the profile enforces |
 | --- | --- |
-| Ruff | `select = ["ALL"]`, `preview = true`, `required-version = "==0.17.4"`, curated ignore list, banned mock and skip APIs |
+| Ruff | `select = ["E4", "E7", "E9", "F", "I"]`, `required-version = "==0.17.4"` |
 | ty | `error` on blanket ignores, unused ignores, disjoint casts, and missing direct dependencies |
-| pytest | `strict = true`, `timeout = "60"`, `-ra --import-mode=importlib -p no:doctest`, `filterwarnings = ["error"]`, no reruns |
+| pytest | `strict = true`, `-ra --import-mode=importlib -p no:doctest`, `filterwarnings = ["error"]`, no reruns |
 | Packaging and locks | `requires-python`, pinned dev tools in `[dependency-groups]`, `exclude-newer`, and up-to-date `uv.lock` |
-| Non-Python and CI | Owned templates for `.editorconfig`, `.gitattributes`, `.gitignore`, `lefthook.yml`, `rumdl`, `tombi`, `yamllint`, and GitHub workflows |
+| Git hooks | Creates a missing `.pre-commit-config.yaml` with pinned TOML and YAML checks through uvx. Existing hook configurations remain project-owned |
 
-Pass `--tools ruff,ty,pytest` to manage only tool settings without packaging or CI templates, or pass `--kind` to select a project layout (`library`, `application`, `pipeline`, or `script`).
+Pass `--tools ruff,ty,pytest` to manage only tool settings without packaging or hooks, or pass `--kind` to select a project layout (`library`, `application`, `pipeline`, or `script`).
 
 ## Privacy and redaction
 
@@ -52,7 +52,7 @@ addopts = "--reruns 2 --strict-markers"
 
 ```console
 $ xpd doctor --format text
-Profile revision 7, kind application, suggested because [project] has no [build-system], so uv runs it without building it
+Profile revision 8, kind application, suggested because [project] has no [build-system], so uv runs it without building it
   A program that runs from its checkout or as an installed command, locked in uv.lock.
 pyproject.toml records no profile yet.
 ...
@@ -60,14 +60,14 @@ pyproject.toml records no profile yet.
 +++ pyproject.toml
 ...
 +[tool.ruff.lint]
-+select = ["ALL"]
++select = ["E4", "E7", "E9", "F", "I"]
 ...
 +[tool.xpd.profile]
-+revision = 7
++revision = 8
 +kind = "application"
 ...
 Changes
-  ruff lint.select: unset -> ["ALL"], tool.ruff.lint.select
+  ruff lint.select: unset -> ["E4", "E7", "E9", "F", "I"], tool.ruff.lint.select
 ...
 Locks
   uv.lock is missing. --apply runs uv lock.
@@ -83,8 +83,8 @@ Add an entry under `[tool.xpd.profile.exceptions]` in `pyproject.toml` with a `r
 ```toml
 [[tool.xpd.profile.exceptions]]
 tool = "ruff"
-id = "T201"
-reason = "CLI commands print directly to stdout."
+id = "F401"
+reason = "Importing the plugin registers it."
 ```
 
 Run `xpd doctor --format json` for machine-readable output containing `profile` (`revision`, `applied`, `kind`, `tools`, `changes`, `conflicts`, `exceptions`, `unverified`, `locks`, `diff`), `tools`, `suggestions`, `policies`, and `notes`.

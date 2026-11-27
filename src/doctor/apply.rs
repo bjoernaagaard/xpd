@@ -232,8 +232,8 @@ fn write<'a>(
     if Some(&stamped.after) != stamped.before.as_ref() {
         replace(&file, &stamped.after)?;
     }
-    if let Some(release) = profile.formats_toml(stamped.kind.as_deref(), &stamped.scope) {
-        format_toml(root, &release)?;
+    if stamped.scope.whole() {
+        format_toml(root, "1.11.3")?;
     }
     Ok(())
 }

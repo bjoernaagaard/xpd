@@ -22,7 +22,7 @@ use super::catalog::{Catalog, Level, Tool};
 use super::edit;
 use super::packaging;
 use super::placement::Destination;
-use super::profile::{self, Exception, LockStyle, Presence, Profile, Scope, Tracked, Values};
+use super::profile::{self, Exception, LockStyle, Presence, Profile, Scope, Values};
 use super::pytest::{self, Release};
 use super::ruff;
 use super::ty;
@@ -257,7 +257,7 @@ pub(crate) fn compute(
         before,
         after: String::new(),
         owned: Vec::new(),
-        pins: profile.pins(tracked(root)?, &scope),
+        pins: profile.pins(&scope),
         rejected: false,
         scope,
     };
@@ -645,6 +645,9 @@ impl Plan {
             let path = PathBuf::from(&owned.path);
             let file = root.join(&path);
             let before = crate::source::read_optional(&file)?;
+            if before.is_some() && owned.path == ".pre-commit-config.yaml" {
+                continue;
+            }
             if before.as_deref() == Some(owned.text) {
                 continue;
             }
@@ -1552,51 +1555,6 @@ fn inserted(text: &str, template: &str) -> Option<String> {
     after.push('\n');
     after.push_str(text);
     Some(after)
-}
-
-/// Which files the project at `root` tracks that only some tools check. Git's ignore files
-/// decide what counts as tracked.
-fn tracked(root: &Path) -> Result<Tracked> {
-    let found = crate::source::files_under(Path::new(""), &[root.to_path_buf()], |path| {
-        notebook(path) || shell_script(path)
-    })?;
-    Ok(Tracked {
-        shell: found.iter().any(|path| shell_script(path)),
-        notebooks: found.iter().any(|path| notebook(path)),
-    })
-}
-
-fn notebook(path: &Path) -> bool {
-    path.extension().is_some_and(|suffix| suffix == "ipynb")
-}
-
-/// Whether `ShellCheck` and `shfmt` read `path`: a `.sh` or `.bash` file, or a file without a
-/// suffix whose first line runs `sh`, `bash`, `dash` or `ksh`, directly or through `env`.
-fn shell_script(path: &Path) -> bool {
-    const SHELLS: [&str; 4] = ["sh", "bash", "dash", "ksh"];
-    if let Some(suffix) = path.extension() {
-        return suffix == "sh" || suffix == "bash";
-    }
-    let Ok(file) = fs::File::open(path) else {
-        return false;
-    };
-    let mut first = String::new();
-    if std::io::BufRead::read_line(&mut std::io::BufReader::new(file), &mut first).is_err() {
-        return false;
-    }
-    let Some(command) = first.strip_prefix("#!") else {
-        return false;
-    };
-    let mut words = command.split_whitespace();
-    let program = words
-        .next()
-        .map(|word| word.rsplit('/').next().unwrap_or(word));
-    let shell = if program == Some("env") {
-        words.find(|word| !word.starts_with('-'))
-    } else {
-        program
-    };
-    shell.is_some_and(|shell| SHELLS.contains(&shell))
 }
 
 fn scripts(files: &[PathBuf]) -> Vec<PathBuf> {
