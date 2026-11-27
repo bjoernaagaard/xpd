@@ -3,7 +3,7 @@ import cvxpy as cp
 
 def rejected():
     x = cp.Variable()
-    problem = cp.Problem(cp.Minimize(cp.sqrt(cp.square(x))))
+    problem = cp.Problem(cp.Minimize(cp.sqrt(cp.square(x))))  # xpd: non-dcp-problem
     problem.solve()
 
 
@@ -16,7 +16,7 @@ def explicit_qcp():
 def unchecked():
     x = cp.Variable()
     problem = cp.Problem(cp.Minimize(cp.abs(x)))
-    problem.solve()
+    problem.solve()  # xpd: unchecked-solver-status
     return problem.value
 
 
@@ -31,7 +31,7 @@ def checked():
 def mixed():
     exposure = cp.Variable(name="exposure [USD]")
     cap = cp.Parameter(name="cap [EUR]")
-    return cp.Problem(cp.Minimize(exposure), [exposure <= cap])
+    return cp.Problem(cp.Minimize(exposure), [exposure <= cap])  # xpd: constraint-unit-mismatch
 
 
 def converted():

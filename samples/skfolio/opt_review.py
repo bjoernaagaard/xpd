@@ -3,7 +3,7 @@ from skfolio.optimization import MeanRisk
 
 
 def leaky(returns):
-    model = MeanRisk().fit(returns)
+    model = MeanRisk().fit(returns)  # xpd: skfolio-fit-on-holdout
     train, test = train_test_split(returns, shuffle=False)
     return model.predict(test)
 
