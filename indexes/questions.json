@@ -324,5 +324,25 @@
   {
     "query": "Harden flaky Python tests and swallowed exceptions with xpd harden",
     "expected": "xpd/recipe/reliability"
+  },
+  {
+    "query": "why does a scaler fit before train_test_split leak data",
+    "expected": "sklearn/scaler-fit-before-split"
+  },
+  {
+    "query": "prefit before cross validation",
+    "expected": "sklearn/prefit-before-cross-validation"
+  },
+  {
+    "query": "scaled target without inverse",
+    "expected": "sklearn/scaled-target-without-inverse"
+  },
+  {
+    "query": "silent dtype coercion in pandas to_numeric",
+    "expected": "pandas/silent-dtype-coercion"
+  },
+  {
+    "query": "join key unvalidated pandas merge",
+    "expected": "pandas/join-key-unvalidated"
   }
 ]

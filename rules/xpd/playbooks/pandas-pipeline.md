@@ -54,6 +54,8 @@ def load(path: Path) -> pd.DataFrame:
 
 ## Commands
 
+For model preparation, use `xpd data-prep start`, list with bare `xpd data-prep`, then use its `plan`, `approve`, `gate`, `drop`, `status` and `finish` stages with the `xpd-data-prep` skill.
+
 1. `xpd profile <data file>` prints the dtype, the nulls and the unique values of each column, so each step is written for the real data.
 2. `xpd graph <file> --format json` lists the steps and the columns each one reads. `pipelines[].source` is the `columns=` list for the read.
 3. `xpd check <file> --format json` reports what is left of the old style, and the code is done when it reports 0 issues.

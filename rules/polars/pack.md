@@ -10,6 +10,7 @@ The Polars pack catches removed Polars 2.0 APIs, expression and null bugs, eager
 
 ## Types and query results
 
+- polars-silent-dtype-coercion
 - polars-streaming-order
 - polars-removed-cast
 - polars-selector-coercion
@@ -44,6 +45,7 @@ The Polars pack catches removed Polars 2.0 APIs, expression and null bugs, eager
 
 ## Joins, categories, SQL and testing
 
+- polars-join-key-unvalidated
 - polars-join-without-validate
 - polars-join-asof-unsorted
 - polars-categorical-vs-enum

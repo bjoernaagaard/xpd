@@ -1,0 +1,9 @@
+id: polars-silent-dtype-coercion
+language: python
+severity: warning
+message: Check invalid values before casting so they are not silently replaced with nulls.
+rule:
+  kind: call
+  all:
+    - has: { field: function, regex: '\.cast$' }
+    - has: { field: arguments, has: { regex: '^strict\s*=\s*False$' } }

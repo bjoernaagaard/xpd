@@ -13,6 +13,7 @@ python-review
 xpd
 xpd-animate
 xpd-chart-review
+xpd-data-prep
 xpd-harden
 xpd-optimize
 xpd-untangle

@@ -94,7 +94,7 @@ pub(crate) fn measure(
     work_dir: &Path,
     policy: AdapterPolicy,
 ) -> Result<RuntimeResult> {
-    let payload = match invoke_adapter(adapter, work_dir) {
+    let payload = match invoke_adapter(adapter, work_dir, FIGURE_FACTS_PY) {
         Ok(payload) => payload,
         Err(error) => {
             if policy == AdapterPolicy::Required {
@@ -177,7 +177,7 @@ pub(crate) fn measure(
 }
 
 /// Invokes a `.py` adapter via `py/figure_facts.py` or runs a shell command emitting figure JSON.
-fn invoke_adapter(adapter: &str, work_dir: &Path) -> Result<Value> {
+pub(crate) fn invoke_adapter(adapter: &str, work_dir: &Path, runner: &str) -> Result<Value> {
     let candidate = work_dir.join(adapter);
     let is_python_file = candidate.is_file()
         && candidate
@@ -187,7 +187,7 @@ fn invoke_adapter(adapter: &str, work_dir: &Path) -> Result<Value> {
     let output = if is_python_file {
         Command::new(venv::project_python())
             .arg("-c")
-            .arg(FIGURE_FACTS_PY)
+            .arg(runner)
             .arg(&candidate)
             .current_dir(work_dir)
             .stdin(Stdio::null())

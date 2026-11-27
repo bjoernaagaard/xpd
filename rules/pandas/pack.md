@@ -95,6 +95,7 @@ The pandas pack catches broken pandas 3 copy-on-write code, slow Python row loop
 
 ## Index alignment and joins
 
+- join-key-unvalidated
 - assign-drops-alignment
 - concat-columns-unchecked
 - merge-on-both-indexes
@@ -133,6 +134,7 @@ The pandas pack catches broken pandas 3 copy-on-write code, slow Python row loop
 
 ## Stated intent
 
+- silent-dtype-coercion
 - repeated-reset-index
 - repeat-rows-by-index
 - numpy-round-trip

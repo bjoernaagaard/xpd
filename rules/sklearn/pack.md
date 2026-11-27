@@ -4,6 +4,8 @@ The scikit-learn pack catches train and test leakage, split and group errors, sw
 
 ## Leakage
 
+- scaler-fit-before-split
+- prefit-before-cross-validation
 - fit-on-test
 - fit-before-split
 - cross-val-on-fitted-data
@@ -34,6 +36,7 @@ The scikit-learn pack catches train and test leakage, split and group errors, sw
 
 ## Pipeline and metadata routing
 
+- scaled-target-without-inverse
 - metadata-routing
 - pipeline-fit-params
 - pipeline-step-form
