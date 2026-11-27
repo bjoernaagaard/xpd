@@ -7,7 +7,7 @@ Start with [`xpd check`](./check/), which lints Python files and writes fixes.
 
 ## The project's Python
 
-`profile`, `equiv`, `refit`, `chart-review --adapter` and `index` run Python code, and `find` uses Python once to download
+`profile`, `equiv`, `refit`, `chart-review --adapter`, `optimize --adapter` and `index` run Python code, and `find` uses Python once to download
 its search model. xpd uses the first of these Pythons that it finds.
 
 1. The one in `$VIRTUAL_ENV`

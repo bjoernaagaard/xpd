@@ -491,15 +491,13 @@ fn user_prompt(cwd: &Path, prompt: &str) -> Result<ExitCode> {
                 .to_owned(),
         );
     }
-    if optimize_prompt(prompt) {
+    if harden_prompt(prompt) {
         text.push(
-            "Simplify or speed up task: `xpd optimize` reads the files and lists rulekit issues, \
-             near copies, repeated calls and masks, loop-invariant calls, default arguments, \
-             pairwise matrices built to be reduced or contracted, full materializations indexed \
-             for one element, and linear scans in loops, each with its evidence. Use \
-             `xpd optimize start <paths> --check \"<tests>\" --bench \"<workload>\"` for a \
-             recorded run that tracks line count, timing and a gate for each change. The \
-             `xpd-optimize` skill holds the steps."
+            "Reliability task: run `xpd harden start` to record checks and find silent failures, fixed waits and unreliable tests. The `xpd-harden` skill holds the steps.".to_owned(),
+        );
+    } else if optimize_prompt(prompt) {
+        text.push(
+            "Performance task: run `xpd optimize` to find repeated work and oversized intermediates. Use `xpd optimize start <paths> --check \"<tests>\" --bench \"<workload>\"` for a recorded run. The `xpd-optimize` skill holds the steps."
                 .to_owned(),
         );
     }
@@ -652,6 +650,33 @@ fn untangle_prompt(prompt: &str) -> bool {
         || lowered.contains("dead code")
         || lowered.contains("technical debt")
         || lowered.contains("tech debt")
+}
+
+fn harden_prompt(prompt: &str) -> bool {
+    let prompt = prompt.to_lowercase();
+    let words: HashSet<_> = prompt
+        .split(|character: char| !character.is_alphanumeric())
+        .collect();
+    let has = |choices: &[&str]| choices.iter().any(|choice| words.contains(choice));
+    has(&[
+        "flaky",
+        "swallowed",
+        "swallow",
+        "swallows",
+        "deterministic",
+        "determinism",
+        "retry",
+        "retries",
+        "rerun",
+        "nondeterministic",
+        "tilfældig",
+        "tilfældigt",
+        "deterministisk",
+    ]) || prompt.contains("fejler nogle gange")
+        || prompt.contains("bare except")
+        || (has(&[
+            "sleep", "sleeps", "random", "seed", "error", "errors", "silent", "silently", "skipped",
+        ]) && (has(&["test", "tests", "except", "failure"]) || prompt.contains("run again")))
 }
 
 /// Whether `prompt` asks to make code simpler, shorter or faster, in English or Danish.

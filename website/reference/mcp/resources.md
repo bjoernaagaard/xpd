@@ -58,6 +58,11 @@ The offline animation workflow and its editable Manim recipes.
 
 The steps of a recorded chart and table review against Tufte's book, driven by [`xpd chart-review`](../../commands/chart-review/).
 
+## skill://xpd-harden/
+
+The reliability skill shows how to review silent failures, fixed waits and unreliable tests with `xpd harden`. It covers the checklist and the gate that repeats the first project check.
+
+
 ## skill://xpd-optimize/
 
 The steps from a finding of [`xpd optimize`](../../commands/optimize/) to a change with proof that

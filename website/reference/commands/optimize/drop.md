@@ -1,10 +1,10 @@
-Record that a fix was given up, with the reason. Restore the files first, so that the commit is the one the run stands at, which `status` names. The run goes on with the next fix.
+Return to the run’s current commit and record a reason for dropping the fix.
 
-The [`xpd optimize`](../../optimize/#a-recorded-run) page shows a whole run.
+Run `xpd optimize drop fix-id --reason "reason"`.
 
 ## Example
 
 ```console
-$ xpd optimize drop --help
-...
+$ xpd optimize drop --help | sed -n '/^Usage:/p'
+Usage: xpd optimize drop [OPTIONS] --reason <REASON> <FIX>
 ```

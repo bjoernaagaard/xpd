@@ -351,6 +351,7 @@ enum Cmd {
     ChartReview(crate::chart_review::ChartReviewArgs),
     Untangle(crate::untangle::UntangleArgs),
     Optimize(crate::optimize::OptimizeArgs),
+    Harden(crate::harden::HardenArgs),
     /// Serve the runs of `xpd untangle`, `xpd optimize`, and `xpd chart-review` from a shared PostgreSQL store.
     #[cfg(feature = "ledger-distributed")]
     #[command(subcommand)]
@@ -482,6 +483,7 @@ pub fn run() -> ExitCode {
         } => command_result(graph(&paths, format.unwrap_or(default_format))),
         Cmd::ChartReview(args) => command_result(args.run(default_format)),
         Cmd::Untangle(args) => command_result(args.run(default_format)),
+        Cmd::Harden(args) => command_result(args.run(default_format)),
         Cmd::Optimize(args) => command_result(args.run(default_format)),
         #[cfg(feature = "ledger-distributed")]
         Cmd::Ledger(LedgerCommand::Worker(args)) => {

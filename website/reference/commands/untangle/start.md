@@ -1,10 +1,10 @@
-Start a refactor run. xpd records the commit that is checked out, the paths and each `--check` command, runs each check once, and counts the findings. Give a check for each command the project checks itself with. A check that fails at the start gates nothing. The tracked files must match the commit, and a run that is not finished is kept unless you pass `--restart`.
+Record the current commit, paths and project checks. Start from a clean tracked tree.
 
-The [`xpd untangle`](../../untangle/#a-recorded-run) page shows a whole run.
+Run `xpd untangle start . --check "your-project-check"`.
 
 ## Example
 
 ```console
-$ xpd untangle start --help
-...
+$ xpd untangle start --help | sed -n '/^Usage:/p'
+Usage: xpd untangle start [OPTIONS] [PATHS]...
 ```

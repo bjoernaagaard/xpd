@@ -17,7 +17,7 @@ sequenceDiagram
     Hook-->>Agent: Brief (packs, style, pipelines, commands)
     You->>Client: Prompt
     Client->>Hook: UserPromptSubmit
-    Hook-->>Agent: Matching playbook, chart-review, untangle, optimize, or open issues
+    Hook-->>Agent: Matching playbook, chart-review, untangle, harden, optimize, or open issues
     Agent->>Client: Edit file.py
     Client->>Hook: PostToolUse
     Hook-->>Agent: Issues in file.py (exit 2)
@@ -57,13 +57,13 @@ xpd repository (loaded as a plugin)
 ├── .agents/plugins/marketplace.json    Codex marketplace listing
 ├── hooks/hooks.json                    runs xpd hook on SessionStart, UserPromptSubmit, PostToolUse, and Stop
 ├── mcp.json                            starts uvx xpd@<version> mcp
-└── skills/                             xpd, xpd-animate, xpd-chart-review, xpd-untangle, xpd-optimize, python-best-practices, python-review
+└── skills/                             xpd, xpd-animate, xpd-chart-review, xpd-untangle, xpd-optimize, xpd-harden, python-best-practices, python-review
 ```
 
 | Hook event | What `xpd hook` does |
 | --- | --- |
 | `SessionStart` | Records HEAD and profile baseline, then prints a short project brief |
-| `UserPromptSubmit` | Routes chart, data file, untangle, optimize, refactor, or animation prompts to the right command or playbook |
+| `UserPromptSubmit` | Routes chart, data file, untangle, harden, optimize, refactor, or animation prompts to the right command or playbook |
 | `PostToolUse` | Lints the edited file (`Edit`, `Write`, or Codex `apply_patch`) and returns issues immediately |
 | `Stop` | Lints every Python file changed in the session and holds the turn if errors, warnings, or profile drift remain |
 
@@ -138,7 +138,8 @@ mkdir -p .claude/skills/xpd && xpd skill > .claude/skills/xpd/SKILL.md
 | `xpd` | When to run each `xpd` command |
 | `xpd-chart-review` | Recorded chart and table review workflow against Tufte's book driven by `xpd chart-review` |
 | `xpd-untangle` | Whole-codebase decoupling workflow driven by `xpd untangle` |
-| `xpd-optimize` | Structural and performance simplification workflow driven by `xpd optimize` |
+| `xpd-optimize` | Measured performance workflow driven by `xpd optimize` |
+| `xpd-harden` | Reliability review and determinism gate driven by `xpd harden` |
 | `xpd-animate` | Creating and revising Manim animations with `xpd animate` |
 | `python-best-practices` | Idiomatic Python rules for writing new code |
 | `python-review` | Structured Python code review with cited rules |

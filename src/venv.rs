@@ -178,6 +178,12 @@ pub(crate) fn project_python() -> PathBuf {
         .unwrap_or_else(|| PathBuf::from("python3"))
 }
 
+pub(crate) fn project_python_at(directory: &Path) -> PathBuf {
+    Venv::find_from(directory)
+        .and_then(|venv| venv.python())
+        .unwrap_or_else(project_python)
+}
+
 fn path_python() -> Option<PathBuf> {
     let path = env::var_os("PATH")?;
     env::split_paths(&path)

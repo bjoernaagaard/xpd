@@ -171,10 +171,7 @@ pub(super) fn facts(path: &Path, root: &Root) -> Facts {
             "if_statement" if !in_test => facts.branches.extend(one_value(&node)),
             _ => {}
         }
-        let waits = if in_test { None } else { wait(&node) };
-        let found = waits
-            .or_else(|| special_case(&node))
-            .or_else(|| link(&node, &modules));
+        let found = link(&node, &modules);
         local.extend(found.map(|(kind, evidence, weight)| (kind, line(&node), evidence, weight)));
     }
     facts.local.extend(local);
@@ -209,47 +206,6 @@ fn definitions(root: &Root) -> Vec<Definition> {
         });
     }
     definitions
-}
-
-/// The fixed wait or the retry that `node` is, with its evidence and the strength of it.
-fn wait(node: &Node<'_>) -> Option<(Kind, String, usize)> {
-    let evidence = match node.kind().as_ref() {
-        "call" if sleeps(node) => "This waits a fixed time for something else to finish.",
-        "decorator" => {
-            let written = node.text().to_lowercase();
-            (written.contains("retry") || written.contains("backoff"))
-                .then_some("This runs the function again when it fails.")?
-        }
-        _ => return None,
-    };
-    Some((Kind::SleepOrRetry, evidence.to_owned(), 1))
-}
-
-/// The special case that `node` is, with its evidence and the strength of it.
-fn special_case(node: &Node<'_>) -> Option<(Kind, String, usize)> {
-    match node.kind().as_ref() {
-        "except_clause" if swallows(node) => Some((
-            Kind::SwallowedException,
-            "This catches an exception and does nothing with it.".to_owned(),
-            1,
-        )),
-        "with_item" => {
-            let suppresses = node.field("value").is_some_and(|value| {
-                value.kind() == "call"
-                    && value.field("function").is_some_and(|function| {
-                        matches!(function.text().as_ref(), "suppress" | "contextlib.suppress")
-                    })
-            });
-            suppresses.then(|| {
-                (
-                    Kind::SwallowedException,
-                    "This suppresses an exception and does nothing with it.".to_owned(),
-                    1,
-                )
-            })
-        }
-        _ => None,
-    }
 }
 
 /// The link that `node` makes to state outside its function or to the inside of another
@@ -377,16 +333,6 @@ fn call(node: &Node<'_>) -> Option<Call> {
     Some(call)
 }
 
-/// Whether `call` is `time.sleep(...)` or `asyncio.sleep(...)`, under either name.
-fn sleeps(call: &Node<'_>) -> bool {
-    call.field("function").is_some_and(|function| {
-        matches!(
-            function.text().as_ref(),
-            "time.sleep" | "sleep" | "asyncio.sleep"
-        )
-    })
-}
-
 /// The `if` with no `elif` that compares something with one string. An `if` with `elif`
 /// branches is a switch over the values, which is no special case.
 fn one_value(statement: &Node<'_>) -> Option<Branch> {
@@ -409,23 +355,6 @@ fn one_value(statement: &Node<'_>) -> Option<Branch> {
             named: children.iter().any(|child| child.kind() == "identifier"),
         })
     })
-}
-
-/// Whether the `except` clause only passes, continues or holds `...`.
-fn swallows(clause: &Node<'_>) -> bool {
-    let Some(block) = clause.children().find(|child| child.kind() == "block") else {
-        return false;
-    };
-    let mut statements = block
-        .children()
-        .filter(|child| child.is_named() && child.kind() != "comment")
-        .peekable();
-    statements.peek().is_some()
-        && statements.all(|statement| match statement.kind().as_ref() {
-            "pass_statement" | "continue_statement" => true,
-            "expression_statement" => statement.text() == "...",
-            _ => false,
-        })
 }
 
 /// The findings that follow from the modules together. `changes` holds the commits that changed

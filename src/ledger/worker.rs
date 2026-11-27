@@ -662,6 +662,7 @@ impl Worker {
         let (broken, after, lines_after) = {
             let _in = InFolder::enter(&after_tree)?;
             let broken = broken_checks(
+                command,
                 run.checks
                     .iter()
                     .map(|check| (check.command.as_str(), check.passed)),
