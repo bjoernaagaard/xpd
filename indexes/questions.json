@@ -1,5 +1,9 @@
 [
   {
+    "query": "review model validation and calibration",
+    "expected": "xpd/recipe/model-review"
+  },
+  {
     "query": "time series bootstrap for cross validation",
     "expected": "mapie.subsample.BlockBootstrap",
     "answer": "I simply meant what classes and modules within the rules or packages we support are available."

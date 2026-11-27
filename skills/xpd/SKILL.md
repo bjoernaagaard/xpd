@@ -106,3 +106,5 @@ the shell also when the server is connected. Its `discovery_gate`, `contract` an
 judge a run from a data file to a saved model, and `gates` runs the stages itself. Its three
 `show_` tools draw what `xpd check`, `xpd graph` and `xpd profile` find, in a host that renders
 apps.
+
+For validation design, baseline comparisons and calibration, run `xpd model-review` and follow the `xpd-model-review` skill.

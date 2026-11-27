@@ -29,6 +29,7 @@ mod ledger;
 mod lsp;
 mod mcp;
 mod migration;
+mod model_review;
 mod names;
 mod nodes;
 mod optimize;

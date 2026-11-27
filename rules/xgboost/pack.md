@@ -12,6 +12,7 @@ The XGBoost pack checks native Booster and scikit-learn estimator code against [
 
 - quantile-eval-without-train-ref
 - reused-early-stopping-callback
+- early-stop-on-test
 
 ## Prediction
 

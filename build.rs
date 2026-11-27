@@ -78,8 +78,6 @@ fn main() -> Result<()> {
     let mut packs = Vec::new();
     let mut docs = BTreeMap::new();
     let mut own = None;
-    // `xpd check --rule` and the old links of the form rules.html#<id>, which the site sends on
-    // to the rule's page, find a rule by its id alone, so an id belongs to one pack.
     let mut owners = BTreeMap::new();
     for pack in sorted_entries(root)?.iter().filter(|path| path.is_dir()) {
         let module = utf8_name(pack)?;
@@ -88,12 +86,7 @@ fn main() -> Result<()> {
             own = Some(doc_sources(&rule_markdown(pack, &ids)?));
             continue;
         }
-        let (source, pack_docs) = pack_source(pack)?;
-        for id in pack_docs.keys() {
-            if let Some(first) = owners.insert(id.clone(), module.to_owned()) {
-                bail!("rules/{module}: the id {id} is also a rule of rules/{first}");
-            }
-        }
+        let (source, pack_docs) = pack_source(pack, &mut owners)?;
         packs.push(source);
         docs.insert(module.to_owned(), pack_docs);
     }
@@ -110,7 +103,10 @@ fn write(target: &Path, source: &str) -> Result<()> {
 
 /// The `PackSource` literal for one pack folder, and the Markdown of each of its rules and
 /// package checks by id.
-fn pack_source(pack: &Path) -> Result<(String, BTreeMap<String, String>)> {
+fn pack_source<'a>(
+    pack: &'a Path,
+    owners: &mut BTreeMap<String, &'a str>,
+) -> Result<(String, BTreeMap<String, String>)> {
     let module = utf8_name(pack)?;
     ensure!(
         module == "feature-review"
@@ -138,14 +134,18 @@ fn pack_source(pack: &Path) -> Result<(String, BTreeMap<String, String>)> {
             manifest = format!("Some({include})");
             let data: Value =
                 ast_grep_config::from_str(&yaml).with_context(|| file.display().to_string())?;
-            ids.extend(
-                data.get("packages")
-                    .and_then(Value::as_array)
-                    .into_iter()
-                    .flatten()
-                    .filter_map(yaml_id)
-                    .map(str::to_owned),
-            );
+            for id in data
+                .get("packages")
+                .and_then(Value::as_array)
+                .into_iter()
+                .flatten()
+                .filter_map(yaml_id)
+            {
+                if let Some(first) = owners.insert(id.to_owned(), module) {
+                    bail!("rules/{module}: the id {id} is also a rule of rules/{first}");
+                }
+                ids.push(id.to_owned());
+            }
         } else {
             let id = name.strip_suffix(".yml").with_context(|| {
                 format!("rules/{module}/{name}: a pack holds {MANIFEST}, {PACK_PAGE}, <rule id>.yml and <rule id>.md files")
@@ -160,10 +160,28 @@ fn pack_source(pack: &Path) -> Result<(String, BTreeMap<String, String>)> {
             rules.push(format!(
                 "            RuleSource {{ path: {path:?}, yaml: {include} }},\n"
             ));
-            ids.push(id.to_owned());
+            let public_id = |doc: &Value| {
+                doc["metadata"]["publicId"]
+                    .as_str()
+                    .unwrap_or(id)
+                    .to_owned()
+            };
+            let public = public_id(&documents[0]);
+            ensure!(
+                documents.iter().all(|doc| public_id(doc) == public),
+                "rules/{module}/{name}: publicId must agree across documents"
+            );
+            if let Some(first) = owners.insert(id.to_owned(), module) {
+                bail!("rules/{module}: the id {id} is also a rule of rules/{first}");
+            }
+            ids.push(public);
         }
     }
     ensure!(!rules.is_empty(), "rules/{module}: the pack has no rules");
+    ensure!(
+        ids.iter().collect::<BTreeSet<_>>().len() == ids.len(),
+        "rules/{module}: duplicate public rule ID"
+    );
     let docs = rule_markdown(pack, &ids)?;
     let source = format!(
         "    PackSource {{\n        module: {module:?},\n        manifest: {manifest},\n        rules: &[\n{}        ],\n        utils: &[\n{}        ],\n        docs: &[\n{}        ],\n    }},\n",

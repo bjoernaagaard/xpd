@@ -1,0 +1,11 @@
+id: early-stop-on-test
+language: python
+severity: warning
+message: Early stopping uses the same holdout later scored as the final test. Stop on a separate development validation pair and score the test pair once.
+rule:
+  pattern: $MODEL.fit($$$ARGS)
+  has:
+    field: arguments
+    has:
+      kind: keyword_argument
+      has: {field: name, regex: "^(eval_set|eval_X)$"}
