@@ -12,6 +12,7 @@ mod check;
 mod cli;
 mod commands;
 mod data_prep;
+mod discover;
 mod docs;
 pub mod doctor;
 mod embed;

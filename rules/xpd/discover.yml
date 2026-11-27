@@ -1,0 +1,26 @@
+facts:
+  - id: check-result
+    text: "Whether the project checks pass."
+    how: "Each check command runs at start and at each gate. A check that failed at start gates nothing."
+  - id: defined-once
+    text: "How many public names one module alone defines, out of all public names."
+    how: "Counted at start and at each gate. A rename that makes two modules define one name adds a name-collision finding, which fails the gate."
+questions:
+  - id: one-search
+    text: "Does one search for each public name in this module land on its definition?"
+    look: "Name-collision and generic-verb-name findings in the module, and a search for each public name."
+  - id: search-words
+    text: "Does the docstring of each public name hold the words someone would search for, spelled out with spaces?"
+    look: "The first line of each docstring, and the phrase a reader would type to find the code."
+  - id: one-spelling
+    text: "Is each concept in this module spelled one way, the same way as in the modules it imports?"
+    look: "Abbreviations and synonyms of the same thing, such as org_id and organization_id, across the module and its imports."
+  - id: one-concept
+    text: "Does this module hold one concept, and does its file name name that concept?"
+    look: "Vague-module-name findings, and whether one question names everything the module defines."
+  - id: thin-coordinator
+    text: "Does each line of a coordinator in this module call a well-named function in one step, with the work done there?"
+    look: "Long functions that run several steps inline, and steps that have no name of their own."
+  - id: name-matches-behavior
+    text: "Does each name still say what its code does, after the last change to the code?"
+    look: "The git history of each public function, and names whose words no longer match the body."

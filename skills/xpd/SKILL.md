@@ -22,6 +22,7 @@ Each review command surveys mechanical findings and a per-entity checklist, then
 | `xpd untangle <paths>` | Structural coupling, hidden links, copies, and dead weight | `xpd-untangle` |
 | `xpd optimize <paths>` | Measured CPU, memory, and I/O waste with `--bench` and profiler adapters | `xpd-optimize` |
 | `xpd harden <paths>` | Silent failures, fixed waits, retries, and unreliable tests with a determinism gate | `xpd-harden` |
+| `xpd discover <paths>` | Names that several modules define, bare verb names, and names and messages that a text search misses | `xpd-discover` |
 
 ## Everyday commands
 

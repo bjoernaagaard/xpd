@@ -66,6 +66,10 @@ The recorded workflow for preparing features and targets with [`xpd data-prep`](
 
 The recorded workflow for measuring time series and candidate groups with [`xpd ts-review`](../../commands/ts-review/).
 
+## skill://xpd-discover/
+
+The recorded workflow for making a codebase findable by text search with [`xpd discover`](../../commands/discover/). It covers name collisions, bare verb names and the gate that rejects a rename that collides.
+
 ## skill://xpd-harden/
 
 The reliability skill shows how to review silent failures, fixed waits and unreliable tests with `xpd harden`. It covers the checklist and the gate that repeats the first project check.

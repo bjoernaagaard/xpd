@@ -8,7 +8,7 @@ Read the full documentation at <https://bjoernaagaard.github.io/xpd/>.
 flowchart LR
     Code["Python and TSX files"] --> Check["Lint and fix (xpd check, hook, lsp)"]
     Code --> Search["Search APIs and playbooks (xpd find, api)"]
-    Code --> Ledgers["Recorded ledgers (chart-review, data-prep, ts-review, feature-review, model-review, opt-review, untangle, optimize, harden)"]
+    Code --> Ledgers["Recorded ledgers (chart-review, data-prep, ts-review, feature-review, model-review, opt-review, untangle, optimize, harden, discover)"]
     Code --> Verify["Dataflow and proof (xpd graph, profile, equiv, refit)"]
     Code --> Agent["Connect agents (xpd mcp, plugin, animate)"]
 ```
@@ -82,7 +82,7 @@ Run `xpd <command> -h` or read the [command reference](https://bjoernaagaard.git
 | Area | Commands | What they do |
 | --- | --- | --- |
 | Lint and guard | `check`, `rules`, `hook`, `lsp` | Lint files, list rules, guard agent edits, and serve editor diagnostics |
-| Code ledgers | `untangle`, `optimize`, `harden` | Audit structural coupling, measured CPU or memory waste, and reliability or flaky tests |
+| Code ledgers | `untangle`, `optimize`, `harden`, `discover` | Audit structural coupling, measured CPU or memory waste, reliability or flaky tests, and names a text search does not find |
 | Domain ledgers | `chart-review`, `data-prep`, `ts-review`, `feature-review`, `model-review`, `opt-review` | Audit charts and tables, data prep, time series, features, model validation, and numerical optimization |
 | Library lookup | `find`, `api`, `index` | Search indexed library symbols, rules, and playbooks for a task |
 | Dataflow and proof | `graph`, `graph map`, `graph impact`, `profile`, `equiv`, `refit` | Trace dataflow, plan pandas to Polars migrations, profile files, and prove refactors or model refits |

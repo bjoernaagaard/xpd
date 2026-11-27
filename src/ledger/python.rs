@@ -13,6 +13,26 @@ pub(crate) fn root_name(node: &Node<'_>) -> Option<String> {
     }
 }
 
+/// The functions and classes at the top of `module`, each with whether a decorator wraps it.
+pub(crate) fn top_level_definitions<'t>(module: &Node<'t>) -> Vec<(Node<'t>, bool)> {
+    module
+        .children()
+        .filter_map(|item| {
+            let decorated = item.kind() == "decorated_definition";
+            let definition = if decorated {
+                item.field("definition")?
+            } else {
+                item
+            };
+            matches!(
+                definition.kind().as_ref(),
+                "function_definition" | "class_definition"
+            )
+            .then_some((definition, decorated))
+        })
+        .collect()
+}
+
 /// The last name of what `call` calls, as `groupby` in `frame.groupby(keys)`.
 pub(crate) fn called(call: &Node<'_>) -> Option<String> {
     let function = call.field("function")?;

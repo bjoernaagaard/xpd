@@ -180,32 +180,18 @@ pub(super) fn facts(path: &Path, root: &Root) -> Facts {
 
 /// The functions and classes at the top of the module in `root`.
 fn definitions(root: &Root) -> Vec<Definition> {
-    let mut definitions = Vec::new();
-    for item in root.root().children() {
-        let decorated = item.kind() == "decorated_definition";
-        let definition = if decorated {
-            item.field("definition")
-        } else {
-            Some(item.clone())
-        };
-        let Some(definition) = definition else {
-            continue;
-        };
-        let class = definition.kind() == "class_definition";
-        if !class && definition.kind() != "function_definition" {
-            continue;
-        }
-        let Some(name) = definition.field("name") else {
-            continue;
-        };
-        definitions.push(Definition {
-            name: name.text().into_owned(),
-            line: line(&definition),
-            decorated,
-            parameters: if class { None } else { parameters(&definition) },
-        });
-    }
-    definitions
+    crate::ledger::python::top_level_definitions(&root.root())
+        .into_iter()
+        .filter_map(|(definition, decorated)| {
+            let class = definition.kind() == "class_definition";
+            Some(Definition {
+                name: definition.field("name")?.text().into_owned(),
+                line: line(&definition),
+                decorated,
+                parameters: if class { None } else { parameters(&definition) },
+            })
+        })
+        .collect()
 }
 
 /// The link that `node` makes to state outside its function or to the inside of another
