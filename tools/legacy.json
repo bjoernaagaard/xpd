@@ -544,7 +544,7 @@
   "src/steps.rs": "215,233,245-246,278,364,369,495,557,961,1081,1090,1218,1226,1284,1349",
   "src/venv.rs": "69",
   "src/workspace.rs": "79",
-  "website/astro.config.mjs": "50,55-56,59-60,63,80",
+  "website/astro.config.mjs": "50,55-56,80",
   "website/ec.config.mjs": "4-5",
   "website/scripts/examples.mjs": "1-21,40,57,73,76,88,105,109,114,123-124,135",
   "website/scripts/exec.mjs": "1",

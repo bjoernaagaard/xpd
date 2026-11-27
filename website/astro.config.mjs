@@ -1,12 +1,12 @@
 import { satteri } from '@astrojs/markdown-satteri';
 import starlight from '@astrojs/starlight';
 import { defineConfig } from 'astro/config';
-import mermaid from 'astro-mermaid';
 import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { editUrl, REPO_URL } from './src/markdown.mjs';
 import { PACKS, packPage } from './src/packs.mjs';
+import { peleMermaidPlugin } from './src/pele.mjs';
 
 function rulePackSidebar() {
   const generated = join(dirname(fileURLToPath(import.meta.url)), '.astro', 'rule-packs.json');
@@ -24,15 +24,17 @@ export default defineConfig({
   // `mise run docs` builds the site into site/ at the root of the repository, which the Pages
   // workflow uploads.
   outDir: '../site',
-  // Keep straight quotes, dashes and dots as written, so text copied from a page matches what a
-  // reader types.
-  markdown: { processor: satteri({ features: { smartPunctuation: false } }) },
+  markdown: {
+    processor: satteri({
+      features: { smartPunctuation: false },
+      mdastPlugins: [peleMermaidPlugin()],
+    }),
+  },
   integrations: [
-    // astro-mermaid has to come before Starlight, so it sees the mermaid code blocks first.
-    mermaid({ autoTheme: true, enableLog: false }),
     starlight({
       title: 'xpd',
       description: 'A fast linter for Python library habits.',
+      customCss: ['./src/styles/pele.css'],
       social: [{ icon: 'github', label: 'GitHub', href: REPO_URL }],
       editLink: { baseUrl: editUrl('website/') },
       sidebar: [
