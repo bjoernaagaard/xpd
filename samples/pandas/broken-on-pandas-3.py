@@ -476,4 +476,4 @@ def removed_names(df):
 @case
 def current_names(df):
     pd.set_option("display.max_rows", 100)
-    return df["k"].value_counts(), df.index.is_monotonic_increasing, df.to_numpy(), pd.json_normalize([{"a": 1}]), pd.to_numeric(df["a"], errors="coerce"), list(df.items())
+    return df["k"].value_counts(), df.index.is_monotonic_increasing, df.to_numpy(), pd.json_normalize([{"a": 1}]), pd.to_numeric(df["a"], errors="coerce"), list(df.items())  # xpd: silent-dtype-coercion
