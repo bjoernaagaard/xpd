@@ -245,8 +245,16 @@ impl FeatureReviewArgs {
             static_survey::survey,
             |ledger| {
                 let runtime = fold_facts::facts_text(&ledger.read.facts);
+                let manifest = if ledger.read.has_manifest() {
+                    ""
+                } else {
+                    "No feature-review.json at the Git root, so only the pack and encoder rules ran. \
+                     Commit one with the target, prediction cutoff, baseline and candidates to add \
+                     the rolling and duplicate checks and the questions for each feature. \
+                     https://bjoernaagaard.github.io/xpd/reference/commands/feature-review/\n"
+                };
                 format!(
-                    "xpd feature-review: {}, {} checklist items\n{runtime}",
+                    "xpd feature-review: {}, {} checklist items\n{manifest}{runtime}",
                     ledger.count(),
                     ledger.checklist.len()
                 )
