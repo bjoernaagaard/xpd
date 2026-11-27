@@ -12,13 +12,16 @@ concurrency:
   cancel-in-progress: true
 jobs:
   lefthook:
-    runs-on: ubuntu-latest
+    runs-on: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && fromJSON('["self-hosted", "homelab"]') || 'ubuntu-latest' }}
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
-      - uses: ./.github/actions/build-setup
+      - if: runner.environment != 'self-hosted'
+        uses: ./.github/actions/build-setup
+      - if: runner.environment == 'self-hosted'
+        run: mise trust --quiet
       - run: lefthook run pre-commit --all-files --force --no-auto-install
       - run: node examples/verify_stop_ownership.mjs
       # The formatters fix and stage files, so any change from HEAD means a file was not formatted.
