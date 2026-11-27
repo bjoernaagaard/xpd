@@ -158,7 +158,7 @@ impl FeatureEvidence {
                 answer.item
             );
         }
-        if question == "value" && !hypothesis {
+        if question == "value" {
             ensure!(
                 fold_scores(&self.facts, id).count() >= 2,
                 "{} needs measured fold lift evidence",
