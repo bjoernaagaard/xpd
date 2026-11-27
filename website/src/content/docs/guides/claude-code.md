@@ -57,17 +57,17 @@ xpd repository (loaded as a plugin)
 ├── .agents/plugins/marketplace.json    Codex marketplace listing
 ├── hooks/hooks.json                    runs xpd hook on SessionStart, UserPromptSubmit, PostToolUse, and Stop
 ├── mcp.json                            starts uvx xpd@<version> mcp
-└── skills/                             xpd, xpd-animate, xpd-chart-review, xpd-data-prep, xpd-ts-review, xpd-feature-review, xpd-opt-review, xpd-untangle, xpd-optimize, xpd-harden, python-best-practices, python-review
+└── skills/                             xpd, xpd-animate, xpd-chart-review, xpd-data-prep, xpd-ts-review, xpd-feature-review, xpd-model-review, xpd-opt-review, xpd-untangle, xpd-optimize, xpd-harden, python-best-practices, python-review
 ```
 
 | Hook event | What `xpd hook` does |
 | --- | --- |
 | `SessionStart` | Records HEAD and profile baseline, then prints a short project brief |
-| `UserPromptSubmit` | Routes chart, data preparation, time series, feature engineering, data file, untangle, harden, optimize, refactor, or animation prompts to the right command or playbook |
+| `UserPromptSubmit` | Routes chart, data preparation, time series, feature engineering, model validation, numerical optimization, data file, untangle, harden, optimize, refactor, or animation prompts to the right command or playbook |
 | `PostToolUse` | Lints the edited file (`Edit`, `Write`, or Codex `apply_patch`) and returns issues immediately |
 | `Stop` | Lints every Python file changed in the session and holds the turn if errors, warnings, or profile drift remain |
 
-See [`xpd hook`](../../commands/hook/#on-each-prompt) for the full prompt routing flowchart and [`xpd find`](../../commands/find/#playbooks) for the five playbooks.
+See [`xpd hook`](../../commands/hook/#on-each-prompt) for the full prompt routing flowchart and [`xpd find`](../../commands/find/#playbooks) for the seven playbooks.
 
 ## Hold turns on house style
 
@@ -140,6 +140,7 @@ mkdir -p .claude/skills/xpd && xpd skill > .claude/skills/xpd/SKILL.md
 | `xpd-data-prep` | Recorded data preparation, split, and scaling review driven by `xpd data-prep` |
 | `xpd-ts-review` | Recorded time series structure, seasonality, and grouping review driven by `xpd ts-review` |
 | `xpd-feature-review` | Recorded feature mechanism, cutoff, and fold-lift review driven by `xpd feature-review` |
+| `xpd-model-review` | Recorded model validation, baseline, calibration, and coverage review driven by `xpd model-review` |
 | `xpd-opt-review` | Recorded numerical optimization and portfolio review driven by `xpd opt-review` |
 | `xpd-untangle` | Whole-codebase decoupling workflow driven by `xpd untangle` |
 | `xpd-optimize` | Measured performance workflow driven by `xpd optimize` |

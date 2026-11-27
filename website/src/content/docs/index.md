@@ -93,6 +93,8 @@ Line 6 now mutates `df` in place under pandas copy-on-write, and line 7 returns 
 | Harden error handling and tests | [Harden Python code](guides/harden/) |
 | Diagnose time series before forecasting | [Review time series before forecasting](guides/ts-review/) |
 | Audit feature mechanisms and fold lift | [Review model features](guides/feature-review/) |
+| Audit model validation and calibration | [Review model validation](guides/model-review/) |
+| Audit CVXPY, pymoo, and skfolio solves | [Review numerical optimization](guides/opt-review/) |
 | Render editable Manim concept animations | [Animate a concept with Manim](guides/animate/) |
 | Author custom project rules or a library pack | [Write a rule](guides/write-a-rule/) |
 | Look up flags and exit codes for any command | [Commands](commands/) |
