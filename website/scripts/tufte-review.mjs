@@ -1,4 +1,5 @@
 const runtimeKinds = {
+  compare: ['free-facet-scales'],
   context: ['missing-context'],
   'color-deficient': ['red-green-only'],
   'deflate-money': ['undeflated-money'],
@@ -49,8 +50,9 @@ const predicates = {
     ['percent units', required(facts, 'table-structure.headers', strings).some((header) => /%|percent/i.test(header))],
   ],
   'many-numbers': (variant, facts, beforeFacts) => {
-    const density = required(facts, 'values.per_square_inch', positive);
-    return [['greater value density', variant === 'after' && density > required(beforeFacts, 'values.per_square_inch', positive)]];
+    const beforeDensity = required(beforeFacts, 'values.per_square_inch', Number.isFinite);
+    const density = required(facts, 'values.per_square_inch', Number.isFinite);
+    return [['greater value density', variant === 'after' && density > beforeDensity]];
   },
 };
 

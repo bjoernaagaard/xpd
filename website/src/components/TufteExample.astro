@@ -3,6 +3,14 @@ const { id, example, table, version, publicVariants, csv, rules } = Astro.props;
 const base = import.meta.env.BASE_URL.replace(/\/$/, '');
 const assets = `${base}/tufte-examples`;
 const variants = ['before', 'after'];
+type Cell = string | number | null;
+const grouped = table?.columns[0] === 'Topic';
+const valueGroups = new Map<Cell, Cell[][]>();
+for (const row of (table?.rows ?? []) as Cell[][]) {
+  const topic = grouped ? row[0] : null;
+  if (!valueGroups.has(topic)) valueGroups.set(topic, []);
+  valueGroups.get(topic)!.push(grouped ? row.slice(1) : row);
+}
 ---
 <p>{example.question}</p>
 <p>{example.source}</p>
@@ -19,6 +27,7 @@ const variants = ['before', 'after'];
         <>
           <div class="chart" data-plotly-spec={`${assets}/${id}/${variant}.json`}
             data-plotly-bundle={`${assets}/plotly-${version}.min.js`} aria-hidden="true"></div>
+          <label data-plotly-frames hidden>Frame <select></select></label>
           <p data-plotly-error hidden>Interactive chart unavailable.</p>
         </>
       )}
@@ -31,17 +40,20 @@ const variants = ['before', 'after'];
 <h2 id="values">Values</h2>
 <div id="example-values">
   <p>{example.before.summary}</p>
-  <p>{example.after.summary}</p>
+  {example.after.summary !== example.before.summary && <p>{example.after.summary}</p>}
 </div>
 {table && (
   <table>
     <caption>Values used in both charts</caption>
-    <thead><tr>{table.columns.map((column: string) => <th scope="col">{column}</th>)}</tr></thead>
-    <tbody>
-      {table.rows.map(([label, ...cells]: (string | number | null)[]) => (
-        <tr><th scope="row">{label ?? 'Missing'}</th>{cells.map((cell) => <td>{cell ?? 'Missing'}</td>)}</tr>
-      ))}
-    </tbody>
+    <thead><tr>{table.columns.slice(grouped ? 1 : 0).map((column: string) => <th scope="col">{column}</th>)}</tr></thead>
+    {[...valueGroups].map(([topic, rows]) => (
+      <tbody>
+        {topic !== null && <tr><th scope="rowgroup" colspan={table.columns.length - 1}>{topic}</th></tr>}
+        {rows.map(([label, ...cells]) => (
+          <tr><th scope="row">{label ?? 'Missing'}</th>{cells.map((cell) => <td>{cell ?? 'Missing'}</td>)}</tr>
+        ))}
+      </tbody>
+    ))}
   </table>
 )}
 {csv && <p><a href={`${assets}/${id}/values.csv`} download>Download all values as CSV</a></p>}
@@ -78,14 +90,15 @@ const variants = ['before', 'after'];
 
 <script>
   type FigureSpec = {
-    data: unknown[];
+    data: { type?: string }[];
     layout: { width?: number; height?: number };
-    frames?: unknown[];
+    frames?: { name: string }[];
   };
 
   type Plotly = {
     newPlot: (chart: HTMLElement, spec: FigureSpec & { config: object }) => Promise<unknown>;
     relayout: (chart: HTMLElement, layout: object) => Promise<unknown>;
+    animate: (chart: HTMLElement, frames: string[], options: object) => Promise<unknown>;
   };
 
   let bundle: Promise<Plotly> | undefined;
@@ -111,16 +124,33 @@ const variants = ['before', 'after'];
       const spec: FigureSpec = await response.json();
       const { width = 700, height = 450 } = spec.layout ?? {};
       chart.dataset.plotlyLoading = '';
+      const hasTable = spec.data.some(({ type }) => type === 'table');
       const size = () => {
         const available = Math.min(width, chart.clientWidth);
-        return { width: available, height: Math.round(available * height / width) };
+        const chartHeight = Math.max(Math.min(height, 320), Math.round(available * height / width));
+        return { width: available, height: hasTable ? height : chartHeight };
       };
       let lastWidth = size().width;
+      const frames = spec.frames ?? [];
+      const frameControls = frames.length ? { updatemenus: [], sliders: [] } : {};
       await plotly.newPlot(chart, {
         ...spec,
-        layout: { ...spec.layout, ...size() },
+        layout: { ...spec.layout, ...frameControls, ...size() },
         config: { displayModeBar: false, responsive: true },
       });
+      if (frames.length) {
+        const label = chart.parentElement!.querySelector<HTMLLabelElement>('[data-plotly-frames]')!;
+        const select = label.querySelector('select')!;
+        select.replaceChildren(...frames.map(({ name }) => new Option(name, name)));
+        select.addEventListener('change', () => {
+          void plotly.animate(chart, [select.value], {
+            mode: 'immediate',
+            frame: { duration: 0 },
+            transition: { duration: 0 },
+          }).catch(console.error);
+        });
+        label.hidden = false;
+      }
       chart.dataset.plotlyReady = '';
       new ResizeObserver(() => {
         const dimensions = size();
