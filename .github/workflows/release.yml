@@ -1,7 +1,3 @@
-# Builds wheels for xpd on native runners on each push to main. A pushed v* tag builds nothing.
-# It publishes the wheels that the run on main built for the same commit to PyPI with trusted
-# publishing, and attaches them to a GitHub Release. A release therefore compiles once, and the
-# tag waits only for the upload. Started from `maturin generate-ci github` (maturin 1.16).
 name: Release
 
 on:
@@ -29,113 +25,77 @@ concurrency:
   cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/') }} # jactionlint ignore=concurrency-cancels-release
 
 jobs:
-  # mise.toml pins Rust. Runners ship older toolchains, so every build installs this one.
-  toolchain:
+  linux:
+    name: linux + musllinux + sdist (homelab)
     if: ${{ !startsWith(github.ref, 'refs/tags/') }}
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    outputs:
-      rust: ${{ steps.read.outputs.rust }}
+    runs-on: [self-hosted, homelab]
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - id: read
+      - name: Build sdist and Linux wheels
         run: |
-          python3 - <<'PYTHON' >> "$GITHUB_OUTPUT"
-          import tomllib
-          from pathlib import Path
-
-          rust = tomllib.loads(Path("mise.toml").read_text())["tools"]["rust"]
-          print("rust=" + (rust if isinstance(rust, str) else rust["version"]))
-          PYTHON
-
-  wheels:
-    name: ${{ matrix.name }}
-    if: ${{ !startsWith(github.ref, 'refs/tags/') }}
-    needs: [toolchain]
-    runs-on: ${{ matrix.runner }}
-    timeout-minutes: 20
-    strategy:
-      fail-fast: true
-      matrix:
-        include:
-          - name: linux (x86_64)
-            runner: ubuntu-22.04
-            target: x86_64
-            args: --release --out dist --zig
-            manylinux: auto
-            artifact: wheels-linux-x86_64
-            smoke: true
-          - name: linux (aarch64)
-            runner: ubuntu-22.04
-            target: aarch64
-            args: --release --out dist --zig
-            manylinux: auto
-            artifact: wheels-linux-aarch64
-            smoke: false
-          - name: musllinux (x86_64)
-            runner: ubuntu-22.04
-            target: x86_64
-            args: --release --out dist --zig
-            manylinux: musllinux_1_2
-            artifact: wheels-musllinux-x86_64
-            smoke: false
-          - name: musllinux (aarch64)
-            runner: ubuntu-22.04
-            target: aarch64
-            args: --release --out dist --zig
-            manylinux: musllinux_1_2
-            artifact: wheels-musllinux-aarch64
-            smoke: false
-          - name: windows (x64)
-            runner: windows-latest
-            target: x64
-            args: --release --out dist
-            manylinux: ""
-            artifact: wheels-windows-x64
-            smoke: true
-          - name: macos (aarch64)
-            runner: macos-latest
-            target: aarch64
-            args: --release --out dist
-            manylinux: ""
-            artifact: wheels-macos-aarch64
-            smoke: true
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - name: Build wheels
-        # The cache comes only from runs on main, which run reviewed code, as bas also accepts.
-        uses: PyO3/maturin-action@e83996d129638aa358a18fbd1dfb82f0b0fb5d3b # v1.51.0 # jactionlint ignore=cache-poisoning
-        env:
-          MACOSX_DEPLOYMENT_TARGET: "11.0"
-        with:
-          target: ${{ matrix.target }}
-          rust-toolchain: ${{ needs.toolchain.outputs.rust }}
-          args: ${{ matrix.args }}
-          sccache: 'true'
-          manylinux: ${{ matrix.manylinux }}
+          set -euo pipefail
+          rm -rf dist dist-sdist
+          uvx maturin sdist --out dist-sdist
+          for target in x86_64-unknown-linux-gnu aarch64-unknown-linux-gnu; do
+            uvx --with ziglang maturin build --release --zig --compatibility manylinux2014 --target "$target" --out dist
+          done
+          for target in x86_64-unknown-linux-musl aarch64-unknown-linux-musl; do
+            uvx --with ziglang maturin build --release --zig --compatibility musllinux_1_2 --target "$target" --out dist
+          done
+          ls -lh dist-sdist dist
       - uses: ./.github/actions/smoke
-        if: matrix.smoke
-      - name: Upload wheels
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: ${{ matrix.artifact }}
-          path: dist
-
-  sdist:
-    if: ${{ !startsWith(github.ref, 'refs/tags/') }}
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - name: Build sdist
-        uses: PyO3/maturin-action@e83996d129638aa358a18fbd1dfb82f0b0fb5d3b # v1.51.0
-        with:
-          command: sdist
-          args: --out dist
       - name: Upload sdist
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: wheels-sdist
+          path: dist-sdist
+      - name: Upload Linux wheels
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: wheels-linux
+          path: dist
+
+  macos:
+    name: macos aarch64 (mini)
+    if: ${{ !startsWith(github.ref, 'refs/tags/') }}
+    runs-on: [self-hosted, mini]
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Build macOS wheel
+        env:
+          MACOSX_DEPLOYMENT_TARGET: "11.0"
+        run: |
+          set -euo pipefail
+          rm -rf dist
+          uvx maturin build --release --target aarch64-apple-darwin --out dist
+          ls -lh dist
+      - uses: ./.github/actions/smoke
+      - name: Upload macOS wheel
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: wheels-macos-aarch64
+          path: dist
+
+  windows:
+    name: windows (x64)
+    if: ${{ github.event_name == 'workflow_dispatch' }}
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Build Windows wheel
+        uses: PyO3/maturin-action@e83996d129638aa358a18fbd1dfb82f0b0fb5d3b # v1.51.0 # jactionlint ignore=cache-poisoning
+        with:
+          target: x64
+          args: --release --out dist
+          sccache: 'true'
+      - uses: ./.github/actions/smoke
+      - name: Upload Windows wheel
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: wheels-windows-x64
           path: dist
 
   # The run on main that built the wheels of the tagged commit. The tag is pushed after that run
