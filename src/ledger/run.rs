@@ -1460,7 +1460,9 @@ fn finish(journal: &mut Journal, place: &Place, found: Found<'_>) -> Result<bool
         return Ok(false);
     }
     journal.current_lines = surveyed.current_lines;
-    journal.feature_evidence = surveyed.feature_evidence.clone();
+    journal
+        .feature_evidence
+        .clone_from(&surveyed.feature_evidence);
     report_finish(journal, &surveyed);
     journal.finished = true;
     Ok(true)

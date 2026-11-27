@@ -620,16 +620,13 @@ fn search_source(out: &Path, entries: &[serde_json::Value]) -> Result<()> {
                 e["summary"].as_str().unwrap_or_default().to_owned(),
                 e["parameters"].to_string(),
                 e["keywords"].to_string(),
-                e["members"]
-                    .as_array()
-                    .map(|members| {
-                        members
-                            .iter()
-                            .filter_map(|m| m["summary"].as_str())
-                            .collect::<Vec<_>>()
-                            .join(" ")
-                    })
-                    .unwrap_or_default(),
+                e["members"].as_array().map_or_default(|members| {
+                    members
+                        .iter()
+                        .filter_map(|m| m["summary"].as_str())
+                        .collect::<Vec<_>>()
+                        .join(" ")
+                }),
             ]
         })
         .collect::<Vec<_>>();
