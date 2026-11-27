@@ -28,12 +28,32 @@ def make_before(data) -> go.Figure:
 
 def make_after(data) -> go.Figure:
     x, y = zip(*data, strict=True)
-    fig = go.Figure(go.Scatter(x=x, y=y, mode="lines+markers"))
-    fig.update_layout(
-        template="simple_white", xaxis_title="Deadline", yaxis_title="Miles per gallon"
+    fig = go.Figure(
+        go.Scatter(
+            x=x,
+            y=y,
+            mode="lines+markers",
+            line={"width": 2, "color": "#3b82c4"},
+            marker={"size": 7, "color": "#3b82c4"},
+            hovertemplate="%{x}: %{y:.1f} mpg<extra></extra>",
+        )
     )
-    fig.add_annotation(x=1978, y=18, text="1978 deadline", xanchor="left", ay=-28)
-    fig.add_annotation(x=1985, y=27.5, text="1985 deadline", xanchor="right", ay=28)
+    fig.update_layout(
+        template="simple_white",
+        font={"family": "Inter, system-ui, -apple-system, sans-serif", "color": "#1f2937"},
+        title={
+            "text": "Federal fuel economy standards",
+            "x": 0,
+            "xanchor": "left",
+            "subtitle": {"text": "Mandated fleet average, 1978 to 1985"},
+        },
+        xaxis_title="Deadline",
+        yaxis_title="Miles per gallon",
+        yaxis_range=[16, 30],
+        margin={"l": 64, "r": 32, "t": 84, "b": 64},
+    )
+    fig.add_annotation(x=1978, y=18, text="1978 deadline (18 mpg)", xanchor="left", ay=-28)
+    fig.add_annotation(x=1985, y=27.5, text="1985 deadline (27.5 mpg)", xanchor="right", ay=28)
     return fig
 
 

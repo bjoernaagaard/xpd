@@ -34,6 +34,10 @@ def make_after(data) -> go.Figure:
         go.Bar(x=days, y=bills, text=bills, textposition="outside", texttemplate="%{text:.2f}")
     )
     fig.update_layout(template="simple_white", yaxis_range=[0, 24], yaxis_title="Median bill (USD)")
+    fig.update_layout(
+        font={"family": "Inter, system-ui, -apple-system, sans-serif", "color": "#1f2937"},
+        colorway=["#3b82c4", "#d97706", "#14967f", "#8b5cf6", "#dc4c3e", "#78716c"],
+    )
     return fig
 
 

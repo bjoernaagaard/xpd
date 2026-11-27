@@ -349,6 +349,9 @@ struct PlotlyAcc {
     x_summaries: Vec<Value>,
     any_years_span: Option<i32>,
     has_bar_or_area: bool,
+    max_trace_points: usize,
+    two_point_year_traces: Vec<String>,
+    y_bounds: BTreeMap<String, (f64, f64)>,
 }
 
 /// Analyzes a Plotly `{ data, layout }` spec (both charts and `go.Table` traces).
@@ -370,7 +373,23 @@ fn analyze_plotly(ctx: &FigureCtx<'_>, spec: &Value, findings: &mut Vec<Finding>
         .filter(|t| t.get("type").and_then(Value::as_str) == Some("table"))
         .collect();
     if !table_traces.is_empty() && table_traces.len() == traces.len() {
-        return analyze_plotly_table(ctx, table_traces[0], layout, findings);
+        let mut first_facts = Value::Null;
+        for (idx, table) in table_traces.iter().enumerate() {
+            let facts = if idx == 0 {
+                analyze_plotly_table(ctx, table, layout, findings)
+            } else {
+                let sub_name = format!("{}:table {idx}", ctx.name);
+                let sub_ctx = FigureCtx {
+                    name: &sub_name,
+                    adapter: ctx.adapter,
+                };
+                analyze_plotly_table(&sub_ctx, table, layout, findings)
+            };
+            if idx == 0 {
+                first_facts = facts;
+            }
+        }
+        return first_facts;
     }
 
     let canvas = (
@@ -381,8 +400,22 @@ fn analyze_plotly(ctx: &FigureCtx<'_>, spec: &Value, findings: &mut Vec<Finding>
     for (idx, trace) in traces.iter().enumerate() {
         collect_plotly_trace(ctx, idx, trace, layout, canvas, &mut acc, findings);
     }
+    if acc.max_trace_points <= 2 {
+        for trace_name in &acc.two_point_year_traces {
+            ctx.push(
+                findings,
+                Kind::MissingContext,
+                &format!("two-points-{trace_name}"),
+                &format!(
+                    "Trace `{trace_name}` plots only two x values with no baseline context (VDQI p. 74)."
+                ),
+                2,
+            );
+        }
+    }
     check_plotly_canvas_and_colors(ctx, layout, canvas, &acc, findings);
     let (title, axis_titles, annotations) = check_plotly_layout_axes(ctx, layout, &acc, findings);
+    check_plotly_annotations(ctx, layout, &acc, findings);
 
     let panel_count = acc.panels.len().max(1);
     let density = match canvas {
@@ -486,16 +519,53 @@ fn collect_plotly_trace(
             1,
         );
     }
+    let panel_canvas = panel_dimensions(trace, layout, canvas);
     check_plotly_trace_data(
         ctx,
         trace,
         trace_type,
         &trace_name,
         is_line,
-        canvas,
+        panel_canvas,
         acc,
         findings,
     );
+}
+
+fn axis_layout_key(short: &str, prefix: &str) -> String {
+    match short.strip_prefix(prefix) {
+        Some("") | None => format!("{prefix}axis"),
+        Some(suffix) => format!("{prefix}axis{suffix}"),
+    }
+}
+
+fn domain_span(layout: &Value, key: &str) -> f64 {
+    layout
+        .get(key)
+        .and_then(|axis| axis.get("domain"))
+        .and_then(Value::as_array)
+        .filter(|d| d.len() == 2)
+        .and_then(|d| Some((d[0].as_f64()?, d[1].as_f64()?)))
+        .map_or(1.0, |(lo, hi)| (hi - lo).clamp(0.05, 1.0))
+}
+
+fn panel_dimensions(
+    trace: &Value,
+    layout: &Value,
+    canvas: (Option<f64>, Option<f64>),
+) -> (Option<f64>, Option<f64>) {
+    let x_key = axis_layout_key(
+        trace.get("xaxis").and_then(Value::as_str).unwrap_or("x"),
+        "x",
+    );
+    let y_key = axis_layout_key(
+        trace.get("yaxis").and_then(Value::as_str).unwrap_or("y"),
+        "y",
+    );
+    (
+        canvas.0.map(|w| w * domain_span(layout, &x_key)),
+        canvas.1.map(|h| h * domain_span(layout, &y_key)),
+    )
 }
 
 #[expect(
@@ -517,18 +587,12 @@ fn check_plotly_trace_data(
     findings: &mut Vec<Finding>,
 ) {
     if let Some(xs) = trace.get("x").and_then(Value::as_array) {
+        acc.max_trace_points = acc.max_trace_points.max(xs.len());
         let years: BTreeSet<i32> = xs.iter().filter_map(year_of).collect();
-        if xs.len() == 2 {
-            ctx.push(
-                findings,
-                Kind::MissingContext,
-                &format!("two-points-{trace_name}"),
-                &format!(
-                    "Trace `{trace_name}` plots only two x values with no baseline context (VDQI p. 74)."
-                ),
-                2,
-            );
-        } else if years.len() > 2
+        if xs.len() == 2 && years.len() == 2 {
+            acc.two_point_year_traces.push(trace_name.to_owned());
+        }
+        if years.len() >= 2
             && let (Some(first), Some(last)) = (years.first(), years.last())
         {
             let span = last - first + 1;
@@ -559,6 +623,24 @@ fn check_plotly_trace_data(
         }
     }
     if let Some(ys) = trace.get("y").and_then(Value::as_array) {
+        let y_axis = trace
+            .get("yaxis")
+            .and_then(Value::as_str)
+            .unwrap_or("y")
+            .to_owned();
+        for num in ys
+            .iter()
+            .filter_map(Value::as_f64)
+            .filter(|v| v.is_finite())
+        {
+            acc.y_bounds
+                .entry(y_axis.clone())
+                .and_modify(|(lo, hi)| {
+                    *lo = lo.min(num);
+                    *hi = hi.max(num);
+                })
+                .or_insert((num, num));
+        }
         let refs: Vec<&Value> = ys.iter().collect();
         if mixes_zero_and_missing(&refs) {
             ctx.push(
@@ -702,16 +784,24 @@ fn check_plotly_layout_axes(
         .unwrap_or_default();
     let mut axis_titles = Vec::new();
     if let Some(layout_map) = layout.as_object() {
-        if layout_map.contains_key("yaxis2") {
-            ctx.push(
-                findings,
-                Kind::DualAxis,
-                "yaxis2",
-                "Figure defines a secondary vertical axis `yaxis2` (VDQI p. 61).",
-                3,
-            );
-        }
         for (key, axis) in layout_map {
+            if key.starts_with("yaxis")
+                && key != "yaxis"
+                && axis
+                    .get("overlaying")
+                    .and_then(Value::as_str)
+                    .is_some_and(|ov| ov.starts_with('y'))
+            {
+                ctx.push(
+                    findings,
+                    Kind::DualAxis,
+                    key,
+                    &format!(
+                        "Figure defines an overlaying secondary vertical axis `{key}` (VDQI p. 61)."
+                    ),
+                    3,
+                );
+            }
             if !(key.starts_with("xaxis") || key.starts_with("yaxis")) {
                 continue;
             }
@@ -723,7 +813,8 @@ fn check_plotly_layout_axes(
         axis_titles.join(" "),
         annotations.join(" ")
     );
-    if let Some(matched) = MONEY_RE.find(&words)
+    if acc.any_years_span.is_some_and(|span| span >= 2)
+        && let Some(matched) = MONEY_RE.find(&words)
         && !BASIS_RE.is_match(&words)
     {
         let span_note = acc
@@ -742,6 +833,83 @@ fn check_plotly_layout_axes(
         );
     }
     (title, axis_titles, annotations)
+}
+
+fn check_plotly_annotations(
+    ctx: &FigureCtx<'_>,
+    layout: &Value,
+    acc: &PlotlyAcc,
+    findings: &mut Vec<Finding>,
+) {
+    let Some(items) = layout.get("annotations").and_then(Value::as_array) else {
+        return;
+    };
+    let mut data_notes: Vec<(String, String, Option<&Value>, f64)> = Vec::new();
+    for item in items {
+        let text = plain_text(item.get("text"));
+        if text.is_empty() {
+            continue;
+        }
+        let yref = item.get("yref").and_then(Value::as_str).unwrap_or("y");
+        if !yref.starts_with('y') {
+            continue;
+        }
+        let Some(y_val) = item.get("y").and_then(Value::as_f64) else {
+            continue;
+        };
+        let norm_ref = if yref == "y1" { "y" } else { yref };
+        data_notes.push((text, norm_ref.to_owned(), item.get("x"), y_val));
+    }
+
+    for (text, yref, _, y_val) in &data_notes {
+        let Some(&(lo, hi)) = acc.y_bounds.get(yref) else {
+            continue;
+        };
+        let span = hi - lo;
+        if span <= 0.0 {
+            continue;
+        }
+        let axis_key = axis_layout_key(yref, "y");
+        let has_range = layout
+            .get(&axis_key)
+            .and_then(|axis| axis.get("range"))
+            .and_then(Value::as_array)
+            .is_some_and(|r| r.len() == 2);
+        let rel = (*y_val - lo) / span;
+        if !has_range && (!(0.05..=0.95).contains(&rel)) {
+            ctx.push(
+                findings,
+                Kind::LabelCollision,
+                &format!("edge-label-{text}"),
+                &format!(
+                    "Annotation `{text}` sits on the `{axis_key}` edge without explicit range padding and risks colliding with the axis or ticks (VDQI p. 183)."
+                ),
+                2,
+            );
+        }
+    }
+
+    for (idx, (t1, yref1, x1, y1)) in data_notes.iter().enumerate() {
+        for (t2, yref2, x2, y2) in &data_notes[idx + 1..] {
+            if yref1 != yref2 || x1.is_none() || x1 != x2 {
+                continue;
+            }
+            if let Some(&(lo, hi)) = acc.y_bounds.get(yref1)
+                && hi > lo
+                && (y1 - y2).abs() / (hi - lo) < 0.08
+            {
+                ctx.push(
+                    findings,
+                    Kind::LabelCollision,
+                    &format!("overlap-label-{t1}-{t2}"),
+                    &format!(
+                        "Annotations `{t1}` and `{t2}` sit within 8% of the y-span at the same x coordinate and risk overlapping (VDQI p. 183)."
+                    ),
+                    2,
+                );
+            }
+        }
+    }
 }
 
 fn check_plotly_single_axis(
@@ -985,6 +1153,15 @@ fn check_plotly_table_chrome(
             2,
         );
     }
+    if trace.pointer("/header/fill").is_none() && trace.pointer("/cells/fill").is_none() {
+        ctx.push(
+            findings,
+            Kind::TableVerticalRules,
+            "table-default-chrome",
+            "Table uses default Plotly gray cell fills and white gridlines (VDQI p. 179). Set flat `header.fill`, `cells.fill`, and `cells.line.width=0`.",
+            2,
+        );
+    }
     if row_count > UNGROUPED_TABLE_ROWS {
         ctx.push(
             findings,
@@ -998,6 +1175,16 @@ fn check_plotly_table_chrome(
     }
 }
 
+fn align_at(aligns: Option<&Value>, idx: usize) -> Option<&str> {
+    aligns.and_then(|a| {
+        a.as_str().or_else(|| {
+            a.as_array()
+                .and_then(|arr| arr.get(idx))
+                .and_then(Value::as_str)
+        })
+    })
+}
+
 fn check_plotly_table_columns(
     ctx: &FigureCtx<'_>,
     trace: &Value,
@@ -1007,6 +1194,7 @@ fn check_plotly_table_columns(
     findings: &mut Vec<Finding>,
 ) {
     let aligns = trace.pointer("/cells/align");
+    let header_aligns = trace.pointer("/header/align");
     let has_format = trace.pointer("/cells/format").is_some_and(|v| !v.is_null());
     let mut first_text_col: Option<Vec<String>> = None;
     let mut first_num_col: Option<Vec<f64>> = None;
@@ -1020,6 +1208,8 @@ fn check_plotly_table_columns(
         let nums: Vec<f64> = col.iter().filter_map(|v| v.as_f64()).collect();
         let non_null = col.iter().filter(|v| !v.is_null()).count();
         let is_numeric = non_null > 0 && nums.len() * 2 >= non_null;
+        let col_align = align_at(aligns, idx);
+        let hdr_align = align_at(header_aligns, idx);
 
         if is_numeric {
             if first_num_col.is_none() && nums.len() == row_count {
@@ -1028,13 +1218,6 @@ fn check_plotly_table_columns(
             if !has_format {
                 check_numeric_precision(ctx, "table-unfmt", &label, &nums, findings);
             }
-            let col_align = aligns.and_then(|a| {
-                a.as_str().or_else(|| {
-                    a.as_array()
-                        .and_then(|arr| arr.get(idx))
-                        .and_then(Value::as_str)
-                })
-            });
             if col_align != Some("right") {
                 ctx.push(
                     findings,
@@ -1042,6 +1225,17 @@ fn check_plotly_table_columns(
                     &format!("table-align-{label}"),
                     &format!(
                         "Numeric column `{label}` is not right-aligned (VDQI p. 178). Set `cells.align='right'`."
+                    ),
+                    2,
+                );
+            }
+            if hdr_align != Some("right") {
+                ctx.push(
+                    findings,
+                    Kind::TableNumberAlignment,
+                    &format!("table-header-align-{label}"),
+                    &format!(
+                        "Numeric column header `{label}` is not right-aligned to match its cells (VDQI p. 178). Set `header.align` to match `cells.align`."
                     ),
                     2,
                 );
@@ -1057,13 +1251,28 @@ fn check_plotly_table_columns(
                     2,
                 );
             }
-        } else if first_text_col.is_none() {
-            let texts: Vec<String> = col
-                .iter()
-                .filter_map(|v| v.as_str().map(str::to_owned))
-                .collect();
-            if texts.len() == row_count {
-                first_text_col = Some(texts);
+        } else {
+            if let Some(cell_align) = col_align
+                && hdr_align != Some(cell_align)
+            {
+                ctx.push(
+                    findings,
+                    Kind::TableNumberAlignment,
+                    &format!("table-header-align-{label}"),
+                    &format!(
+                        "Table header `{label}` alignment does not match its column cells (VDQI p. 178). Set `header.align` to match `cells.align`."
+                    ),
+                    2,
+                );
+            }
+            if first_text_col.is_none() {
+                let texts: Vec<String> = col
+                    .iter()
+                    .filter_map(|v| v.as_str().map(str::to_owned))
+                    .collect();
+                if texts.len() == row_count {
+                    first_text_col = Some(texts);
+                }
             }
         }
     }

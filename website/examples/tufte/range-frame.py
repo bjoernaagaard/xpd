@@ -36,6 +36,10 @@ def make_after(data) -> go.Figure:
     fig.update_xaxes(range=[min(x), max(x)], tickvals=[min(x), 5, 6, 7, max(x)])
     fig.update_yaxes(range=[min(y), max(y)], tickvals=[min(y), 3, 4, max(y)])
     fig.update_traces(cliponaxis=False)
+    fig.update_layout(
+        font={"family": "Inter, system-ui, -apple-system, sans-serif", "color": "#1f2937"},
+        colorway=["#3b82c4", "#d97706", "#14967f", "#8b5cf6", "#dc4c3e", "#78716c"],
+    )
     return fig
 
 

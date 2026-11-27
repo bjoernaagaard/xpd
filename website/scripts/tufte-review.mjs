@@ -18,6 +18,35 @@ const runtimeKinds = {
   'zero-and-missing': ['zero-missing-ambiguity'],
 };
 
+const smallDataChartAllowed = new Set([
+  'bar-erase',
+  'color-use',
+  'context',
+  'craft',
+  'data-positioned-labels',
+  'deflate-money',
+  'design-variation',
+  'dimensions',
+  'duck',
+  'horizontal-type',
+  'judgment',
+  'labels',
+  'lie-factor',
+  'map-area',
+  'meaningful-id-order',
+  'multifunction',
+  'pie',
+  'redundant-ink',
+  'repeat-cycle',
+  'scale-choice',
+  'table-semi-graphic',
+  'type-case',
+  'uniform-notes-to-caption',
+  'vibration',
+  'zero-and-missing',
+  'zero-baseline',
+]);
+
 function required(facts, path, accepts) {
   const value = path.split('.').reduce((parent, key) => parent?.[key], facts);
   if (!accepts(value)) throw new Error(`missing required measurement ${path}`);
@@ -56,6 +85,16 @@ const predicates = {
   },
 };
 
+const twoPointAllowed = new Set(['deflate-money', 'lie-factor']);
+
+function unexpectedAfterFindings(questionId, findings) {
+  const allowSmall = smallDataChartAllowed.has(questionId);
+  const allowTwoPoint = twoPointAllowed.has(questionId);
+  return findings.filter(
+    ({ kind }) => !(allowSmall && kind === 'small-data-chart') && !(allowTwoPoint && kind === 'missing-context'),
+  );
+}
+
 export function validateReview(question, variants) {
   const kinds = new Set([...question.rule_finding_kinds, ...(runtimeKinds[question.id] ?? [])]);
   const predicate = predicates[question.id];
@@ -65,14 +104,15 @@ export function validateReview(question, variants) {
       .filter(([, passed]) => !passed)
       .map(([name]) => name);
     const relevant = report.findings.filter(({ kind }) => kinds.has(kind));
+    const unexpected = variant === 'after' ? unexpectedAfterFindings(question.id, report.findings) : [];
     const colorFailure = report.findings.some(({ kind }) => kind === 'red-green-only');
     const expectedColorFailure = question.id === 'color-deficient' && variant === 'before';
     if (colorFailure !== expectedColorFailure) throw new Error(`${variant} color gate: ${JSON.stringify(report.findings)}`);
-    return { failed, relevant };
+    return { failed, relevant, unexpected };
   });
   const [before, after] = results;
   const measured = kinds.size > 0 || Boolean(predicate);
-  const counts = results.flatMap(({ relevant, failed }) => [relevant.length, failed.length]);
+  const counts = [before.relevant.length, before.failed.length, after.unexpected.length, after.failed.length];
   const judgment = measured ? '' : ` | Judgment. ${question.look}`;
   console.log(`${question.id} | ${counts.join(' | ')}${judgment}`);
   if ((measured && !counts[0] && !counts[1]) || counts[2] || counts[3]) {

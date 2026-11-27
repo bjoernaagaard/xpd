@@ -6,7 +6,7 @@ def load_data():
 
 
 def value_table(data):
-    return {"columns": ["Year", "Net income (USD)"], "rows": [list(row) for row in data]}
+    return {"columns": ["Year", "Net income (nominal USD)"], "rows": [list(row) for row in data]}
 
 
 def make_before(data) -> go.Figure:
@@ -25,20 +25,39 @@ def make_before(data) -> go.Figure:
 
 def make_after(data) -> go.Figure:
     years, values = zip(*data, strict=True)
-    fig = go.Figure(go.Bar(x=years, y=values))
+    colors = ["#dc4c3e" if value < 0 else "#3b82c4" for value in values]
+    fig = go.Figure(
+        go.Bar(
+            x=years,
+            y=values,
+            marker_color=colors,
+            hovertemplate="%{x}: $%{y:,.0f}<extra></extra>",
+        )
+    )
     fig.update_layout(
         template="simple_white",
+        font={"family": "Inter, system-ui, -apple-system, sans-serif", "color": "#1f2937"},
+        title={
+            "text": "Day Mines net income, 1970 to 1974",
+            "x": 0,
+            "xanchor": "left",
+            "subtitle": {"text": "Nominal USD with zero baseline preserved"},
+        },
         xaxis_title="Year",
         xaxis_tickvals=list(years),
-        yaxis_title="Net income (USD)",
-        yaxis_range=[-150000, 1800000],
+        yaxis_title="Net income (nominal USD)",
+        yaxis_range=[-180000, 1850000],
+        yaxis_tickprefix="$",
         yaxis_tickformat=",.0f",
+        yaxis_zeroline=True,
+        yaxis_zerolinecolor="#9ca3af",
+        margin={"l": 80, "r": 24, "t": 84, "b": 64},
     )
     fig.add_annotation(
         x=1970,
         y=values[0],
         text="Loss of $11,014",
-        ax=38,
+        ax=42,
         ay=-36,
         arrowhead=2,
         arrowwidth=1,

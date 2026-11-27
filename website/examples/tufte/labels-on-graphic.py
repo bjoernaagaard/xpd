@@ -36,8 +36,8 @@ def make_before(data) -> go.Figure:
 
 def make_after(data) -> go.Figure:
     fig = go.Figure()
-    tickers = ("GOOG", "AAPL")
-    for index, ticker in enumerate(tickers):
+    series = (("GOOG", "#3b82c4", "solid"), ("AAPL", "#d97706", "dash"))
+    for ticker, color, dash in series:
         dates, values = zip(
             *((date, value) for name, date, value in data if name == ticker), strict=True
         )
@@ -47,17 +47,35 @@ def make_after(data) -> go.Figure:
                 y=values,
                 name=ticker,
                 mode="lines",
-                line={"width": 2, "dash": ("solid", "dash", "dot")[index]},
+                line={"width": 2, "color": color, "dash": dash},
+                hovertemplate="%{y:.2f}<extra>%{fullData.name}</extra>",
             )
         )
         fig.add_annotation(
-            x=dates[-1], y=values[-1], text=ticker, showarrow=False, xanchor="left", xshift=4
+            x=dates[-1],
+            y=values[-1],
+            text=f"<b>{ticker}</b>  {values[-1]:.2f}",
+            showarrow=False,
+            xanchor="left",
+            xshift=6,
+            font={"color": color, "size": 12},
         )
     fig.update_layout(
         template="simple_white",
+        font={"family": "Inter, system-ui, -apple-system, sans-serif", "color": "#1f2937"},
+        title={
+            "text": "Weekly stock index, 2018",
+            "x": 0,
+            "xanchor": "left",
+            "subtitle": {"text": "Rebased to 1.00 on January 1, 2018"},
+        },
         showlegend=False,
+        hovermode="x unified",
+        xaxis_title="Week",
         yaxis_title="Index (first week = 1)",
-        margin={"r": 64},
+        yaxis_range=[0.76, 1.36],
+        yaxis_tickformat=".2f",
+        margin={"l": 64, "r": 96, "t": 84, "b": 64},
     )
     return fig
 
@@ -72,8 +90,8 @@ EXAMPLE = {
         "Both started at 1.00.",
     },
     "after": {
-        "caption": "The names at the line ends let readers identify the lines at the "
-        "point of comparison.",
+        "caption": "The names and final values sit cleanly beside the line ends with padded "
+        "margins so readers identify each series at the point of comparison.",
         "summary": "During the week of March 19, Apple is about 0.94 and Google 0.93. "
         "Both started at 1.00.",
     },

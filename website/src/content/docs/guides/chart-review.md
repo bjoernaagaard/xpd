@@ -113,15 +113,15 @@ Adapter `figures.py` measured 1 figure: prices
 | Runtime fact | What it measures | Mechanical defects flagged |
 | --- | --- | --- |
 | `canvas` | Pixel width, height, and panel count | Single panel taller than wide |
-| `values` | Plotted value count, pie slices, and bar/category ordering | 20 or fewer values, pie charts, alphabetical category ordering |
-| `colors` | Trace colors, dashes, rainbow scales, and direct labels | Red against green only, rainbow scales, redundant color |
-| `x-values` | Plotted x values, year span, and irregular step spacing | Two isolated points with no context, irregular time spacing |
-| `text` | Titles, axis labels, tick angles, and annotations | All-caps titles, rotated ticks, undeflated currency, raw column names |
-| `slopes` | Median absolute visual slope of line segments | Aspect ratios far from banking to 45 degrees |
-| `axes` | Axis ranges, secondary axes, explicit ticks, grids, and frames | Non-zero bar or area baselines, dual axes, excess ticks, heavy grids |
-| `legend` | Legend box visibility versus direct series annotations | Separate legend where direct labels fit |
-| `table` | `go.Table` headers, cell fills, alignment, decimals, and row count | Zebra fills, vertical rules, centered numbers, unaligned decimals, raw headers |
-| `grid` | AG Grid `columnDefs`, `rowData`, and theme params | Vertical `columnBorder`, `oddRowBackgroundColor`, unformatted numeric columns, ungrouped flat rows |
+| `values` | Plotted value count, pie slices, and bar ordering | 20 or fewer values, pie charts, alphabetical category ordering, mixed zeros and nulls |
+| `colors` | Trace colors, line dashes, widths, and direct labels | Red against green only, thick line strokes |
+| `x-values` | Plotted x values and year span | Two isolated years with no context, multi-year undeflated currency |
+| `text` | Titles, axis titles, tick angles, and data-bound annotations | All-caps titles, rotated ticks, edge-clipping or overlapping direct labels |
+| `axes` | Axis ranges, overlaying secondary axes, explicit ticks, and frames | Non-zero bar or area baselines, overlaying dual axes, excess ticks, boxed Matplotlib frames |
+| `banking` | Median absolute visual slope per subplot panel | Aspect ratios far from banking to 45 degrees |
+| `table-borders` | `go.Table` and AG Grid cell borders, default gray chrome, and row striping | Vertical rules, default unstyled `go.Table` chrome, zebra striping |
+| `table-numbers` | Numeric formatting, header and cell alignment, and zero versus missing values | Unformatted decimals, misaligned headers or numeric cells, mixed zeros and nulls |
+| `table-structure` | Row count, topical grouping, header clarity, and row ordering | Raw or all-caps headers, alphabetical row order, more than 12 flat rows |
 
 ## List all 57 principles
 

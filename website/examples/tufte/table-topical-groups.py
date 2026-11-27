@@ -61,6 +61,7 @@ def make_before(data) -> go.Figure:
 def make_after(data) -> go.Figure:
     fig = go.Figure()
     topics = ("Party", "Ideology", "Democrats", "Independents")
+    align = ["left", "right", "right", "right", "right"]
     for index, topic in enumerate(topics):
         group = [
             tuple(value if value is not None else "Missing" for value in row[1:])
@@ -80,11 +81,18 @@ def make_after(data) -> go.Figure:
                         "Anderson 1980 (%)",
                         "Carter and Ford 1976 (%)",
                     ],
+                    "align": align,
+                    "fill": {"color": "rgba(15,23,42,0.04)"},
+                    "line": {"color": "#cbd5e1", "width": 1},
+                    "font": {"color": "#1f2937", "size": 12},
                     "height": 28,
                 },
                 cells={
                     "values": list(zip(*group, strict=True)),
-                    "align": ["left", "right", "right", "right", "right"],
+                    "align": align,
+                    "fill": {"color": "rgba(0,0,0,0)"},
+                    "line": {"width": 0},
+                    "font": {"color": "#1f2937", "size": 12},
                     "height": 26,
                 },
             )
@@ -94,13 +102,18 @@ def make_after(data) -> go.Figure:
             y=top,
             xref="paper",
             yref="paper",
-            text=topic,
+            text=f"<b>{topic}</b>",
             showarrow=False,
+            xanchor="left",
             yanchor="top",
-            font={"size": 14},
+            font={"size": 13},
         )
     fig.update_layout(
-        template="simple_white", height=830, width=700, margin={"l": 10, "r": 10, "t": 14, "b": 10}
+        template="simple_white",
+        font={"family": "Inter, system-ui, -apple-system, sans-serif", "color": "#1f2937"},
+        height=760,
+        width=700,
+        margin={"l": 0, "r": 0, "t": 12, "b": 8},
     )
     return fig
 

@@ -47,6 +47,10 @@ def make_after(data) -> go.Figure:
     fig.update_layout(
         template="simple_white", xaxis_title="Sepal length (cm)", yaxis_title="Sepal width (cm)"
     )
+    fig.update_layout(
+        font={"family": "Inter, system-ui, -apple-system, sans-serif", "color": "#1f2937"},
+        colorway=["#3b82c4", "#d97706", "#14967f", "#8b5cf6", "#dc4c3e", "#78716c"],
+    )
     return fig
 
 

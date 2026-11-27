@@ -28,8 +28,29 @@ def make_before(data) -> go.Figure:
 
 def make_after(data) -> go.Figure:
     days, tips = zip(*data, strict=True)
-    fig = go.Figure(go.Bar(x=days, y=tips))
-    fig.update_layout(template="simple_white", yaxis_title="Median tip (USD)")
+    fig = go.Figure(
+        go.Bar(
+            x=days,
+            y=tips,
+            marker_color="#3b82c4",
+            hovertemplate="%{x}: $%{y:.2f}<extra></extra>",
+        )
+    )
+    fig.update_layout(
+        template="simple_white",
+        font={"family": "Inter, system-ui, -apple-system, sans-serif", "color": "#1f2937"},
+        title={
+            "text": "Median tip by day",
+            "x": 0,
+            "xanchor": "left",
+            "subtitle": {"text": "Single fill keeps attention on bar height"},
+        },
+        xaxis_title="Day",
+        yaxis_title="Median tip (USD)",
+        yaxis_tickprefix="$",
+        yaxis_tickformat=".2f",
+        margin={"l": 64, "r": 24, "t": 84, "b": 64},
+    )
     return fig
 
 

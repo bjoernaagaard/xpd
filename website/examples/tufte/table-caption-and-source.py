@@ -46,6 +46,7 @@ def make_before(data) -> go.Figure:
 
 def make_after(data) -> go.Figure:
     values = list(zip(*(row[1:] for row in data), strict=True))
+    align = ["left", "right", "right", "right", "right"]
     fig = go.Figure(
         go.Table(
             header={
@@ -56,21 +57,34 @@ def make_after(data) -> go.Figure:
                     "Anderson 1980 (%)",
                     "Carter and Ford 1976 (%)",
                 ],
-                "align": ["left", "right", "right", "right", "right"],
+                "align": align,
+                "fill": {"color": "rgba(15,23,42,0.04)"},
+                "line": {"color": "#cbd5e1", "width": 1},
+                "font": {"color": "#1f2937", "size": 12},
+                "height": 34,
             },
             cells={
                 "values": values,
-                "align": ["left", "right", "right", "right", "right"],
+                "align": align,
+                "fill": {"color": "rgba(0,0,0,0)"},
                 "line": {"width": 0},
+                "font": {"color": "#1f2937", "size": 12},
+                "height": 28,
             },
             columnwidth=[2, 1, 1, 1, 1],
         )
     )
     fig.update_layout(
         template="simple_white",
-        height=360,
-        margin={"l": 12, "r": 12, "t": 52, "b": 12},
-        title="Presidential votes by group, 1980 and 1976",
+        font={"family": "Inter, system-ui, -apple-system, sans-serif", "color": "#1f2937"},
+        height=290,
+        margin={"l": 0, "r": 0, "t": 64, "b": 8},
+        title={
+            "text": "Presidential votes by group, 1980 and 1976",
+            "x": 0,
+            "xanchor": "left",
+            "subtitle": {"text": "Share of voters (%) from 12,782 election-day interviews"},
+        },
     )
     return fig
 
@@ -88,8 +102,7 @@ EXAMPLE = {
         "Ford.",
     },
     "after": {
-        "caption": "The title and headers name the elections and units. The source note "
-        "gives the survey population and sample size.",
+        "caption": "The title, subtitle, and headers name the elections, units, and sample size.",
         "summary": "Among Democrats interviewed in 1980, 66 percent voted for Carter. "
         "The 1976 comparison was 77 percent for Carter and 22 percent for "
         "Ford.",

@@ -26,12 +26,33 @@ def make_before(data) -> go.Figure:
 
 def make_after(data) -> go.Figure:
     years, _, real = zip(*data, strict=True)
-    fig = go.Figure(go.Scatter(x=years, y=real, mode="lines+markers"))
+    fig = go.Figure(
+        go.Scatter(
+            x=years,
+            y=real,
+            mode="lines+markers+text",
+            text=[f"${v:,.0f}" for v in real],
+            textposition="top center",
+            line={"width": 2, "color": "#3b82c4"},
+            marker={"size": 8, "color": "#3b82c4"},
+            hovertemplate="%{x}: $%{y:,.0f} (1967 USD)<extra></extra>",
+        )
+    )
     fig.update_layout(
         template="simple_white",
+        font={"family": "Inter, system-ui, -apple-system, sans-serif", "color": "#1f2937"},
+        title={
+            "text": "New York State budget per resident",
+            "x": 0,
+            "xanchor": "left",
+            "subtitle": {"text": "Deflated to constant 1967 dollars"},
+        },
+        xaxis_title="Year",
         xaxis_tickvals=list(years),
         yaxis_title="Budget per resident (constant 1967 USD)",
+        yaxis_tickprefix="$",
         yaxis_range=[250, 825],
+        margin={"l": 72, "r": 32, "t": 84, "b": 64},
     )
     return fig
 

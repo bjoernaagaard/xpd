@@ -85,6 +85,10 @@ def make_after(data: list[tuple[str, int, float]]) -> go.Figure:
         showlegend=False,
         margin={"l": 42, "r": 16, "t": 34, "b": 40},
     )
+    fig.update_layout(
+        font={"family": "Inter, system-ui, -apple-system, sans-serif", "color": "#1f2937"},
+        colorway=["#3b82c4", "#d97706", "#14967f", "#8b5cf6", "#dc4c3e", "#78716c"],
+    )
     return fig
 
 

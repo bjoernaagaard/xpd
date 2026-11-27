@@ -24,7 +24,8 @@ for (const row of (table?.rows ?? []) as Cell[][]) {
     <h2 id={variant}>{variant === 'before' ? 'Before' : 'After'}</h2>
     <figure aria-labelledby={variant} aria-describedby={`${variant}-caption example-values`}>
       <div class="chart" data-plotly-spec={`${assets}/${id}/${variant}.json`}
-        data-plotly-bundle={`${assets}/plotly-${version}.min.js`} aria-hidden="true"></div>
+        data-plotly-bundle={`${assets}/plotly-${version}.min.js`}
+        data-plotly-variant={variant} aria-hidden="true"></div>
       <label data-plotly-frames hidden>Frame <select></select></label>
       <p data-plotly-error hidden>Interactive chart unavailable.</p>
       <figcaption id={`${variant}-caption`}>{example[variant].caption}</figcaption>
@@ -68,7 +69,8 @@ for (const row of (table?.rows ?? []) as Cell[][]) {
 
   .chart {
     width: 100%;
-    color-scheme: light;
+    border-radius: 6px;
+    overflow: hidden;
   }
 
   .chart:empty {
@@ -85,14 +87,16 @@ for (const row of (table?.rows ?? []) as Cell[][]) {
 </style>
 
 <script>
+  type Trace = Record<string, any>;
   type FigureSpec = {
-    data: { type?: string }[];
-    layout: { width?: number; height?: number };
+    data: Trace[];
+    layout: Record<string, any>;
     frames?: { name: string }[];
   };
 
   type Plotly = {
     newPlot: (chart: HTMLElement, spec: FigureSpec & { config: object }) => Promise<unknown>;
+    react: (chart: HTMLElement, data: Trace[], layout: Record<string, any>, config: object) => Promise<unknown>;
     relayout: (chart: HTMLElement, layout: object) => Promise<unknown>;
     animate: (chart: HTMLElement, frames: string[], options: object) => Promise<unknown>;
   };
@@ -110,6 +114,133 @@ for (const row of (table?.rows ?? []) as Cell[][]) {
     return bundle;
   }
 
+  const isDarkTheme = () => document.documentElement.dataset.theme === 'dark';
+
+  const DARK_INKS = new Set([
+    'black', '#000', '#000000', '#111', '#111111', '#1f2937', '#222', '#222222',
+    '#242424', '#333', '#333333', '#353535', 'rgb(36,36,36)', 'rgb(0,0,0)',
+  ]);
+
+  function normalizeInk(color: unknown, dark: boolean, fg: string) {
+    if (!dark || typeof color !== 'string') return color;
+    return DARK_INKS.has(color.trim().toLowerCase().replaceAll(' ', '')) ? fg : color;
+  }
+
+  function hasExplicitTintedBg(spec: FigureSpec, variant: string) {
+    if (variant !== 'before') return false;
+    const layout = spec.layout ?? {};
+    const tmplBg = layout.template?.layout?.plot_bgcolor;
+    const explicitBg = layout.plot_bgcolor ?? layout.paper_bgcolor;
+    const isTinted = (bg: unknown) =>
+      typeof bg === 'string' && !['white', '#fff', '#ffffff', 'rgba(0,0,0,0)', 'transparent'].includes(bg.trim().toLowerCase());
+    return isTinted(explicitBg) || isTinted(tmplBg);
+  }
+
+  function applyTheme(spec: FigureSpec, variant: string, dimensions: { width: number; height: number }) {
+    const dark = isDarkTheme();
+    const layout = structuredClone(spec.layout ?? {});
+    const data = structuredClone(spec.data ?? []);
+    const frames = spec.frames ?? [];
+    const frameControls = frames.length ? { updatemenus: [], sliders: [] } : {};
+
+    if (hasExplicitTintedBg(spec, variant)) {
+      return { data, layout: { ...layout, ...frameControls, ...dimensions } };
+    }
+
+    const fg = dark ? '#e6e8ec' : '#1f2937';
+    const muted = dark ? '#9ca3af' : '#4b5563';
+    const axisLine = dark ? '#6b7280' : '#4b5563';
+    const grid = dark ? 'rgba(255,255,255,0.12)' : 'rgba(15,23,42,0.08)';
+    const hoverBg = dark ? '#1f232b' : '#ffffff';
+    const hoverBorder = dark ? '#374151' : '#d1d5db';
+    const tableHeaderBg = dark ? 'rgba(255,255,255,0.06)' : 'rgba(15,23,42,0.04)';
+    const tableRule = dark ? 'rgba(255,255,255,0.18)' : 'rgba(15,23,42,0.14)';
+
+    layout.paper_bgcolor = 'rgba(0,0,0,0)';
+    layout.plot_bgcolor = 'rgba(0,0,0,0)';
+    layout.font = { ...layout.font, color: fg };
+    if (layout.title && typeof layout.title === 'object') {
+      layout.title.font = { ...layout.title.font, color: fg };
+      if (layout.title.subtitle && typeof layout.title.subtitle === 'object') {
+        layout.title.subtitle.font = { ...layout.title.subtitle.font, color: muted };
+      }
+    }
+    layout.hoverlabel = {
+      ...layout.hoverlabel,
+      bgcolor: hoverBg,
+      bordercolor: hoverBorder,
+      font: { ...layout.hoverlabel?.font, color: fg },
+    };
+    if (layout.legend && typeof layout.legend === 'object') {
+      layout.legend.bgcolor = 'rgba(0,0,0,0)';
+      layout.legend.font = { ...layout.legend.font, color: fg };
+    }
+
+    const axisKeys = new Set<string>(Object.keys(layout).filter((k) => /^(?:x|y)axis\d*$/.test(k)));
+    const hasCartesian = data.some((t) => !['table', 'pie', 'indicator', 'sunburst', 'scatter3d'].includes(t.type ?? 'scatter'));
+    if (hasCartesian) {
+      axisKeys.add('xaxis');
+      axisKeys.add('yaxis');
+    }
+    for (const key of axisKeys) {
+      const axis = { ...(layout[key] ?? {}) };
+      axis.automargin = axis.automargin ?? true;
+      axis.linecolor = normalizeInk(axis.linecolor ?? axisLine, dark, axisLine);
+      axis.tickcolor = normalizeInk(axis.tickcolor ?? axisLine, dark, axisLine);
+      axis.tickfont = { ...axis.tickfont, color: muted };
+      if (axis.title && typeof axis.title === 'object') {
+        axis.title = { ...axis.title, font: { ...axis.title.font, color: muted } };
+      } else if (typeof axis.title === 'string') {
+        axis.title = { text: axis.title, font: { color: muted } };
+      }
+      if (axis.showgrid && !axis.gridcolor) axis.gridcolor = grid;
+      if (axis.zerolinecolor) axis.zerolinecolor = normalizeInk(axis.zerolinecolor, dark, grid);
+      layout[key] = axis;
+    }
+
+    if (Array.isArray(layout.annotations)) {
+      layout.annotations = layout.annotations.map((ann: Record<string, any>) => ({
+        ...ann,
+        font: { ...ann.font, color: normalizeInk(ann.font?.color ?? fg, dark, fg) },
+      }));
+    }
+    if (Array.isArray(layout.shapes)) {
+      layout.shapes = layout.shapes.map((shape: Record<string, any>) => {
+        if (!shape.line?.color) return shape;
+        return { ...shape, line: { ...shape.line, color: normalizeInk(shape.line.color, dark, axisLine) } };
+      });
+    }
+
+    for (const trace of data) {
+      if (trace.type === 'table') {
+        const keepBeforeTable = variant === 'before' && (Array.isArray(trace.cells?.fill?.color) || (trace.cells?.line?.width ?? 0) >= 2);
+        if (keepBeforeTable) {
+          trace.header = { ...trace.header, font: { ...trace.header?.font, color: '#1f2937' } };
+          trace.cells = { ...trace.cells, font: { ...trace.cells?.font, color: '#1f2937' } };
+        } else {
+          trace.header = {
+            ...trace.header,
+            fill: { color: tableHeaderBg },
+            line: { color: tableRule, width: trace.header?.line?.width ?? 1 },
+            font: { ...trace.header?.font, color: fg },
+          };
+          trace.cells = {
+            ...trace.cells,
+            fill: { color: 'rgba(0,0,0,0)' },
+            line: { color: tableRule, width: trace.cells?.line?.width ?? 0 },
+            font: { ...trace.cells?.font, color: fg },
+          };
+        }
+      } else {
+        if (trace.line?.color) trace.line.color = normalizeInk(trace.line.color, dark, fg);
+        if (trace.marker?.color) trace.marker.color = normalizeInk(trace.marker.color, dark, fg);
+        if (trace.textfont?.color) trace.textfont.color = normalizeInk(trace.textfont.color, dark, fg);
+      }
+    }
+
+    return { data, layout: { ...layout, ...frameControls, ...dimensions } };
+  }
+
   async function draw(chart: HTMLElement) {
     try {
       const [plotly, response] = await Promise.all([
@@ -118,6 +249,7 @@ for (const row of (table?.rows ?? []) as Cell[][]) {
       ]);
       if (!response.ok) throw new Error(`Plotly figure request failed: ${response.status}`);
       const spec: FigureSpec = await response.json();
+      const variant = chart.dataset.plotlyVariant ?? 'after';
       const { width = 700, height = 450 } = spec.layout ?? {};
       chart.dataset.plotlyLoading = '';
       const hasTable = spec.data.some(({ type }) => type === 'table');
@@ -128,11 +260,13 @@ for (const row of (table?.rows ?? []) as Cell[][]) {
       };
       let lastWidth = size().width;
       const frames = spec.frames ?? [];
-      const frameControls = frames.length ? { updatemenus: [], sliders: [] } : {};
+      const config = { displayModeBar: false, responsive: true };
+      const initial = applyTheme(spec, variant, size());
       await plotly.newPlot(chart, {
         ...spec,
-        layout: { ...spec.layout, ...frameControls, ...size() },
-        config: { displayModeBar: false, responsive: true },
+        data: initial.data,
+        layout: initial.layout,
+        config,
       });
       if (frames.length) {
         const label = chart.parentElement!.querySelector<HTMLLabelElement>('[data-plotly-frames]')!;
@@ -154,6 +288,10 @@ for (const row of (table?.rows ?? []) as Cell[][]) {
         lastWidth = dimensions.width;
         void plotly.relayout(chart, dimensions);
       }).observe(chart);
+      new MutationObserver(() => {
+        const updated = applyTheme(spec, variant, size());
+        void plotly.react(chart, updated.data, updated.layout, config);
+      }).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
     } catch (error) {
       console.error(error);
       chart.replaceChildren();

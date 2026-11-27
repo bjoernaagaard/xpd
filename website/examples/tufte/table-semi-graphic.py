@@ -30,9 +30,7 @@ def make_before(data) -> go.Figure:
             columnwidth=[2, 1, 1],
         )
     )
-    fig.update_layout(
-        template="simple_white", height=300, margin={"l": 15, "r": 15, "t": 42, "b": 12}
-    )
+    fig.update_layout(template="simple_white", height=260, margin={"l": 0, "r": 0, "t": 16, "b": 8})
     return fig
 
 
@@ -40,6 +38,7 @@ def make_after(data) -> go.Figure:
     from plotly.subplots import make_subplots
 
     names, gnp, industry = zip(*data, strict=True)
+    align = ["left", "right", "right"]
     fig = make_subplots(
         rows=1,
         cols=3,
@@ -50,11 +49,21 @@ def make_after(data) -> go.Figure:
     )
     fig.add_trace(
         go.Table(
-            header={"values": ["Forecaster", "GNP (%)", "Industry (%)"], "height": 24},
+            header={
+                "values": ["Forecaster", "GNP (%)", "Industry (%)"],
+                "align": align,
+                "fill": {"color": "rgba(15,23,42,0.04)"},
+                "line": {"color": "#cbd5e1", "width": 1},
+                "font": {"color": "#1f2937", "size": 12},
+                "height": 26,
+            },
             cells={
                 "values": [names, gnp, industry],
-                "align": ["left", "right", "right"],
+                "align": align,
                 "format": ["", ".1f", ".1f"],
+                "fill": {"color": "rgba(0,0,0,0)"},
+                "line": {"width": 0},
+                "font": {"color": "#1f2937", "size": 12},
                 "height": 34,
             },
             columnwidth=[2, 1, 1],
@@ -62,7 +71,7 @@ def make_after(data) -> go.Figure:
         row=1,
         col=1,
     )
-    rows = [41 + index * 34 for index in range(len(names))]
+    rows = [42 + index * 34 for index in range(len(names))]
     for column, values in ((2, gnp), (3, industry)):
         fig.add_trace(
             go.Scatter(
@@ -71,10 +80,12 @@ def make_after(data) -> go.Figure:
                 mode="markers",
                 showlegend=False,
                 marker={
-                    "color": "#245a80",
+                    "color": "#3b82c4",
+                    "size": 8,
                     "symbol": ["diamond", "circle", "circle", "circle", "circle"],
                 },
                 hovertext=names,
+                hovertemplate="%{hovertext}: %{x:.1f}%<extra></extra>",
             ),
             row=1,
             col=column,
@@ -88,12 +99,15 @@ def make_after(data) -> go.Figure:
             y1=1,
             xref=xref,
             yref=yref,
-            line={"color": "#a0a0a0", "width": 1},
+            line={"color": "#9ca3af", "width": 1, "dash": "dot"},
         )
-        fig.update_yaxes(range=[194, 0], visible=False, row=1, col=column)
+        fig.update_yaxes(range=[196, 0], visible=False, row=1, col=column)
         fig.update_xaxes(range=[0, 7], tickvals=[0, 3, 6], ticksuffix="%", row=1, col=column)
     fig.update_layout(
-        template="simple_white", height=260, margin={"l": 10, "r": 12, "t": 30, "b": 36}
+        template="simple_white",
+        font={"family": "Inter, system-ui, -apple-system, sans-serif", "color": "#1f2937"},
+        height=260,
+        margin={"l": 0, "r": 12, "t": 32, "b": 36},
     )
     return fig
 

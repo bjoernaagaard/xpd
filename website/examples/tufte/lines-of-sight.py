@@ -51,6 +51,10 @@ def make_after(data) -> go.Figure:
     )
     fig.update_xaxes(matches="x", nticks=4)
     fig.for_each_annotation(lambda note: note.update(text=note.text.split("=")[-1]))
+    fig.update_layout(
+        font={"family": "Inter, system-ui, -apple-system, sans-serif", "color": "#1f2937"},
+        colorway=["#3b82c4", "#d97706", "#14967f", "#8b5cf6", "#dc4c3e", "#78716c"],
+    )
     return fig
 
 

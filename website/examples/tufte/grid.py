@@ -59,6 +59,10 @@ def make_after(data) -> go.Figure:
     fig.update_layout(template="simple_white", yaxis_title="Index (first week = 1)")
     fig.update_xaxes(showgrid=False)
     fig.update_yaxes(showgrid=True, gridcolor="#eeeeee", gridwidth=1)
+    fig.update_layout(
+        font={"family": "Inter, system-ui, -apple-system, sans-serif", "color": "#1f2937"},
+        colorway=["#3b82c4", "#d97706", "#14967f", "#8b5cf6", "#dc4c3e", "#78716c"],
+    )
     return fig
 
 

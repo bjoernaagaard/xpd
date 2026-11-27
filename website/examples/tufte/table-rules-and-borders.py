@@ -49,20 +49,19 @@ def make_before(data) -> go.Figure:
             columnwidth=[2, 1, 1, 1, 1],
         )
     )
-    fig.update_layout(
-        template="simple_white", height=360, margin={"l": 12, "r": 12, "t": 52, "b": 12}
-    )
+    fig.update_layout(template="simple_white", height=320, margin={"l": 0, "r": 0, "t": 16, "b": 8})
     return fig
 
 
 def make_after(data) -> go.Figure:
     fig = go.Figure()
+    align = ["left", "right", "right", "right", "right"]
     for index, topic in enumerate(("Party", "Ideology")):
         group = [row[1:] for row in data if row[0] == topic]
         top = 1 - 0.5 * index
         fig.add_trace(
             go.Table(
-                domain={"y": [top - 0.43, top - 0.05]},
+                domain={"y": [top - 0.43, top - 0.09]},
                 columnwidth=[2, 1, 1, 1, 1],
                 header={
                     "values": [
@@ -72,19 +71,32 @@ def make_after(data) -> go.Figure:
                         "Anderson 1980 (%)",
                         "Carter and Ford 1976 (%)",
                     ],
+                    "align": align,
+                    "fill": {"color": "rgba(15,23,42,0.04)"},
+                    "line": {"color": "#cbd5e1", "width": 1},
+                    "font": {"color": "#1f2937", "size": 12},
                     "height": 32,
                 },
                 cells={
                     "values": list(zip(*group, strict=True)),
                     "line": {"width": 0},
-                    "fill": {"color": "#ffffff"},
-                    "align": ["left", "right", "right", "right", "right"],
+                    "fill": {"color": "rgba(0,0,0,0)"},
+                    "align": align,
+                    "font": {"color": "#1f2937", "size": 12},
                     "height": 26,
                 },
             )
         )
         fig.add_annotation(
-            x=0, y=top, xref="paper", yref="paper", text=topic, showarrow=False, yanchor="top"
+            x=0,
+            y=top,
+            xref="paper",
+            yref="paper",
+            text=f"<b>{topic}</b>",
+            showarrow=False,
+            xanchor="left",
+            yanchor="top",
+            font={"size": 13},
         )
     fig.add_shape(
         type="line",
@@ -94,10 +106,13 @@ def make_after(data) -> go.Figure:
         y1=0.53,
         xref="paper",
         yref="paper",
-        line={"width": 1, "color": "#b0b0b0"},
+        line={"width": 1, "color": "#cbd5e1"},
     )
     fig.update_layout(
-        template="simple_white", height=455, margin={"l": 12, "r": 12, "t": 20, "b": 10}
+        template="simple_white",
+        font={"family": "Inter, system-ui, -apple-system, sans-serif", "color": "#1f2937"},
+        height=390,
+        margin={"l": 0, "r": 0, "t": 12, "b": 8},
     )
     return fig
 

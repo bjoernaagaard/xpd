@@ -38,6 +38,10 @@ def make_after(data) -> go.Figure:
         margin={"l": 151, "r": 12},
         xaxis_title="Life expectancy (years)",
     )
+    fig.update_layout(
+        font={"family": "Inter, system-ui, -apple-system, sans-serif", "color": "#1f2937"},
+        colorway=["#3b82c4", "#d97706", "#14967f", "#8b5cf6", "#dc4c3e", "#78716c"],
+    )
     return fig
 
 

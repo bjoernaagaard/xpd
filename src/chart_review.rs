@@ -102,6 +102,8 @@ pub(crate) enum Kind {
     ZeroMissingAmbiguity,
     /// Legend forces eye travel where direct series labels belong (VDQI p. 183).
     LegendInsteadOfLabels,
+    /// Direct label or annotation sits on an axis edge without range padding or collides with another label (VDQI p. 183).
+    LabelCollision,
     /// Axis or series label shows a raw column name instead of spelled-out words (VDQI p. 183).
     ColumnNameLabel,
     /// Tick labels are rotated instead of running left to right (VDQI p. 183).
@@ -170,6 +172,7 @@ impl ledger::Kind for Kind {
             | Self::AlphabeticalOrder
             | Self::ZeroMissingAmbiguity => Group::EncodingAndForm,
             Self::LegendInsteadOfLabels
+            | Self::LabelCollision
             | Self::ColumnNameLabel
             | Self::RotatedTicks
             | Self::AllCapsText

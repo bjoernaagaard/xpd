@@ -37,6 +37,10 @@ def make_after(data) -> go.Figure:
         fig.add_trace(go.Bar(x=days, y=bills, showlegend=False), row=1, col=column)
     fig.update_layout(template="simple_white")
     fig.update_yaxes(range=[0, 100], dtick=20, showgrid=True, gridcolor="#e8e8e8", gridwidth=1)
+    fig.update_layout(
+        font={"family": "Inter, system-ui, -apple-system, sans-serif", "color": "#1f2937"},
+        colorway=["#3b82c4", "#d97706", "#14967f", "#8b5cf6", "#dc4c3e", "#78716c"],
+    )
     return fig
 
 

@@ -45,6 +45,10 @@ def make_after(data) -> go.Figure:
         xaxis_title="Date",
         yaxis_title="Oil price (nominal USD per barrel)",
     )
+    fig.update_layout(
+        font={"family": "Inter, system-ui, -apple-system, sans-serif", "color": "#1f2937"},
+        colorway=["#3b82c4", "#d97706", "#14967f", "#8b5cf6", "#dc4c3e", "#78716c"],
+    )
     return fig
 
 

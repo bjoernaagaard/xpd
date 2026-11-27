@@ -52,9 +52,25 @@ def make_after(data) -> go.Figure:
         log_x=True,
         template="simple_white",
         hover_name="Country",
-        color_discrete_sequence=["#245a80", "#8f591f", "#643e90", "#447d80", "#353535"],
+        color_discrete_sequence=["#3b82c4", "#d97706", "#8b5cf6", "#14967f", "#78716c"],
     )
-    fig.update_layout(legend={"orientation": "h", "y": 1.05})
+    fig.update_traces(
+        marker={"size": 7, "opacity": 0.9},
+        hovertemplate="<b>%{hovertext}</b><br>Income: $%{x:,.0f}<br>Life expectancy: %{y:.1f} yr<extra>%{fullData.name}</extra>",
+    )
+    fig.update_layout(
+        font={"family": "Inter, system-ui, -apple-system, sans-serif", "color": "#1f2937"},
+        title={
+            "text": "Income and life expectancy by continent, 2007",
+            "x": 0,
+            "xanchor": "left",
+            "subtitle": {"text": "GDP per capita on a log scale versus life expectancy at birth"},
+        },
+        xaxis_tickprefix="$",
+        yaxis_title="Life expectancy (years)",
+        legend={"orientation": "h", "y": 1.06, "x": 0, "xanchor": "left", "title": {"text": ""}},
+        margin={"l": 64, "r": 24, "t": 100, "b": 64},
+    )
     return fig
 
 

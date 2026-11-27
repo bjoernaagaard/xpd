@@ -23,25 +23,44 @@ def make_before(data) -> go.Figure:
 
 def make_after(data) -> go.Figure:
     days, counts = zip(*((day, count) for day, count in data if count), strict=True)
-    fig = go.Figure(go.Bar(x=days, y=counts, name="Observed lunches"))
+    fig = go.Figure(
+        go.Bar(
+            x=days,
+            y=counts,
+            name="Observed lunches",
+            marker_color="#3b82c4",
+            hovertemplate="%{x}: %{y} lunch bills<extra></extra>",
+        )
+    )
     fig.add_trace(
         go.Scatter(
             x=["Sun"],
             y=[0],
             mode="markers",
-            marker={"symbol": "diamond", "size": 9},
+            marker={"symbol": "diamond", "size": 9, "color": "#d97706"},
             showlegend=False,
             cliponaxis=False,
+            hovertemplate="Sun: 0 observed lunch bills<extra></extra>",
         )
     )
-    fig.add_annotation(x="Sun", y=0, text="Zero", yshift=14, showarrow=False)
-    fig.add_annotation(x="Mon", y=0, text="Missing", yshift=14, showarrow=False)
+    fig.add_annotation(x="Sun", y=0, text="Zero", yshift=16, showarrow=False)
+    fig.add_annotation(x="Mon", y=0, text="Missing", yshift=16, showarrow=False)
     fig.update_layout(
         template="simple_white",
+        font={"family": "Inter, system-ui, -apple-system, sans-serif", "color": "#1f2937"},
+        title={
+            "text": "Lunch bills by day of week",
+            "x": 0,
+            "xanchor": "left",
+            "subtitle": {"text": "Sunday has zero observed lunches; Monday was not recorded"},
+        },
+        xaxis_title="Day",
         yaxis_title="Lunch bills",
+        yaxis_range=[0, 72],
         xaxis_categoryorder="array",
         xaxis_categoryarray=[day for day, _ in data],
         xaxis_range=[-0.5, 4.5],
+        margin={"l": 60, "r": 24, "t": 84, "b": 64},
     )
     return fig
 
