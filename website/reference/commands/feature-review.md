@@ -9,7 +9,7 @@ $ xpd feature-review --questions --format json | jq -c '[.questions[].id] | sort
 
 ## Manifest
 
-Commit `feature-review.json` at the Git root. Select every owning file. A feature needs an output `column` and can name a graph `node` that resolves once in its owner. A hypothesis can live in an existing project note. Use its original ID when implementing it.
+Commit `feature-review.json` at the Git root. Without it the survey runs only the pack and encoder rules, and the text output says so. The rolling and duplicate checks, the checklist and `--adapter` need it. Select every owning file. A feature needs an output `column` and can name a graph `node` that resolves once in its owner. A hypothesis can live in an existing project note. Use its original ID when implementing it.
 
 ```json title="feature-review.json"
 {

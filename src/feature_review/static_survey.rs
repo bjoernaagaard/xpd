@@ -20,9 +20,15 @@ use super::{CATALOG, Feature, FeatureKind, Kind, Manifest, Rolling, fold_facts, 
 
 #[derive(Debug, Serialize)]
 pub(super) struct Read {
-    manifest: Manifest,
+    manifest: Option<Manifest>,
     graph: Value,
     pub(super) facts: Value,
+}
+
+impl Read {
+    pub(super) fn has_manifest(&self) -> bool {
+        self.manifest.is_some()
+    }
 }
 
 pub(super) fn survey(
@@ -34,12 +40,13 @@ pub(super) fn survey(
     policy: AdapterPolicy,
 ) -> Result<SurveyOutput<Kind, Read>> {
     let root = tree.top.context("feature-review needs a Git repository")?;
-    let manifest: Manifest = serde_json::from_slice(
-        &std::fs::read(root.join("feature-review.json"))
-            .context("cannot read feature-review.json")?,
-    )
-    .context("invalid feature-review.json")?;
-    validate_manifest(&manifest, root, paths)?;
+    let manifest = read_manifest(root)?;
+    if let Some(manifest) = &manifest {
+        validate_manifest(manifest, root, paths)?;
+    }
+    let features = manifest
+        .as_ref()
+        .map_or(&[][..], |manifest| &manifest.features);
     let listing = Listing::of(paths, tree, top, commit)?;
     let python: BTreeMap<String, _> = listing
         .files
@@ -52,7 +59,7 @@ pub(super) fn survey(
         .collect();
     let graph_paths: Vec<_> = python.keys().map(PathBuf::from).collect();
     let graph = Graph::read(root, &graph_paths).to_json();
-    let nodes = feature_nodes(&manifest, &graph)?;
+    let nodes = feature_nodes(features, &graph)?;
     let known_rules: BTreeMap<_, _> = Kind::value_variants()
         .iter()
         .copied()
@@ -97,21 +104,22 @@ pub(super) fn survey(
     computations.dedup_by(|left, right| left.1 == right.1);
     duplicate_findings(computations, &mut findings);
 
-    let implemented = manifest
-        .features
+    let implemented = features
         .iter()
         .any(|feature| feature.kind == FeatureKind::Feature);
     ensure!(
         !implemented || adapter.is_some() || policy == AdapterPolicy::BestEffort,
         "recorded feature-review with implemented candidates requires an adapter"
     );
-    let facts = adapter
-        .map(|spec| fold_facts::measure(spec, root, &manifest))
-        .transpose()?
-        .unwrap_or(Value::Null);
+    let facts = match (adapter, &manifest) {
+        (Some(spec), Some(manifest)) => fold_facts::measure(spec, root, manifest)?,
+        (Some(_), None) => anyhow::bail!(
+            "the feature-review adapter needs feature-review.json at the Git root, with the target, prediction cutoff, baseline and candidates"
+        ),
+        (None, _) => Value::Null,
+    };
     let catalog = Catalog::load(CATALOG)?;
-    let checklist = manifest
-        .features
+    let checklist = features
         .iter()
         .flat_map(|feature| {
             catalog.checklist(
@@ -174,6 +182,19 @@ fn append_pack_findings(
             });
         }
     }
+}
+
+/// Reads `feature-review.json` at the Git root. A project without one gets the pack and encoder
+/// findings only, because the rolling, duplicate and checklist parts need its declared features.
+fn read_manifest(root: &Path) -> Result<Option<Manifest>> {
+    let bytes = match std::fs::read(root.join("feature-review.json")) {
+        Ok(bytes) => bytes,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+        Err(error) => return Err(error).context("cannot read feature-review.json"),
+    };
+    serde_json::from_slice(&bytes)
+        .map(Some)
+        .context("invalid feature-review.json")
 }
 
 fn validate_manifest(manifest: &Manifest, root: &Path, paths: &[PathBuf]) -> Result<()> {
@@ -241,11 +262,11 @@ fn validate_manifest(manifest: &Manifest, root: &Path, paths: &[PathBuf]) -> Res
 }
 
 fn feature_nodes<'a>(
-    manifest: &'a Manifest,
+    features: &'a [Feature],
     graph: &'a Value,
 ) -> Result<Vec<(&'a Feature, &'a Value)>> {
     let mut resolved = Vec::new();
-    for feature in &manifest.features {
+    for feature in features {
         let Some(name) = &feature.node else { continue };
         let matches: Vec<_> = graph["nodes"]
             .as_array()
