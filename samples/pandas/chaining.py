@@ -100,7 +100,7 @@ def ladders_that_stay():
     return df, name, rows, other
 
 
-def clean(frame):
+def clean(frame):  # xpd: generic-verb-name
     return frame.dropna(subset=["price"])
 
 

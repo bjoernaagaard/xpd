@@ -73,7 +73,7 @@ def settings_toml() -> str:
     ruff = tomllib.loads(PROFILE.read_text())["ruff"]
     tables: dict[str, dict[str, object]] = defaultdict(dict)
     tables["lint"]["select"] = ruff["select"]
-    tables["lint"]["ignore"] = ruff["ignore"]
+    tables["lint"]["ignore"] = ruff.get("ignore", [])
     for table, key, value in leaves(ruff["settings"], ()):
         if key not in {"unfixable", "required-version"}:
             tables[table][key] = value
@@ -225,7 +225,7 @@ def page_pairs(root: Path, config: str, rules: list[dict[str, str]]) -> list[Pai
 def example_pairs(root: Path, config: str) -> list[Pair]:
     """Run xpd on the bad example and on the recommended code of every Ruff rule page."""
     bad, good = {}, {}
-    off = tuple(tomllib.loads(PROFILE.read_text())["ruff"]["ignore"])
+    off = tuple(tomllib.loads(PROFILE.read_text())["ruff"].get("ignore", []))
     for rule in json.loads(run(["ruff", "rule", "--all", "--output-format", "json"], root)):
         example = rule["explanation"].partition("## Example")[2]
         wrong, found, recommended = example.partition("Use instead")

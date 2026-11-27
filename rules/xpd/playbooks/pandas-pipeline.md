@@ -47,7 +47,7 @@ def prepared(orders: pd.DataFrame) -> pd.DataFrame:
     return orders.pipe(valid_rows).pipe(amounts).pipe(customer_shares)
 
 
-def load(path: Path) -> pd.DataFrame:
+def load_orders(path: Path) -> pd.DataFrame:
     orders = pd.read_parquet(path, columns=COLUMNS)
     return prepared(orders)
 ```

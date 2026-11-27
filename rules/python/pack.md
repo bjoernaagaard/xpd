@@ -7,8 +7,8 @@ and the `python-review` skill reviews code against it.
 
 | Group | Rules |
 | --- | --- |
-| Names | `module-private-name`, `vague-module-name` |
-| Search | `error-message-prefix`, `deprecated-without-decorator` |
+| Names | `module-private-name`, `vague-module-name`, `generic-verb-name` |
+| Search | `error-message-prefix`, `deprecated-without-decorator`, `interpolated-key` |
 | Modules | `import-side-effect` |
 | Types | `typing-cast`, `dict-str-any`, `id-without-newtype`, `record-without-namedtuple`, `json-without-type`, `same-type-conversion`, `float-around-number` |
 | Functions | `pass-through-function`, `multi-line-call-argument` |
@@ -19,10 +19,11 @@ and the `python-review` skill reviews code against it.
 
 ## Names
 
-Name each module after what it holds, and leave the underscore off module level names.
+Name each module after what it holds, leave the underscore off module level names, and give each verb its object.
 
 - module-private-name
 - vague-module-name
+- generic-verb-name
 
 ## Search
 
@@ -30,6 +31,7 @@ Put the words a search uses where the search lands, so a message from a log or a
 
 - error-message-prefix
 - deprecated-without-decorator
+- interpolated-key
 
 ## Modules
 

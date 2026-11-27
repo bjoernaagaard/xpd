@@ -125,7 +125,7 @@ class Item(NamedTuple):
     price: float
 
 
-def load(body: bytes) -> float:
+def load(body: bytes) -> float:  # xpd: generic-verb-name
     return json.loads(body)["price"]  # xpd: json-without-type
 
 
@@ -414,3 +414,30 @@ def load_orders(path: str, sep: str | None = None) -> str:
     if sep is not None:
         warnings.warn("The sep argument is ignored", DeprecationWarning, stacklevel=2)
     return path
+
+
+def clean(text: str) -> str:  # xpd: generic-verb-name
+    return " ".join(text.split())
+
+
+def clean_title(text: str) -> str:
+    return " ".join(text.split())
+
+
+EVENT_NAMES = {("pr", "merged"): "github.pr.merged", ("pr", "closed"): "github.pr.closed"}
+
+
+def event_name(entity: str, action: str) -> str:
+    return f"github.{entity}.{action}"  # xpd: interpolated-key
+
+
+def event_name_whole(entity: str, action: str) -> str:
+    return EVENT_NAMES[entity, action]
+
+
+def loader_of(module: object, kind: str) -> object:
+    return getattr(module, f"load_{kind}")  # xpd: interpolated-key
+
+
+def column_of(zone: str) -> str:
+    return f"{zone}_mw"

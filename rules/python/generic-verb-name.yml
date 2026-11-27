@@ -1,0 +1,21 @@
+id: generic-verb-name
+language: python
+severity: warning
+message: $NAME is only a verb, so a search for $NAME also finds every other function with that verb. Add what it acts on, such as load_orders or clean_title.
+rule:
+  kind: function_definition
+  inside: { kind: module }
+  has:
+    field: name
+    pattern: $NAME
+    regex: ^(analyze|apply|build|check|clean|compute|convert|create|diff|execute|fetch|filter|format|get|handle|load|make|merge|normalize|parse|prepare|process|read|render|run|sanitize|save|sort|transform|update|validate|write)$
+  not:
+    inside:
+      stopBy: end
+      kind: module
+      has:
+        any:
+          - kind: import_statement
+            has: { stopBy: end, kind: dotted_name, regex: ^hamilton(\.|$) }
+          - kind: import_from_statement
+            has: { field: module_name, regex: ^hamilton(\.|$) }

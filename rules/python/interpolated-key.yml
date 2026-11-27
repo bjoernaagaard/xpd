@@ -1,0 +1,17 @@
+id: interpolated-key
+language: python
+severity: warning
+message: This name is built from parts, so a search for the whole name finds nothing. Write each name out whole, such as a dict from each value to its full name.
+rule:
+  kind: string
+  has: { kind: interpolation }
+  any:
+    - regex: '^[fF]["''][^\s/"'']*[A-Za-z_]{2,}\.\{[^\s/"'']*["'']$'
+    - regex: '^[fF]["''][^\s"'']*["'']$'
+      inside:
+        kind: argument_list
+        inside:
+          kind: call
+          has:
+            field: function
+            regex: ^(getattr|setattr|hasattr|delattr|(importlib\.)?import_module|__import__)$

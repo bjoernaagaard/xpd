@@ -21,7 +21,7 @@ def features(orders: pd.DataFrame) -> pd.DataFrame:
     )
 
 
-def load(path: str) -> pd.DataFrame:  # xpd: pass-through-function
+def load(path: str) -> pd.DataFrame:  # xpd: pass-through-function, generic-verb-name
     return pd.read_parquet(path)
 
 

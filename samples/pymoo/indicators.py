@@ -52,7 +52,7 @@ def distance_on_a_stretched_front():
     return ignored, plain, scaled, off, normalize(F)
 
 
-def normalize(F, normalize=True):
+def normalize(F, normalize=True):  # xpd: generic-verb-name
     return (F - F.min(axis=0)) / (F.max(axis=0) - F.min(axis=0)) if normalize else F
 
 
