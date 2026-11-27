@@ -1,6 +1,7 @@
 //! The embedded Tufte VDQI inventory (`rules/xpd/chart-review.yml`), shared by
 //! `xpd chart-review` and `xpd rules --format json`.
 
+use super::Kind;
 use anyhow::{Context as _, Result};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
@@ -100,6 +101,7 @@ impl Question {
             "kinds": self.kinds,
             "plotly": self.plotly,
             "rules": rules,
+            "rule_finding_kinds": self.rules.iter().filter_map(|rule| Kind::of_plotly_rule(rule)).collect::<Vec<_>>(),
             "facts": self.facts,
             "covers": self.covers,
             "mode": self.mode,

@@ -2,6 +2,7 @@
 
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { parseArgs } from 'node:util';
 
 import { buildXpd } from './exec.mjs';
 import { lintDocs } from './prose-lint.mjs';
@@ -9,7 +10,7 @@ import { generateReference } from './reference.mjs';
 import { generateRules } from './rules.mjs';
 
 const repository = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
+const { values } = parseArgs({ options: { 'tufte-id': { type: 'string', multiple: true } } });
 lintDocs(repository);
 const xpd = buildXpd(repository);
-generateRules(xpd);
-await generateReference(xpd);
+generateRules(xpd, await generateReference(xpd, values['tufte-id']));

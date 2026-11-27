@@ -38,7 +38,7 @@ function severityText(rule) {
   return `${rule.severities.default}${strict}. A rule of the [house style](../../../commands/check/#house-style)`;
 }
 
-function reviewQuestions(rule) {
+function reviewQuestions(rule, exampleIds) {
   if (!rule.questions?.length) return [];
   return [
     '## Questions of the chart review',
@@ -47,12 +47,16 @@ function reviewQuestions(rule) {
     '',
     '| Question | Page | Principle | What it asks |',
     '| --- | --- | --- | --- |',
-    ...rule.questions.map((question) => `| ${question.id} | ${question.page} | ${question.principle} | ${question.text.replaceAll('|', '\\|')} |`),
+    ...rule.questions.map((question) => {
+      const { id } = question;
+      const link = exampleIds.has(id) ? `[${id}](../../../guides/tufte-examples/${id}/)` : id;
+      return `| ${link} | ${question.page} | ${question.principle} | ${question.text.replaceAll('|', '\\|')} |`;
+    }),
     '',
   ];
 }
 
-export function generateRules(xpd) {
+export function generateRules(xpd, exampleIds = new Set()) {
   const catalog = JSON.parse(
     run(xpd, ['rules', '--builtin', '--format', 'json'], { cwd: repository }),
   );
@@ -106,7 +110,7 @@ export function generateRules(xpd) {
         '',
         siteLinks(rule.doc, pack, 2),
         '',
-        ...reviewQuestions(rule),
+        ...reviewQuestions(rule, exampleIds),
         '## Diagnostic message',
         '',
         '```text',
