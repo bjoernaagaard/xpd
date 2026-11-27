@@ -1,5 +1,5 @@
 ---
-const { id, example, table, version, publicVariants, csv, rules } = Astro.props;
+const { id, example, table, version, csv, rules } = Astro.props;
 const base = import.meta.env.BASE_URL.replace(/\/$/, '');
 const assets = `${base}/tufte-examples`;
 const variants = ['before', 'after'];
@@ -19,18 +19,14 @@ for (const row of (table?.rows ?? []) as Cell[][]) {
   <footer>Edward Tufte, <cite>The Visual Display of Quantitative Information</cite>, second edition, p. {example.book.page}.</footer>
 </blockquote>
 
-{variants.map((variant, index) => (
+{variants.map((variant) => (
   <section>
     <h2 id={variant}>{variant === 'before' ? 'Before' : 'After'}</h2>
     <figure aria-labelledby={variant} aria-describedby={`${variant}-caption example-values`}>
-      {publicVariants[index] && (
-        <>
-          <div class="chart" data-plotly-spec={`${assets}/${id}/${variant}.json`}
-            data-plotly-bundle={`${assets}/plotly-${version}.min.js`} aria-hidden="true"></div>
-          <label data-plotly-frames hidden>Frame <select></select></label>
-          <p data-plotly-error hidden>Interactive chart unavailable.</p>
-        </>
-      )}
+      <div class="chart" data-plotly-spec={`${assets}/${id}/${variant}.json`}
+        data-plotly-bundle={`${assets}/plotly-${version}.min.js`} aria-hidden="true"></div>
+      <label data-plotly-frames hidden>Frame <select></select></label>
+      <p data-plotly-error hidden>Interactive chart unavailable.</p>
       <figcaption id={`${variant}-caption`}>{example[variant].caption}</figcaption>
     </figure>
     <p><a href={`${assets}/${id}/${variant}.py`} download>Download {variant} Python code</a></p>

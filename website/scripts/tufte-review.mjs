@@ -66,9 +66,9 @@ export function validateReview(question, variants) {
       .map(([name]) => name);
     const relevant = report.findings.filter(({ kind }) => kinds.has(kind));
     const colorFailure = report.findings.some(({ kind }) => kind === 'red-green-only');
-    const hidden = question.id === 'color-deficient' && variant === 'before';
-    if (colorFailure !== hidden) throw new Error(`${variant} color gate: ${JSON.stringify(report.findings)}`);
-    return { failed, relevant, hidden };
+    const expectedColorFailure = question.id === 'color-deficient' && variant === 'before';
+    if (colorFailure !== expectedColorFailure) throw new Error(`${variant} color gate: ${JSON.stringify(report.findings)}`);
+    return { failed, relevant };
   });
   const [before, after] = results;
   const measured = kinds.size > 0 || Boolean(predicate);
@@ -78,5 +78,4 @@ export function validateReview(question, variants) {
   if ((measured && !counts[0] && !counts[1]) || counts[2] || counts[3]) {
     throw new Error(`before or after failed the review contract: ${JSON.stringify({ before, after, reports: Object.values(variants).map(({ findings }) => findings) })}`);
   }
-  return results.map(({ hidden }) => !hidden);
 }

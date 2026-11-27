@@ -80,9 +80,10 @@ EXAMPLE = {
         "line": 7986,
     },
     "before": {
-        "caption": "One solid red line and one solid green line carry the two indexes. "
+        "caption": "The original chart uses solid red and green lines for the two indexes. "
         "A reader who cannot distinguish those colors can lose track of the "
-        "lines.",
+        "lines. The chart on this page uses dashes for Apple. The downloaded before "
+        "code uses two solid lines.",
         "summary": "On December 31, Google was about 0.97 and Apple 0.85. Both started at 1.00.",
     },
     "after": {

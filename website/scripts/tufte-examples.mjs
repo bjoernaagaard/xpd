@@ -1,4 +1,4 @@
-import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readdirSync, renameSync, rmSync, writeFileSync } from 'node:fs';
+import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
@@ -51,13 +51,7 @@ function readMetadata(python, sections, work, assets, source) {
   return result;
 }
 
-function reviewVariant({ xpd, python, variant, sections, work }) {
-  const file = join(work, `${variant}.py`);
-  const figure = join(work, `${variant}.json`);
-  const payload = join(work, `${variant}.adapter.json`);
-  const section = sections[variants.indexOf(variant) + 1];
-  writeFileSync(file, `${sections[0].trimEnd()}\n\n\n${section.trim()}\n\n\nif __name__ == "__main__":\n    print(make_${variant}(load_data()).to_json())\n`);
-  writeFileSync(figure, step(python, [file]));
+function measureFigure(xpd, python, variant, file, figure, payload) {
   writeFileSync(payload, step(python, [pythonHelper, 'adapter', figure, join(repository, 'py', 'figure_facts.py'), variant]));
   const report = JSON.parse(step(xpd, ['chart-review', file, '--adapter', `cat ${shellQuote(payload)}`, '--format', 'json', '--limit', '0']));
   const runtime = report.read?.facts;
@@ -68,6 +62,38 @@ function reviewVariant({ xpd, python, variant, sections, work }) {
     throw new Error(`expected one scanned Python file and one measured Plotly figure: ${JSON.stringify(report)}`);
   }
   return report;
+}
+
+function reviewVariant({ xpd, python, variant, sections, work }) {
+  const file = join(work, `${variant}.py`);
+  const figure = join(work, `${variant}.json`);
+  const payload = join(work, `${variant}.adapter.json`);
+  const section = sections[variants.indexOf(variant) + 1];
+  writeFileSync(file, `${sections[0].trimEnd()}\n\n\n${section.trim()}\n\n\nif __name__ == "__main__":\n    print(make_${variant}(load_data()).to_json())\n`);
+  writeFileSync(figure, step(python, [file]));
+  return measureFigure(xpd, python, variant, file, figure, payload);
+}
+
+function publishFigure({ id, variant, work, assets, xpd, python }) {
+  const name = `${variant}.json`;
+  const figure = join(work, name);
+  const published = join(assets, name);
+  if (id !== 'color-deficient' || variant !== 'before') {
+    copyFileSync(figure, published);
+    return;
+  }
+
+  const spec = JSON.parse(readFileSync(figure, 'utf8'));
+  const apple = spec.data.find(({ name }) => name === 'AAPL');
+  apple.line.dash = 'dash';
+  writeFileSync(published, JSON.stringify(spec));
+  const report = measureFigure(
+    xpd, python, variant, join(work, 'before.py'), published, join(work, 'public-before.adapter.json'),
+  );
+  if (report.findings.some(({ kind }) => kind === 'red-green-only')) {
+    throw new Error(`public before color gate: ${JSON.stringify(report.findings)}`);
+  }
+  console.log('color-deficient public before | color gate passed');
 }
 
 function generateExample(question, paths, xpd, python, version, order) {
@@ -87,12 +113,12 @@ function generateExample(question, paths, xpd, python, version, order) {
         throw new Error(`${variant}: ${error.message}`, { cause: error });
       }
     }));
-    const publicVariants = validateReview(question, reports);
-    for (const [index, variant] of variants.entries()) {
+    validateReview(question, reports);
+    for (const variant of variants) {
       copyFileSync(join(work, `${variant}.py`), join(assets, `${variant}.py`));
-      if (publicVariants[index]) copyFileSync(join(work, `${variant}.json`), join(assets, `${variant}.json`));
+      publishFigure({ id, variant, work, assets, xpd, python });
     }
-    const props = { id, example, table, version, publicVariants, csv: existsSync(join(assets, 'values.csv')), rules: question.rules };
+    const props = { id, example, table, version, csv: existsSync(join(assets, 'values.csv')), rules: question.rules };
     writeFileSync(join(paths.pages, `${id}.mdx`), page({
       title: yaml(question.principle),
       description: yaml(example.after.caption),
