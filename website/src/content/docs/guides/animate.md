@@ -8,10 +8,11 @@ Run `xpd animate` to render and revise an editable Manim video from a built-in s
 ```mermaid
 flowchart LR
     A["xpd animate doctor and setup"] --> B["xpd animate guide <recipe> > scene.py"]
-    B --> C["xpd animate render --profile preview"]
+    B --> C["xpd animate start"]
     C --> D["Inspect video and contact sheet"]
-    D -->|Edit scene.py| C
-    D -->|Approved| E["xpd animate render --profile final"]
+    D -->|Edit and run xpd animate revise| P["Render the next preview"]
+    P --> D
+    D -->|Approved| E["xpd animate approve"]
 ```
 
 ## Set up the renderer once
@@ -26,13 +27,29 @@ xpd animate doctor --json
 
 ## Render and revise a scene
 
-Generate an editable starter scene, render a 1080p preview with a contact sheet, tweak timing or layout, and render the 4K final video. Jobs are cached under `.xpd-animate/jobs/<id>/` (pass `--no-cache` to force a fresh render).
+Start a run with a scene and its assets. Inspect the preview video and contact sheet.
 
 ```sh
 xpd animate guide sequence > cache_miss.py
-xpd animate render cache_miss.py CacheMiss --profile preview --json
-xpd animate render cache_miss.py CacheMiss --profile final --json
+xpd animate start cache_miss.py CacheMiss --json
 ```
+
+Use the returned run ID in place of `RUN`. Approve revision 1 if the first preview is ready.
+After editing, submit a new revision and inspect its preview before approving it.
+
+```sh
+xpd animate revise RUN --revision 1 --note "Hold the last frame longer" --json
+xpd animate status RUN --json
+xpd animate approve RUN --revision 2 --json
+```
+
+The project holds source bundles and render artifacts under `.xpd-animate/`. Duroxide stores
+review history in SQLite under `$XDG_STATE_HOME/xpd/animate`, defaulting to
+`~/.local/state/xpd/animate`. Run commands from the same project directory so xpd can find its history.
+
+Approval renders the saved revision even if the working files have changed. Use
+`xpd animate resume RUN` to recover an interrupted render. For a standalone render, use
+`xpd animate render` with one of the following profiles.
 
 | Profile | Manim preset | Output | Resolution |
 | --- | --- | --- | --- |

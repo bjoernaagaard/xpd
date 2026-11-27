@@ -30,6 +30,8 @@ pub(crate) enum Profile {
 
 #[derive(Debug, Subcommand)]
 pub(crate) enum Animation {
+    #[command(flatten)]
+    Workflow(crate::animate_workflow::Workflow),
     /// Show the offline animation workflow or print an editable Manim example.
     Guide {
         #[arg(value_enum)]
@@ -60,17 +62,28 @@ pub(crate) enum Animation {
     },
 }
 
+pub(crate) fn runner() -> Command {
+    let python = env::current_exe()
+        .and_then(fs::canonicalize)
+        .ok()
+        .map(|exe| exe.with_file_name("python"))
+        .filter(|python| python.is_file())
+        .unwrap_or_else(|| PathBuf::from("python3"));
+    let mut child = Command::new(python);
+    child.args(["-I", "-c", RUNNER, MEDIA, WORKER, SEQUENCE]);
+    child
+}
+
 impl Animation {
     pub(crate) fn run(self) -> Result<ExitCode> {
-        let python = env::current_exe()
-            .and_then(fs::canonicalize)
-            .ok()
-            .map(|exe| exe.with_file_name("python"))
-            .filter(|python| python.is_file())
-            .unwrap_or_else(|| PathBuf::from("python3"));
-        let mut child = Command::new(python);
-        child.args(["-I", "-c", RUNNER, MEDIA, WORKER, SEQUENCE]);
+        if !matches!(self, Self::Guide { .. })
+            && !cfg!(all(target_os = "linux", target_arch = "x86_64"))
+        {
+            anyhow::bail!("xpd animate currently needs Linux x86_64 and rootless Podman");
+        }
+        let mut child = runner();
         match self {
+            Self::Workflow(workflow) => return workflow.run(),
             Self::Guide { recipe } => {
                 let text = match recipe {
                     None => include_str!("../skills/xpd-animate/SKILL.md"),
@@ -132,9 +145,6 @@ impl Animation {
 fn run(mut child: Command) -> Result<ExitCode> {
     use std::os::unix::process::CommandExt;
 
-    if cfg!(not(all(target_os = "linux", target_arch = "x86_64"))) {
-        anyhow::bail!("xpd animate currently needs Linux x86_64 and rootless Podman");
-    }
     Err(child.exec()).context("xpd animate needs Python 3.10 or newer on PATH")
 }
 

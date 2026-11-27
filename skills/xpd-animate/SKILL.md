@@ -19,21 +19,32 @@ that runs in the app itself.
 3. Use a recipe or write a normal Manim `Scene` subclass. Keep the main scene and its inputs
    in the project. Pass every local asset or imported helper needed at render time. Make
    settings for the scene's important timing and data easy to edit.
-4. Render with the `preview` profile. Inspect the contact sheet and play the video when timing
-   matters. Check that the user can read the labels, follow the key change, and understand
-   the outcome. A `still` render is useful for checking the final layout.
-5. Render with the `final` profile after inspection. Return the video and source or the render
-   manifest so another session can revise the work. Check the new preview after any edit.
+4. Start a workflow from the project root. Inspect the preview video for timing and the contact
+   sheet for layout. If a change is needed, edit the scene or its assets and submit a revision
+   with a short note. Inspect each new preview.
+5. Approve the revision you inspected. Approval renders that saved scene and its assets at final
+   quality. Return the video and source bundle or render manifest.
 
 ## CLI
 
-Run from the project root:
+Start a run and save the run ID printed by the command:
 
 ```sh
 xpd animate guide sequence > cache_miss.py
-xpd animate render cache_miss.py CacheMiss --profile preview --json
-xpd animate render cache_miss.py CacheMiss --profile final --json
+xpd animate start cache_miss.py CacheMiss --json
 ```
+
+Use the returned ID in place of `RUN`. For example, after changing the pause in
+`cache_miss.py`, submit the edit, inspect revision 2, and approve it:
+
+```sh
+xpd animate revise RUN --revision 1 --note "Hold the last frame longer" --json
+xpd animate status RUN --json
+xpd animate approve RUN --revision 2 --json
+```
+
+Use `xpd animate resume RUN` after an interruption. For a standalone preview, final,
+or still, use `xpd animate render cache_miss.py CacheMiss --profile still`.
 
 The `preview` profile uses Manim's `-qh` (1080p60), and `final` uses `-qk`
 (4K60). The `still` profile uses `-qm -s` for the last frame at 720p.

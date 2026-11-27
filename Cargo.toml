@@ -51,14 +51,16 @@ sha2 = "0.10.9"
 siphasher = "1.0.4"
 gix = { version = "0.91.0", default-features = false, features = ["revision", "blob-diff", "sha1", "sha256"], optional = true }
 salsa = { version = "0.28.6", optional = true }
-duroxide = { version = "=0.2.1", features = ["sqlite"], optional = true }
-tokio = { version = "1.54.1", optional = true }
+duroxide = { version = "=0.2.1", features = ["sqlite"] }
+tokio = { version = "1.54.1", features = ["rt", "macros", "process"] }
+tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }
+uuid = { version = "1.29.3", features = ["v4"] }
 duroxide-pg = { version = "=0.2.0", optional = true }
 
 [features]
 default = []
 ledger-incremental = ["dep:gix", "dep:salsa"]
-ledger-durable = ["ledger-incremental", "dep:duroxide", "dep:tokio"]
+ledger-durable = ["ledger-incremental"]
 ledger-distributed = ["ledger-durable", "dep:duroxide-pg"]
 
 [build-dependencies]

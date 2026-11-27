@@ -5925,6 +5925,8 @@ dependencies = [
  "siphasher",
  "tokio",
  "toml_edit",
+ "tracing-subscriber",
+ "uuid",
 ]
 
 [[package]]

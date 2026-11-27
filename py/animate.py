@@ -2,6 +2,7 @@
 
 import argparse
 import contextlib
+import fcntl
 import hashlib
 import io
 import json
@@ -21,7 +22,7 @@ from configparser import Error as ConfigError
 from pathlib import Path
 from typing import NamedTuple, TypedDict
 from uuid import uuid4
-from zipfile import ZIP_DEFLATED, BadZipFile, ZipFile
+from zipfile import ZIP_DEFLATED, BadZipFile, ZipFile, ZipInfo
 
 VERSION = "0.22.1"
 IMAGE = (
@@ -171,25 +172,29 @@ def saved_files(root: Path, job_id: str) -> dict[Path, bytes]:
         msg = "Pass the ID of a saved render from this project."
         raise AnimationError(msg)
     archive = read_regular(folder / "source.zip", INPUT_LIMIT + 2 * INLINE_LIMIT)
+    with ZipFile(io.BytesIO(archive)) as bundle:
+        return archive_files(bundle)
+
+
+def archive_files(bundle: ZipFile) -> dict[Path, bytes]:
     files = {}
     remaining = INPUT_LIMIT
-    with ZipFile(io.BytesIO(archive)) as bundle:
-        entries = bundle.infolist()
-        if len(entries) > MAX_FILES:
-            msg = f"A saved render can include at most {MAX_FILES} files."
+    entries = bundle.infolist()
+    if len(entries) > MAX_FILES:
+        msg = f"A saved render can include at most {MAX_FILES} files."
+        raise AnimationError(msg)
+    for item in entries:
+        path = positive_path(item.filename)
+        if item.is_dir() or path in files or item.file_size > remaining:
+            msg = f"Invalid or oversized file in saved source: {item.filename}"
             raise AnimationError(msg)
-        for item in entries:
-            path = positive_path(item.filename)
-            if item.is_dir() or path in files or item.file_size > remaining:
-                msg = f"Invalid or oversized file in saved source: {item.filename}"
-                raise AnimationError(msg)
-            with bundle.open(item) as content:
-                data = content.read(remaining + 1)
-            remaining -= len(data)
-            if remaining < 0:
-                msg = "Saved source exceeds the total scene input limit."
-                raise AnimationError(msg)
-            files[path] = data
+        with bundle.open(item) as content:
+            data = content.read(remaining + 1)
+        remaining -= len(data)
+        if remaining < 0:
+            msg = "Saved source exceeds the total scene input limit."
+            raise AnimationError(msg)
+        files[path] = data
     return files
 
 
@@ -250,6 +255,36 @@ def load_scene(root: Path, args: argparse.Namespace) -> Scene:
         files[path] = data
         remaining -= len(data)
     return Scene(entry, args.scene, files)
+
+
+def snapshot(scene: Scene) -> str:
+    state = state_folder(Path.cwd(), STATE)
+    snapshots = state_folder(state, "snapshots")
+    with tempfile.NamedTemporaryFile(dir=snapshots) as pending:
+        with ZipFile(pending, "w") as bundle:
+            bundle.comment = json.dumps([scene.entry.as_posix(), scene.name]).encode()
+            for path, data in sorted(scene.files.items()):
+                bundle.writestr(ZipInfo(path.as_posix()), data)
+        pending.seek(0)
+        digest = hashlib.sha256(pending.read()).hexdigest()
+        with contextlib.suppress(FileExistsError):
+            os.link(pending.name, snapshots / digest)
+    return digest
+
+
+def frozen_scene(state: Path, digest: str) -> Scene:
+    if not re.fullmatch(r"[a-f0-9]{64}", digest):
+        msg = "Invalid animation snapshot ID."
+        raise AnimationError(msg)
+    archive = read_regular(
+        state_folder(state, "snapshots") / digest, INPUT_LIMIT + 2 * INLINE_LIMIT
+    )
+    if hashlib.sha256(archive).hexdigest() != digest:
+        msg = "The saved animation snapshot has changed."
+        raise AnimationError(msg)
+    with ZipFile(io.BytesIO(archive)) as bundle:
+        entry, name = json.loads(bundle.comment)
+        return Scene(positive_path(entry), name, archive_files(bundle))
 
 
 def podman_status() -> str | None:
@@ -456,6 +491,13 @@ def state_folder(parent: Path, name: str) -> Path:
 def cached_report(jobs: Path, lookup: Path, fingerprint: str) -> RenderReport | None:
     try:
         job_id = read_regular(lookup, 32).decode()
+    except (OSError, ValueError):
+        return None
+    return verified_report(jobs, job_id, fingerprint)
+
+
+def verified_report(jobs: Path, job_id: str, fingerprint: str) -> RenderReport | None:
+    try:
         folder = jobs / job_id
         if not JOB_ID.fullmatch(job_id) or folder.is_symlink():
             return None
@@ -659,17 +701,15 @@ def publish(
     return report
 
 
-def render(args: argparse.Namespace) -> RenderReport:
-    started = time.monotonic()
-    root = Path.cwd().resolve()
-    scene = load_scene(root, args)
-    fingerprint = scene.fingerprint(args.profile)
-    plan = Render(scene, args.profile, uuid4().hex, fingerprint, started)
+def render_scene(plan: Render, *, use_cache: bool, staging: Path | None = None) -> RenderReport:
+    root = Path.cwd()
+    scene = plan.scene
+    fingerprint = plan.fingerprint
     state = root / STATE
     jobs = state / "jobs"
     cache = state / "cache"
     if (
-        not args.no_cache
+        use_cache
         and not any(path.is_symlink() for path in (state, jobs, cache))
         and (report := cached_report(jobs, cache / fingerprint, fingerprint))
     ):
@@ -682,39 +722,84 @@ def render(args: argparse.Namespace) -> RenderReport:
     jobs = state_folder(state, "jobs")
     lookup = state_folder(state, "cache") / fingerprint
     partial_cache = None
-    if not args.no_cache:
+    if use_cache or staging is not None:
         partial_cache = state_folder(
-            state_folder(state, "segments"), scene.segment_key(args.profile)
+            state_folder(state, "segments"), scene.segment_key(plan.profile)
         )
     final = root / plan.path
     with (
-        tempfile.TemporaryDirectory(prefix="xpd-manim-", dir="/tmp") as scratch,
-        tempfile.TemporaryDirectory(prefix=".pending-", dir=jobs) as pending_name,
+        tempfile.TemporaryDirectory(prefix="xpd-manim-", dir=staging) as scratch,
+        tempfile.TemporaryDirectory(prefix=".pending-", dir=staging or jobs) as pending_name,
     ):
         pending = Path(pending_name)
         log = pending / "render.log"
         try:
-            stats, artifacts = run_scene(Path(scratch), scene, args.profile, log, partial_cache)
+            stats, artifacts = run_scene(Path(scratch), scene, plan.profile, log, partial_cache)
             report = publish(pending, plan, stats, artifacts)
         except (OSError, AnimationError, subprocess.SubprocessError) as error:
             if log.exists():
-                pending.rename(final)
-                msg = f"{error}\nRender log: {final.relative_to(root) / log.name}"
+                if staging is not None:
+                    failure_log = state_folder(state, "logs") / f"{plan.job_id}.log"
+                    log.replace(failure_log)
+                else:
+                    pending.rename(final)
+                    failure_log = final / log.name
+                msg = f"{error}\nRender log: {failure_log.relative_to(root)}"
                 raise AnimationError(msg) from error
             raise
         pending.rename(final)
-    if not args.no_cache:
+    if use_cache:
         index_update = lookup.with_name(plan.job_id)
         index_update.write_text(plan.job_id, encoding="ascii")
         index_update.replace(lookup)
     return report
 
 
+def render_snapshot(digest: str, job_id: str, profile: str) -> RenderReport:
+    if not JOB_ID.fullmatch(job_id):
+        msg = "Invalid workflow render job ID."
+        raise AnimationError(msg)
+    state = state_folder(Path.cwd(), STATE)
+    scene = frozen_scene(state, digest)
+    plan = Render(scene, profile, job_id, scene.fingerprint(profile), time.monotonic())
+    locks = state_folder(state, "locks")
+    flags = os.O_CREAT | os.O_RDWR | os.O_NOFOLLOW | os.O_NONBLOCK
+    with os.fdopen(os.open(locks / job_id, flags, 0o600), "r+b") as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX)
+        staging = state_folder(state, "staging") / job_id
+        if staging.exists():
+            shutil.rmtree(staging)
+        jobs = state_folder(state, "jobs")
+        if os.path.lexists(jobs / job_id):
+            if report := verified_report(jobs, job_id, plan.fingerprint):
+                return report
+            msg = f"Published workflow render failed verification: {job_id}"
+            raise AnimationError(msg)
+        staging.mkdir(mode=0o700)
+        try:
+            return render_scene(plan, use_cache=False, staging=staging)
+        finally:
+            shutil.rmtree(staging)
+
+
 def cancelled(_signal: int, _frame: object) -> None:
     raise KeyboardInterrupt
 
 
-def main() -> int:
+def render(args: argparse.Namespace) -> None:
+    started = time.monotonic()
+    scene = load_scene(Path.cwd(), args)
+    plan = Render(scene, args.profile, uuid4().hex, scene.fingerprint(args.profile), started)
+    report = render_scene(plan, use_cache=not args.no_cache)
+    if args.json:
+        print(json.dumps(report))
+    else:
+        print(report["video"] or report["still"])
+        print(f"Editable scene: {report['source_dir']}/{report['entry']}")
+        print(f"Render settings: {report['manifest']}")
+
+
+def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(prog="xpd animate")
     commands = parser.add_subparsers(dest="command", required=True)
     commands.add_parser("setup")
@@ -723,10 +808,20 @@ def main() -> int:
     render_args.add_argument("--profile", choices=PROFILES, required=True)
     render_args.add_argument("--json", action="store_true")
     render_args.add_argument("--no-cache", action="store_true")
-    render_args.add_argument("--asset", action="append", default=[])
-    render_args.add_argument("file")
-    render_args.add_argument("scene")
-    args = parser.parse_args(sys.argv[4:])
+    snapshot_args = commands.add_parser("snapshot")
+    for source_args in (render_args, snapshot_args):
+        source_args.add_argument("--asset", action="append", default=[])
+        source_args.add_argument("file")
+        source_args.add_argument("scene")
+    frozen = commands.add_parser("render-snapshot")
+    frozen.add_argument("snapshot")
+    frozen.add_argument("job_id")
+    frozen.add_argument("profile", choices=("preview", "final"))
+    return parser.parse_args(sys.argv[4:])
+
+
+def main() -> int:
+    args = parse_args()
     signal.signal(signal.SIGTERM, cancelled)
     try:
         match args.command:
@@ -738,14 +833,14 @@ def main() -> int:
                     print(json.dumps(status))
                 else:
                     print(status["reason"] or f"Ready: Manim Community {VERSION}, rootless Podman")
+            case "snapshot":
+                scene = load_scene(Path.cwd(), args)
+                print(json.dumps({"snapshot": snapshot(scene)}))
+            case "render-snapshot":
+                report = render_snapshot(args.snapshot, args.job_id, args.profile)
+                print(json.dumps(report))
             case "render":
-                report = render(args)
-                if args.json:
-                    print(json.dumps(report))
-                else:
-                    print(report["video"] or report["still"])
-                    print(f"Editable scene: {report['source_dir']}/{report['entry']}")
-                    print(f"Render settings: {report['manifest']}")
+                render(args)
     except (AnimationError, BadZipFile, OSError, ValueError, subprocess.SubprocessError) as error:
         if getattr(args, "json", False):
             print(json.dumps({"error": str(error)}))

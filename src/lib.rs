@@ -2,6 +2,7 @@
 //! humans and coding agents. Each library gets one rule pack under `rules/`.
 
 mod animate;
+mod animate_workflow;
 mod author;
 mod cases;
 mod catalog;
