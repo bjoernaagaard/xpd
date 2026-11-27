@@ -1,11 +1,11 @@
 ---
 name: xpd-optimize
-description: Use xpd optimize for measured performance work. Find repeated computation, expensive scans and oversized allocations, and measure workload time, CPU and memory.
+description: Reduce measured CPU, memory, and I/O waste with xpd optimize. Find repeated computation, linear scans, and oversized intermediates, and gate every change on workload timing and profiling.
 ---
 
-# xpd optimize
+# Optimize measured cost with xpd
 
-Run `xpd optimize` to answer one question. Does the program spend CPU, memory or I/O it does not need?
+Use `xpd optimize` to eliminate CPU, memory, and I/O work that the result does not need, proving every change against a real workload.
 
 | Group | Finding kinds |
 | --- | --- |
@@ -13,17 +13,20 @@ Run `xpd optimize` to answer one question. Does the program spend CPU, memory or
 | Repeated work | `repeated-call`, `repeated-mask`, `loop-invariant-call` |
 | Oversized intermediates and scans | `matrix-reduced`, `materialized-for-one`, `linear-scan-in-loop` |
 
-A function with a finding or at least 5 percent of a workload’s CPU time gets six checklist items. Run `xpd optimize --questions` to read the questions and the facts that inform them. The supported fix goals are `faster`, `both` or `design`.
+Each function with a finding or at least 5 percent of a workload's CPU time gets six performance checklist items. Run `xpd optimize --questions` to read the catalog. Supported fix goals are `faster`, `both`, and `design`.
 
-Pass a representative workload with `--bench` to time the whole command. Use `--adapter perf.py` on a list or start to measure individual workloads. The adapter defines `workloads()`, which returns a mapping from names to zero-argument callables. A shell adapter emits a JSON object with a `workloads` array. Each workload has `name`, `median_ms`, `peak_bytes` and `functions`. Each function has `file`, `name`, `line`, `cpu_ms`, `cumulative_cpu_ms`, `cpu_share` and `calls`. Use project-relative file paths and express shares as fractions.
+## Workloads and adapters
+
+- **Command benchmark (`--bench "<workload>"`)**: time an end-to-end workload at `start` and each `gate`.
+- **Python profiler adapter (`--adapter perf.py`)**: define `workloads()` returning a dict of workload names to zero-argument callables.
+- **Command adapter**: print JSON with a `workloads` array where each item has `name`, `median_ms`, `peak_bytes`, and `functions` (`file`, `name`, `line`, `cpu_ms`, `cumulative_cpu_ms`, `cpu_share`, `calls` using project-relative paths and fractional shares).
 
 ## Recorded run
 
-1. **Start**. Record the current commit, paths and project checks. Start from a clean tracked tree. Run `xpd optimize start . --check "your-project-check"`.
-2. **List**. Read the findings and checklist with the bare command. Use JSON to get stable finding IDs and checklist item IDs. Run `xpd optimize . --format json`.
-3. **Plan**. Record an ordered list of fixes and any findings or checklist answers that have a reason. Name a finding ID or set a supported goal for each fix. A design goal names checklist items in `questions`. Under `answered`, give each item a verdict of `pass`, `na` or `accepted` and a reason. Run `xpd optimize plan plan.json`.
-4. **Approve**. Record approval for a fix that changes what callers or users see. Run `xpd optimize approve fix-id`.
-5. **Gate**. Commit the fix and run its gate. The gate checks the project, compares findings and records its verdict. A design fix must edit a file that owns a cited checklist item. Run `xpd optimize gate fix-id`.
-6. **Drop**. Return to the run’s current commit and record a reason for dropping the fix. Run `xpd optimize drop fix-id --reason "reason"`.
-7. **Status**. Show the current run, its recorded answers and the next stage. Run `xpd optimize status`.
-8. **Finish**. Compare against the starting commit. An open fix, a new finding without an accepted reason or an unanswered checklist item causes a failure. Run `xpd optimize finish`.
+1. **Start**: run `xpd optimize start . --check "<project-check>" [--bench "<workload>"] [--adapter perf.py]` from a clean commit.
+2. **List**: run `xpd optimize . [--adapter perf.py] --format json` to read finding IDs, hotspot measurements, and checklist items.
+3. **Plan**: write `plan.json` with ordered `fixes` (naming finding IDs or a `faster`, `both`, or `design` goal), `accepted` findings with reasons, and `answered` checklist verdicts (`pass`, `na`, or `accepted`) with reasons. Run `xpd optimize plan plan.json`.
+4. **Approve**: run `xpd optimize approve <fix-id>` after user approval for a fix that changes public interfaces.
+5. **Gate**: commit one fix and run `xpd optimize gate <fix-id>`.
+6. **Drop**: restore the run's current commit and run `xpd optimize drop <fix-id> --reason "<why>"` if a fix is abandoned.
+7. **Status and finish**: run `xpd optimize status` to see the next stage, and `xpd optimize finish` once every open fix, new finding, and checklist item is resolved.

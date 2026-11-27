@@ -1,21 +1,55 @@
 ---
 title: Review time series before forecasting
-description: Measure cadence, intermittency, seasonality and group coherence with a recorded xpd ts-review ledger.
+description: Measure cadence, intermittency, seasonality, structural breaks, and group coherence in a recorded xpd ts-review ledger before picking a forecasting model.
+sidebar:
+  order: 9
 ---
 
-Use `xpd ts-review` to decide which patterns are supported by the observations and which series belong together. Write a `series()` adapter that returns the observations and the metadata you want to compare.
+Run `xpd ts-review <paths>` to inspect time series cadence, intermittency, seasonal drivers, regime breaks, and group coherence before fitting a forecasting model. Add `--adapter` to measure each series and compare candidate pooling or hierarchy groups.
 
-1. Run `xpd ts-review start forecast.py --check "python -m py_compile forecast.py" --adapter series.py`. Inspect the bare list with `xpd ts-review forecast.py --adapter series.py --format json`.
-2. Check what `ds` represents. Read missing and duplicate stamps before interpreting periods. Use ADI and CV squared to describe intermittent demand. Look for seasonal phase, breaks and changes in variance. Treat these measurements as evidence about the series.
-3. Compare period and phase within groups. Read metadata eta squared, silhouette and cluster assignments. Record whether each entity should be independent, pooled or reconciled in a hierarchy. Name the calendar drivers and what changed around candidate breaks.
-4. Write a plan and run `xpd ts-review plan plan.json`. Record checklist answers with reasons. Commit one fix at a time and run `xpd ts-review gate <fix-id>`. Use `xpd ts-review approve <fix-id>` for an approved interface change and `xpd ts-review drop <fix-id> --reason "<why>"` after restoring an abandoned fix.
-5. Check progress with `xpd ts-review status` and close the ledger with `xpd ts-review finish`.
+```mermaid
+flowchart LR
+    Code["Forecasting code"] --> Static["Check splits, lags, exogenous alignment, and metrics"]
+    Adapter["series() --adapter"] --> Stats["Measure cadence, ADI, FFT, breaks, and group coherence"]
+    Static --> Ledger["Finding ledger and series or group checklist"]
+    Stats --> Ledger
+    Ledger --> Loop["start -> plan -> gate -> finish"]
+```
 
-See the [command reference](../../commands/ts-review/) for adapter inputs and plan stages.
+## What xpd ts-review checks
 
-The sample forecast file has four review findings.
+| Group | Example finding kinds |
+| --- | --- |
+| Evaluation | `random-time-split`, `mape-on-intermittent`, `mase-without-train-df`, `intervals-without-calibration`, `unscaled-returns` |
+| Lags and exogenous features | `ungrouped-lag`, `missing-future-exog`, `mintrace-without-insample`, `fitted-values-without-fitted`, `indptr-missing-zero` |
+| Grouping and identity | `not-a-time-series`, `incoherent-group`, `time-before-entity-index`, `panel-ols-without-effects`, `clustered-without-clusters` |
+
+## Static check on a sample script
+
+Running `xpd ts-review` without an adapter flags static forecasting mistakes directly from source.
 
 ```console
 $ xpd ts-review samples/tsreview/faults.py --format json | jq -c '[.findings[].kind]'
 ["random-time-split","mape-on-intermittent","ungrouped-lag","missing-future-exog"]
 ```
+
+## Write a series adapter and run the review
+
+Define `series()` in a Python adapter file returning a pandas or Polars DataFrame (or file path) with `unique_id`, `ds`, `y`, and candidate metadata columns.
+
+```python title="series.py"
+from pathlib import Path
+
+
+def series():
+    return Path(__file__).with_name("demand.parquet")
+```
+
+1. Start the run from a clean commit with `xpd ts-review start forecast.py --check "python -m py_compile forecast.py" --adapter series.py`.
+2. Inspect findings and per-series measurements with `xpd ts-review forecast.py --adapter series.py --format json`.
+3. Check cadence, missing or duplicate timestamps, ADI and CV squared intermittency, seasonal periods, phase alignment, and structural breaks before picking a model family.
+4. Compare metadata eta squared, silhouette scores, and cluster assignments to decide whether each series belongs in an independent model, a pooled global model, or a reconciled hierarchy.
+5. Record fixes, accepted findings, and checklist verdicts (`pass`, `na`, or `accepted`) with `xpd ts-review plan plan.json`. Drop any seasonal period with fewer than two observed cycles and record `na` with that reason.
+6. Approve interface changes with `xpd ts-review approve <fix-id>`, commit one fix, and run `xpd ts-review gate <fix-id>`. Restore an abandoned edit before `xpd ts-review drop <fix-id> --reason "<why>"`, resume with `xpd ts-review status`, and close with `xpd ts-review finish`.
+
+See the [command reference](../../commands/ts-review/) for adapter options, hierarchy declarations, and all stage commands.

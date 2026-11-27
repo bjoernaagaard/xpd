@@ -17,7 +17,7 @@ sequenceDiagram
     Hook-->>Agent: Brief (packs, style, pipelines, commands)
     You->>Client: Prompt
     Client->>Hook: UserPromptSubmit
-    Hook-->>Agent: Matching playbook, chart-review, untangle, harden, optimize, or open issues
+    Hook-->>Agent: Matching playbook, review ledger hint, or open issues
     Agent->>Client: Edit file.py
     Client->>Hook: PostToolUse
     Hook-->>Agent: Issues in file.py (exit 2)
@@ -57,17 +57,17 @@ xpd repository (loaded as a plugin)
 ├── .agents/plugins/marketplace.json    Codex marketplace listing
 ├── hooks/hooks.json                    runs xpd hook on SessionStart, UserPromptSubmit, PostToolUse, and Stop
 ├── mcp.json                            starts uvx xpd@<version> mcp
-└── skills/                             xpd, xpd-animate, xpd-chart-review, xpd-untangle, xpd-optimize, xpd-harden, python-best-practices, python-review
+└── skills/                             xpd, xpd-animate, xpd-chart-review, xpd-data-prep, xpd-ts-review, xpd-feature-review, xpd-untangle, xpd-optimize, xpd-harden, python-best-practices, python-review
 ```
 
 | Hook event | What `xpd hook` does |
 | --- | --- |
 | `SessionStart` | Records HEAD and profile baseline, then prints a short project brief |
-| `UserPromptSubmit` | Routes chart, data file, untangle, harden, optimize, refactor, or animation prompts to the right command or playbook |
+| `UserPromptSubmit` | Routes chart, data preparation, time series, feature engineering, data file, untangle, harden, optimize, refactor, or animation prompts to the right command or playbook |
 | `PostToolUse` | Lints the edited file (`Edit`, `Write`, or Codex `apply_patch`) and returns issues immediately |
 | `Stop` | Lints every Python file changed in the session and holds the turn if errors, warnings, or profile drift remain |
 
-See [`xpd hook`](../../commands/hook/#on-each-prompt) for the full prompt routing flowchart and [`xpd find`](../../commands/find/#playbooks) for the four playbooks.
+See [`xpd hook`](../../commands/hook/#on-each-prompt) for the full prompt routing flowchart and [`xpd find`](../../commands/find/#playbooks) for the five playbooks.
 
 ## Hold turns on house style
 
@@ -137,6 +137,9 @@ mkdir -p .claude/skills/xpd && xpd skill > .claude/skills/xpd/SKILL.md
 | --- | --- |
 | `xpd` | When to run each `xpd` command |
 | `xpd-chart-review` | Recorded chart and table review workflow against Tufte's book driven by `xpd chart-review` |
+| `xpd-data-prep` | Recorded data preparation, split, and scaling review driven by `xpd data-prep` |
+| `xpd-ts-review` | Recorded time series structure, seasonality, and grouping review driven by `xpd ts-review` |
+| `xpd-feature-review` | Recorded feature mechanism, cutoff, and fold-lift review driven by `xpd feature-review` |
 | `xpd-untangle` | Whole-codebase decoupling workflow driven by `xpd untangle` |
 | `xpd-optimize` | Measured performance workflow driven by `xpd optimize` |
 | `xpd-harden` | Reliability review and determinism gate driven by `xpd harden` |

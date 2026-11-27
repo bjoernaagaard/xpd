@@ -1,11 +1,11 @@
 ---
 name: xpd-untangle
-description: Use xpd untangle for codebase refactors, coupling and dead weight. Use the source and Git history to find copies, needless dependencies and surplus code.
+description: Refactor codebase structure, coupling, and dead weight with xpd untangle. Use source and Git history to eliminate copies, needless dependencies, and surplus code in a recorded ledger.
 ---
 
-# xpd untangle
+# Untangle codebase structure with xpd
 
-Run `xpd untangle` to answer one question. Do pieces that change together live together, with no dead weight?
+Use `xpd untangle` to put pieces that change together in the same module, sever needless links, and remove dead weight. It reads source files and Git history without executing code.
 
 | Group | Finding kinds |
 | --- | --- |
@@ -14,17 +14,14 @@ Run `xpd untangle` to answer one question. Do pieces that change together live t
 | Surplus | `pass-through`, `default-argument`, `unreferenced`, `constant-parameter` |
 | Special cases | `one-value-branch`, `one-caller-parameter` |
 
-A module with a finding gets six checklist items. Run `xpd untangle --questions` to read the questions and the facts that inform them. The supported fix goals are `shorter` or `design`.
-
-A `shorter` fix needs a lower line count. For a data script, run `xpd equiv` on the old and new versions. Record the result in the fix commit.
+Each module with a finding gets six structural checklist items. Run `xpd untangle --questions` to inspect the catalog. Supported fix goals are `shorter` (requires a lower line count) and `design` (requires editing a file owning a cited checklist item). For a data script refactor, prove behavior did not change with `xpd equiv` and note the result in the commit.
 
 ## Recorded run
 
-1. **Start**. Record the current commit, paths and project checks. Start from a clean tracked tree. Run `xpd untangle start . --check "your-project-check"`.
-2. **List**. Read the findings and checklist with the bare command. Use JSON to get stable finding IDs and checklist item IDs. Run `xpd untangle . --format json`.
-3. **Plan**. Record an ordered list of fixes and any findings or checklist answers that have a reason. Name a finding ID or set a supported goal for each fix. A design goal names checklist items in `questions`. Under `answered`, give each item a verdict of `pass`, `na` or `accepted` and a reason. Run `xpd untangle plan plan.json`.
-4. **Approve**. Record approval for a fix that changes what callers or users see. Run `xpd untangle approve fix-id`.
-5. **Gate**. Commit the fix and run its gate. The gate checks the project, compares findings and records its verdict. A design fix must edit a file that owns a cited checklist item. Run `xpd untangle gate fix-id`.
-6. **Drop**. Return to the run’s current commit and record a reason for dropping the fix. Run `xpd untangle drop fix-id --reason "reason"`.
-7. **Status**. Show the current run, its recorded answers and the next stage. Run `xpd untangle status`.
-8. **Finish**. Compare against the starting commit. An open fix, a new finding without an accepted reason or an unanswered checklist item causes a failure. Run `xpd untangle finish`.
+1. **Start**: run `xpd untangle start . --check "<project-check>"` from a clean commit.
+2. **List**: run `xpd untangle . --format json` to read stable finding IDs and checklist item IDs.
+3. **Plan**: write `plan.json` with ordered `fixes` (naming finding IDs or a `shorter` or `design` goal), `accepted` findings with reasons, and `answered` checklist verdicts (`pass`, `na`, or `accepted`) with reasons. Run `xpd untangle plan plan.json`.
+4. **Approve**: run `xpd untangle approve <fix-id>` after user approval for a fix that changes public interfaces.
+5. **Gate**: commit one fix and run `xpd untangle gate <fix-id>`.
+6. **Drop**: restore the run's current commit and run `xpd untangle drop <fix-id> --reason "<why>"` if a fix is abandoned.
+7. **Status and finish**: run `xpd untangle status` to see the next stage, and `xpd untangle finish` once every open fix, new finding, and checklist item is resolved.

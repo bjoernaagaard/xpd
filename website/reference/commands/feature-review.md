@@ -44,9 +44,16 @@ A Python adapter defines `review()` and returns a mapping with these fields.
 
 For supervised features, make training encodings out of fold under the inner time or group policy. Map validation using fitted training state. Any tuning or early stopping uses only the training partition.
 
-A command adapter executes at the Git root of the measured tree and prints the same JSON as the bundled Python runner. Its `schema_version` is 1. Its `protocol` contains `development_fingerprint`, `split_fingerprint`, `development_rows`, `mode`, `baseline`, `metric`, `direction` and optional `justification`. Each ordered `folds` entry has an `id`, `train_count`, `validation_count`, `boundary`, `baseline_score`, and `stability`, `unseen`, `clusters` and `ablation` facts. The boundary declares row `overlap`, group `group_overlap` when applicable and UTC `train_latest`, `validation_cutoff` and `train_label_latest` in time mode. The Python runner checks row membership directly. A command adapter declares its provenance.
+A command adapter executes at the Git root of the measured tree and prints the same aggregate JSON (`schema_version: 1`, without raw rows or labels) as the bundled Python runner.
 
-Stability reports usable count and missing share, numeric median and IQR or raw categorical level count. Unseen reports numerator, denominator, rate and missing count. Clusters report training Spearman edges with pair counts and connected components. Ablation reports baseline-plus-one score, the paired improvement, and its mean and range across folds. Undefined values have a reason. The output contains aggregate evidence without raw rows or labels.
+| JSON section | Contents |
+| --- | --- |
+| `protocol` | `development_fingerprint`, `split_fingerprint`, `development_rows`, `mode`, `baseline`, `metric`, `direction`, and optional `justification` |
+| `folds[].boundary` | Row `overlap`, `group_overlap` when grouped, and UTC `train_latest`, `validation_cutoff`, and `train_label_latest` in time mode |
+| `folds[].stability` | Usable count, missing share, and numeric median plus IQR or raw categorical level count |
+| `folds[].unseen` | Validation unseen numerator, denominator, rate, and missing count |
+| `folds[].clusters` | Training Spearman edges with pair counts and connected components |
+| `folds[].ablation` | Baseline-plus-one score, paired improvement, and mean plus range across folds (undefined values carry a reason) |
 
 ## Recorded stages
 

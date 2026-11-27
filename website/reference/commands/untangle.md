@@ -1,4 +1,4 @@
-Run `xpd untangle` to answer one question. Do pieces that change together live together, with no dead weight?
+Run `xpd untangle` to find pieces that change together in separate modules, needless links between modules, and dead weight across a codebase.
 
 | Group | Finding kinds |
 | --- | --- |
@@ -7,20 +7,31 @@ Run `xpd untangle` to answer one question. Do pieces that change together live t
 | Surplus | `pass-through`, `default-argument`, `unreferenced`, `constant-parameter` |
 | Special cases | `one-value-branch`, `one-caller-parameter` |
 
-A module with a finding gets six checklist items. Run `xpd untangle --questions` to read the questions and the facts that inform them. The supported fix goals are `shorter` or `design`.
+A module with a finding gets six structural checklist items. Run `xpd untangle --questions` to read the questions and the facts that inform them. The supported fix goals are `shorter` and `design`.
 
-A `shorter` fix needs a lower line count. For a data script, run `xpd equiv` on the old and new versions. Record the result in the fix commit.
+A `shorter` fix requires a lower line count. For a data script refactor, run `xpd equiv` on the old and new versions and record the result in the fix commit.
 
 ## Recorded run
 
-1. **Start**. Record the current commit, paths and project checks. Start from a clean tracked tree. Run `xpd untangle start . --check "your-project-check"`.
-2. **List**. Read the findings and checklist with the bare command. Use JSON to get stable finding IDs and checklist item IDs. Run `xpd untangle . --format json`.
-3. **Plan**. Record an ordered list of fixes and any findings or checklist answers that have a reason. Name a finding ID or set a supported goal for each fix. A design goal names checklist items in `questions`. Under `answered`, give each item a verdict of `pass`, `na` or `accepted` and a reason. Run `xpd untangle plan plan.json`.
-4. **Approve**. Record approval for a fix that changes what callers or users see. Run `xpd untangle approve fix-id`.
-5. **Gate**. Commit the fix and run its gate. The gate checks the project, compares findings and records its verdict. A design fix must edit a file that owns a cited checklist item. Run `xpd untangle gate fix-id`.
-6. **Drop**. Return to the run’s current commit and record a reason for dropping the fix. Run `xpd untangle drop fix-id --reason "reason"`.
-7. **Status**. Show the current run, its recorded answers and the next stage. Run `xpd untangle status`.
-8. **Finish**. Compare against the starting commit. An open fix, a new finding without an accepted reason or an unanswered checklist item causes a failure. Run `xpd untangle finish`.
+```mermaid
+stateDiagram-v2
+    [*] --> start: xpd untangle start --check
+    start --> plan: xpd untangle plan (findings, goals, answered)
+    plan --> gate: edit and commit
+    gate --> plan: kept (checks pass, <= findings, goal met)
+    gate --> drop: failed gate
+    drop --> plan
+    plan --> [*]: xpd untangle finish (all items settled)
+```
+
+1. **Start**: record the current commit, paths, and project checks from a clean tracked tree with `xpd untangle start . --check "your-project-check"`.
+2. **List**: read stable finding IDs and checklist item IDs with `xpd untangle . --format json`.
+3. **Plan**: record ordered fixes, accepted findings, and checklist verdicts (`pass`, `na`, or `accepted`) with reasons using `xpd untangle plan plan.json`.
+4. **Approve**: record approval for an interface change with `xpd untangle approve fix-id`.
+5. **Gate**: commit one fix and run `xpd untangle gate fix-id`. A `design` fix must edit a file that owns a cited checklist item.
+6. **Drop**: return to the run's current commit and record a reason with `xpd untangle drop fix-id --reason "reason"`.
+7. **Status**: show the current run, its recorded answers, and the next stage with `xpd untangle status`.
+8. **Finish**: compare against the starting commit with `xpd untangle finish`. An open fix, a new finding without an accepted reason, or an unanswered checklist item causes exit 1.
 
 ## Example
 

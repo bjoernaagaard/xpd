@@ -1,28 +1,64 @@
 ---
 title: Prepare features and targets
-description: Record a data preparation review from the raw input through feature and target scaling.
+description: Audit raw data loading, joins, cleaning, imputation, splits, and feature or target scaling in a recorded xpd data-prep ledger.
 sidebar:
   order: 7
 ---
 
-Start with a committed preparation script, a reproducible project check, and an adapter for the data the script reads. The adapter below loads a CSV next to the adapter file.
+Run `xpd data-prep <paths>` to check Python data preparation code from raw ingestion through joins, imputation, train-test splits, and feature or target scaling. Add `--adapter` to profile the real columns and record every scaling and cleaning decision in a gated ledger.
 
-```python
+```mermaid
+flowchart LR
+    Code["Preparation script"] --> Static["Check leakage, joins, dtypes, and target pairs"]
+    Adapter["Python or JSON --adapter"] --> Measure["Profile nulls, sentinels, skew, and outliers"]
+    Static --> Ledger["Finding ledger and column checklist"]
+    Measure --> Ledger
+    Ledger --> Loop["start -> plan -> gate -> finish"]
+```
+
+## What xpd data-prep checks
+
+| Group | Example finding kinds |
+| --- | --- |
+| Leakage | `fit-before-split`, `fit-on-test`, `cross-val-on-fitted-data`, `scaler-fit-before-split`, `prefit-before-cross-validation` |
+| Joins and alignment | `merge-without-validate`, `polars-join-without-validate`, `merge-asof-unsorted`, `concat-columns-unchecked`, `join-key-unvalidated` |
+| Target transforms | `transformed-target-pair`, `scaled-target-without-inverse` |
+| Dtypes and missing values | `compare-to-missing`, `polars-null-comparison`, `nan-to-int`, `silent-dtype-coercion` |
+| Pipeline shape | `stateful-function-transformer`, `read-parquet-all-columns`, `frame-column-write`, `no-inplace` |
+
+## Write a column adapter
+
+Commit a preparation script, a reproducible check command, and a small adapter file that returns the data the script reads. Declare `target` and `model_family` when you want scaling guidance tailored to the model family.
+
+```python title="columns.py"
 from pathlib import Path
 
 model_family = "linear"
 target = "sale_price"
 
+
 def columns():
     return Path(__file__).with_name("sales.csv")
 ```
 
-1. Start with `xpd data-prep start prep.py --check "python prep.py" --adapter columns.py`. List with `xpd data-prep prep.py --adapter columns.py --format json`.
-2. Review the graph and the measured columns. Confirm what sentinels, nulls and outliers mean before changing values. Check join cardinality and duplicate rows, and choose a time or group split when rows are dependent.
-3. Record findings and checklist decisions with `xpd data-prep plan plan.json`. Each answer has an `item` such as `amount/outlier-meaning`, a `verdict` of `pass`, `na` or `accepted`, and a `reason`. Design fixes cite item IDs in `questions` and use `"goal": "design"`.
-4. For an approved interface change, run `xpd data-prep approve <fix-id>`. Commit the fix and run `xpd data-prep gate <fix-id>`. Restore an abandoned change before running `xpd data-prep drop <fix-id> --reason "<why>"`.
-5. Run `xpd data-prep status` to see what needs attention and `xpd data-prep finish` to close the run once fixes and checklist items are resolved.
+## Run a recorded review
 
-Fit scalers and imputers inside a pipeline or on training rows only. For example, the adapter suggests `RobustScaler` when a feature has heavy tails, and can suggest a `TransformedTargetRegressor` for a right-skewed nonnegative target. Check the transformed target against the loss in the original units. A pure tree adapter gets no scaling recommendation.
+1. Start the run from a clean commit with `xpd data-prep start prep.py --check "python prep.py" --adapter columns.py`.
+2. Inspect findings and column questions with `xpd data-prep prep.py --adapter columns.py --format json`.
+3. Review the pipeline graph and measured columns. Confirm what sentinels, nulls, outliers, and duplicate rows mean before transforming them, and choose a time or group split when rows depend on each other.
+4. Record ordered fixes, accepted exceptions, and column answers with `xpd data-prep plan plan.json`. Each checklist answer pairs an `item` such as `amount/outlier-meaning` with a `verdict` (`pass`, `na`, or `accepted`) and a `reason`. Fixes addressing judgment items set `"goal": "design"` and cite their item IDs in `questions`.
+5. Run `xpd data-prep approve <fix-id>` after approving an interface change, commit one fix, and verify it with `xpd data-prep gate <fix-id>`. Restore an abandoned edit before running `xpd data-prep drop <fix-id> --reason "<why>"`.
+6. Resume across sessions with `xpd data-prep status`, and close the run with `xpd data-prep finish` once every fix, new finding, and checklist item is settled.
 
-See the [command reference](../../commands/data-prep/) for adapter inputs and the stage commands.
+## Scaling guidance
+
+Fit every scaler and imputer on training rows or inside a scikit-learn Pipeline.
+
+| Measured distribution | Suggested transform |
+| --- | --- |
+| Heavy tails or high outlier share | `RobustScaler` |
+| Right-skewed nonnegative target | `TransformedTargetRegressor` (check loss in original units) |
+| Roughly symmetric numeric feature | `StandardScaler` |
+| Pure tree pipeline (`model_family = "tree"`) | No scaling required |
+
+See the [command reference](../../commands/data-prep/) for all adapter inputs, flags, and stage commands.

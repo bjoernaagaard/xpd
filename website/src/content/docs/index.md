@@ -88,8 +88,11 @@ Line 6 now mutates `df` in place under pandas copy-on-write, and line 7 returns 
 | Expose visual tools, gates, and animations over MCP | [Connect an agent with MCP](guides/mcp/) |
 | Validate a scikit-learn pipeline end to end | [Train a model with gates](guides/gates/) |
 | Get live diagnostics and quick fixes in your editor | [Use xpd in an editor](guides/editors/) |
-| Audit charts against Tufte's principles | [Review a chart against Tufte's book](guides/chart-review/) |
-| Prepare features and targets | [Record a data preparation review](guides/data-prep/) |
+| Audit charts and tables against Tufte's principles | [Review charts and tables against Tufte's book](guides/chart-review/) |
+| Prepare features and targets | [Prepare features and targets](guides/data-prep/) |
+| Harden error handling and tests | [Harden Python code](guides/harden/) |
+| Diagnose time series before forecasting | [Review time series before forecasting](guides/ts-review/) |
+| Audit feature mechanisms and fold lift | [Review model features](guides/feature-review/) |
 | Render editable Manim concept animations | [Animate a concept with Manim](guides/animate/) |
 | Author custom project rules or a library pack | [Write a rule](guides/write-a-rule/) |
 | Look up flags and exit codes for any command | [Commands](commands/) |
