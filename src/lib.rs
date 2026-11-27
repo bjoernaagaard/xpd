@@ -32,6 +32,7 @@ mod migration;
 mod model_review;
 mod names;
 mod nodes;
+mod opt_review;
 mod optimize;
 mod outline;
 mod output;

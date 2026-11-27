@@ -357,6 +357,7 @@ enum Cmd {
     FeatureReview(crate::feature_review::FeatureReviewArgs),
     /// Review model validation, baseline comparisons and calibration.
     ModelReview(crate::model_review::ModelReviewArgs),
+    OptReview(crate::opt_review::OptReviewArgs),
     Untangle(crate::untangle::UntangleArgs),
     Optimize(crate::optimize::OptimizeArgs),
     Harden(crate::harden::HardenArgs),
@@ -494,6 +495,7 @@ pub fn run() -> ExitCode {
         Cmd::TsReview(args) => command_result(args.run(default_format)),
         Cmd::FeatureReview(args) => command_result(args.run(default_format)),
         Cmd::ModelReview(args) => command_result(args.run(default_format)),
+        Cmd::OptReview(args) => command_result(args.run(default_format)),
         Cmd::Untangle(args) => command_result(args.run(default_format)),
         Cmd::Harden(args) => command_result(args.run(default_format)),
         Cmd::Optimize(args) => command_result(args.run(default_format)),

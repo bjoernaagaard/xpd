@@ -50,6 +50,10 @@ impl Catalog {
         Ok(ExitCode::SUCCESS)
     }
 
+    pub(crate) fn has_fact(&self, id: &str) -> bool {
+        self.facts.iter().any(|fact| fact.id == id)
+    }
+
     pub(crate) fn checklist(
         &self,
         entities: BTreeSet<(String, String)>,

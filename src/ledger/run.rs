@@ -667,7 +667,7 @@ pub(super) fn judge_fix(evidence: &GateEvidence<'_>) -> Result<Compared, String>
         .any(|id| !evidence.after.contains(id));
     let strict_removal = matches!(
         evidence.command,
-        "chart-review" | "feature-review" | "model-review"
+        "chart-review" | "feature-review" | "model-review" | "opt-review"
     );
     if !evidence.findings.is_empty()
         && !finding_removed
@@ -928,7 +928,7 @@ fn validate_start_adapter(
     here: &Path,
     adapter: Option<&str>,
 ) -> Result<()> {
-    if matches!(command, "feature-review" | "model-review")
+    if matches!(command, "feature-review" | "model-review" | "opt-review")
         && let Some(spec) = adapter
     {
         let candidate = here.join(spec);
@@ -1545,7 +1545,7 @@ fn act_journal<K: Kind>(
             let mut journal = place.read(command)?;
             kept = if matches!(
                 command,
-                "data-prep" | "ts-review" | "feature-review" | "model-review"
+                "data-prep" | "ts-review" | "feature-review" | "model-review" | "opt-review"
             ) && let Some(open) = journal.open()
             {
                 eprintln!("xpd: the fix {} is still open", open.id);
@@ -2342,7 +2342,7 @@ mod durable_run {
         );
         if matches!(
             at.store.command,
-            "data-prep" | "ts-review" | "feature-review" | "model-review"
+            "data-prep" | "ts-review" | "feature-review" | "model-review" | "opt-review"
         ) && let Some(open) = at.journal.open()
         {
             eprintln!("xpd: the fix {} is still open", open.id);
@@ -2488,7 +2488,7 @@ pub(super) fn act<K: Kind, R: Serialize>(
     let surveyed = |journal: &Journal, commit: Option<&str>| -> Result<SurveyOutput<K, R>> {
         let top = Some(place.top.as_path());
         let adapter = journal.adapter.as_deref();
-        let measured_head = (matches!(command, "feature-review" | "model-review")
+        let measured_head = (matches!(command, "feature-review" | "model-review" | "opt-review")
             && commit.is_none())
         .then(|| place.head())
         .transpose()?;
@@ -2526,6 +2526,10 @@ pub(super) fn act<K: Kind, R: Serialize>(
         ensure!(
             command != "model-review" || !starting || !checklist.is_empty(),
             "no models found in the selected Python files"
+        );
+        ensure!(
+            command != "opt-review" || !starting || !checklist.is_empty(),
+            "no optimization problems found in the selected Python files"
         );
         let ids = output.findings.into_iter().map(|entry| entry.id).collect();
         let feature_evidence = (command == "feature-review")

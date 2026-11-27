@@ -392,7 +392,7 @@ fn scope_binds(node: &Node<'_>, name: &str) -> bool {
 /// statement that holds it, and stops at the start of the function. A statement that holds the
 /// use and binds the name anywhere inside ends the search, because a loop can run the binding
 /// before the use.
-fn origin<'t>(usage: &Node<'t>) -> Option<Origin<'t>> {
+pub(crate) fn origin<'t>(usage: &Node<'t>) -> Option<Origin<'t>> {
     let name = usage.text();
     let statement = statement_around(usage.clone())?;
     if binds(&statement, &name) {

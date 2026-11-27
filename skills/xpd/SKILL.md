@@ -17,6 +17,7 @@ Each review command surveys mechanical findings and a per-entity checklist, then
 | `xpd data-prep <paths>` | Raw data ingestion, joins, cleaning, imputation, splits, and feature or target scaling | `xpd-data-prep` |
 | `xpd ts-review <paths>` | Time series cadence, intermittency, seasonality, breaks, and group coherence before forecasting | `xpd-ts-review` |
 | `xpd feature-review <paths>` | Model feature domain mechanism, publication cutoff, lineage, and development-fold lift | `xpd-feature-review` |
+| `xpd opt-review <paths>` | Numerical formulations, solver diagnostics, portfolio validation, and Pareto convergence | `xpd-opt-review` |
 | `xpd model-review <paths>` | Model validation design, baseline comparisons, calibration, and conformal interval coverage | `xpd-model-review` |
 | `xpd untangle <paths>` | Structural coupling, hidden links, copies, and dead weight | `xpd-untangle` |
 | `xpd optimize <paths>` | Measured CPU, memory, and I/O waste with `--bench` and profiler adapters | `xpd-optimize` |

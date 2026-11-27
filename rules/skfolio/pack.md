@@ -14,6 +14,7 @@ The skfolio pack catches skfolio 1.14 migrations, financial validation leaks, re
 
 - skfolio-shuffled-returns-split
 - skfolio-preselection-before-split
+- skfolio-fit-on-holdout
 - skfolio-sklearn-cross-val-predict
 - skfolio-cpcv-zero-purge
 

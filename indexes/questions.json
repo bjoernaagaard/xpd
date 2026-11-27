@@ -1,4 +1,6 @@
 [
+  {"query": "audit numerical optimization and portfolio solves", "expected": "xpd/recipe/opt-review"},
+  {"query": "walk forward portfolio cross validation", "expected": "skfolio.model_selection.WalkForward"},
   {
     "query": "review model validation and calibration",
     "expected": "xpd/recipe/model-review"

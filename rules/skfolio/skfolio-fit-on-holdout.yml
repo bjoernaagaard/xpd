@@ -1,0 +1,6 @@
+id: skfolio-fit-on-holdout
+language: python
+severity: warning
+message: Fit the skfolio optimizer on the training split before using it on the holdout.
+rule:
+  all: [{kind: call}, {pattern: '$MODEL.fit($$$ARGS)'}]

@@ -483,6 +483,10 @@ pub(crate) fn analyze(file: File<'_>, src: &str, packs: &[Pack], edits: Edits) -
         }
         let unbound = unbound_names(pack, imports.as_deref());
         for m in matches {
+            let detector = crate::opt_review::opt_rule_detector(rule.id.package(), rule.id.name());
+            if detector.is_some_and(|detect| detect(&m).is_none()) {
+                continue;
+            }
             let message = if rule.id.name() == "early-stop-on-test"
                 && matches!(rule.id.package(), "xgboost" | "lightgbm")
             {

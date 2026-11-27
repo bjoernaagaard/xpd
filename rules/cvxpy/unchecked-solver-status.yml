@@ -1,0 +1,6 @@
+id: unchecked-solver-status
+language: python
+severity: warning
+message: Check the CVXPY problem status before using values from this solve.
+rule:
+  all: [{kind: call}, {pattern: '$PROBLEM.solve($$$ARGS)'}]

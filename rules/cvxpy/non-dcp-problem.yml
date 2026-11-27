@@ -1,0 +1,6 @@
+id: non-dcp-problem
+language: python
+severity: warning
+message: This expression violates CVXPY disciplined convex programming rules for the default solve. Reformulate it or select the appropriate supported solve mode.
+rule:
+  all: [{any: [{kind: call}, {kind: comparison_operator}, {kind: identifier}]}]
