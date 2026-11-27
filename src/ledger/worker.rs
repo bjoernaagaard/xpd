@@ -642,6 +642,10 @@ impl Worker {
                 start.command != "model-review" || !checklist.is_empty(),
                 "no models found in the selected Python files"
             );
+            ensure!(
+                start.command != "opt-review" || !checklist.is_empty(),
+                "no optimization problems found in the selected Python files"
+            );
             let paths: Vec<PathBuf> = start.paths.iter().map(PathBuf::from).collect();
             (
                 checks,

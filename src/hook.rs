@@ -457,19 +457,12 @@ fn user_prompt(cwd: &Path, prompt: &str) -> Result<ExitCode> {
     }
     let cwd = project_root(cwd)?;
     let mut text = Vec::new();
-    let chart = chart_prompt(prompt);
-    if chart {
-        text.push(
-            "Chart or table task: run `xpd chart-review <paths>` on the files \
-             that draw charts or presentation tables in Python or React/TypeScript (Plotly, Dash, \
-             AG Grid, Matplotlib, Seaborn, pandas). It lists mechanical Tufte findings and a \
-             per-figure checklist across all 57 principles from Tufte's book. Add `--adapter \
-             <adapter.py or command>` to measure rendered figures, and `xpd chart-review start` \
-             to record a gated review run. The `xpd-chart-review` skill holds the steps, and \
-             `xpd api xpd/recipe/plotly-chart` prints the plotly-chart playbook."
-                .to_owned(),
-        );
+    let numerical_review = opt_review_prompt(prompt);
+    if numerical_review {
+        text.push("Numerical optimization task: run `xpd opt-review <paths>` to list problems and questions. Use `xpd opt-review start` to record the review, follow the `xpd-opt-review` skill, and read `xpd api xpd/recipe/opt-review`.".to_owned());
     }
+    let chart = chart_prompt(prompt);
+    text.extend(chart.then(|| CHART_REVIEW_HINT.to_owned()));
     text.extend(model_review_prompt(prompt).then(|| MODEL_REVIEW_HINT.to_owned()));
     let feature_review = feature_review_prompt(prompt);
     if feature_review {
@@ -512,7 +505,7 @@ fn user_prompt(cwd: &Path, prompt: &str) -> Result<ExitCode> {
         text.push(
             "Reliability task: run `xpd harden start` to record checks and find silent failures, fixed waits and unreliable tests. The `xpd-harden` skill holds the steps.".to_owned(),
         );
-    } else if optimize_prompt(prompt) {
+    } else if !numerical_review && optimize_prompt(prompt) {
         text.push(
             "Performance task: run `xpd optimize` to find repeated work and oversized intermediates. Use `xpd optimize start <paths> --check \"<tests>\" --bench \"<workload>\"` for a recorded run. The `xpd-optimize` skill holds the steps."
                 .to_owned(),
@@ -531,7 +524,10 @@ fn user_prompt(cwd: &Path, prompt: &str) -> Result<ExitCode> {
         }
         let library = index::load(None)?.without_download(&cwd);
         if let Some(playbook) = index::playbook_for(&library, prompt)
-            && playbook.name != "xpd/recipe/model-review"
+            && !matches!(
+                playbook.name.as_str(),
+                "xpd/recipe/model-review" | "xpd/recipe/opt-review"
+            )
         {
             text.push(playbook_lines(&playbook));
         }
@@ -1803,4 +1799,91 @@ fn hook_workspace(project: &Path) -> Result<Workspace> {
         venv,
         &Filters::default(),
     )
+}
+
+const CHART_REVIEW_HINT: &str = "Chart or table task: run `xpd chart-review <paths>` on the files \
+             that draw charts or presentation tables in Python or React/TypeScript (Plotly, Dash, \
+             AG Grid, Matplotlib, Seaborn, pandas). It lists mechanical Tufte findings and a \
+             per-figure checklist across all 57 principles from Tufte's book. Add `--adapter \
+             <adapter.py or command>` to measure rendered figures, and `xpd chart-review start` \
+             to record a gated review run. The `xpd-chart-review` skill holds the steps, and \
+             `xpd api xpd/recipe/plotly-chart` prints the plotly-chart playbook.";
+
+fn opt_review_prompt(prompt: &str) -> bool {
+    let prompt = prompt.to_lowercase();
+    if prompt
+        .split(|character: char| !(character.is_alphanumeric() || character == '-'))
+        .any(|word| word == "opt-review")
+    {
+        return true;
+    }
+    let words: Vec<_> = prompt
+        .split(|character: char| !character.is_alphanumeric())
+        .filter(|word| !word.is_empty())
+        .collect();
+    let contains = |choices: &[&str]| words.iter().any(|word| choices.contains(word));
+    let intent = [
+        "why",
+        "check",
+        "review",
+        "audit",
+        "verify",
+        "inspect",
+        "diagnose",
+        "fix",
+        "solve",
+        "does",
+        "is",
+        "which",
+        "gennemgå",
+        "tjek",
+        "undersøg",
+        "find",
+    ];
+    let numerical = [
+        "dcp",
+        "dqcp",
+        "meanrisk",
+        "porteføljeoptimering",
+        "porteføljeoptimeringen",
+    ];
+    let phrases = [
+        "solver status",
+        "duality gap",
+        "constraint binds",
+        "binding constraint",
+        "portfolio optimization",
+        "portfolio optimisation",
+        "optimization problem",
+        "optimisation problem",
+        "convergence of the pareto front",
+        "pareto front convergence",
+    ];
+    let packages = ["cvxpy", "skfolio", "pymoo"];
+    let details = [
+        "solve",
+        "solver",
+        "constraints",
+        "constraint",
+        "feasibility",
+        "infeasible",
+        "convergence",
+        "backtest",
+        "leakage",
+        "formulation",
+        "scaling",
+        "optimize",
+        "optimisation",
+        "optimization",
+        "fit",
+    ];
+    contains(&intent)
+        && (contains(&numerical)
+            || phrases.iter().any(|phrase| {
+                let expected: Vec<_> = phrase.split_whitespace().collect();
+                words
+                    .windows(expected.len())
+                    .any(|window| window == expected)
+            })
+            || (contains(&packages) && contains(&details)))
 }

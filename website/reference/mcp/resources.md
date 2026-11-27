@@ -111,3 +111,7 @@ Review feature mechanisms, cutoff and fold value with [`xpd feature-review`](../
 ## skill://xpd-model-review/
 
 Review model validation, baseline comparisons and calibration. The skill describes how to record the review and cite pipeline gate evidence.
+
+## skill://xpd-opt-review/
+
+Review formulation, solve evidence, and portfolio validation with [`xpd opt-review`](../../commands/opt-review/).

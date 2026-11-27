@@ -1,0 +1,150 @@
+facts:
+  - id: "runtime-dcp"
+    text: "Record whether CVXPY recognizes the formulation as DCP."
+    how: "Call Problem.is_dcp() on the exact problem and record the requested solve mode separately."
+    source: "CVXPY Disciplined Convex Programming, The DCP rules and Example 2, https://www.cvxpy.org/tutorial/dcp/"
+  - id: "solver-status"
+    text: "Record the actual solve outcome before reading a solution."
+    how: "Read the exact Problem.status and solver name after the requested solve, preserve solved and inaccurate statuses, and record a caught expected DCPError as a model outcome."
+    source: "CVXPY What is CVXPY?, Infeasible and unbounded problems and Other problem statuses, https://www.cvxpy.org/tutorial/intro/"
+  - id: "duality-gap"
+    text: "Record the solver’s available duality gap with its definition."
+    how: "For SCS and a usable solution, read abs(problem.solver_stats.extra_stats[\"info\"][\"gap\"]) and label it as the SCS absolute conic gap."
+    source: "SCS Return information, gap, https://www.cvxgrp.org/scs/api/info.html"
+  - id: "constraint-violation"
+    text: "Measure the largest native residual on the returned solution."
+    how: "Compute the maximum over each constraint’s finite violation() entries and report the winning constraint index and label, with each raw residual’s provenance."
+    source: "CVXPY Constraints, Constraint.violation, https://www.cvxpy.org/api_reference/cvxpy.constraints.html"
+  - id: "pymoo-constraint-violation"
+    text: "Measure positive inequality excess and absolute equality residuals on returned candidates."
+    how: "Use returned candidate G and H and their bounds, compute max(0,G), abs(H), max(0,xl-X,X-xu) componentwise over available bounds, and report the maximum raw residual with its candidate and constraint."
+    source: "pymoo Constraint Handling, https://pymoo.org/constraints/index.html"
+  - id: "pymoo-status"
+    text: "Report termination evidence and whether a feasible front was returned."
+    how: "Read the returned result and its algorithm evaluation count and record the configured termination, seed and a completed-with-feasible-front or completed-without-feasible-front outcome."
+    source: "pymoo Result, https://pymoo.org/interface/result.html"
+  - id: "front-convergence"
+    text: "Measure feasible front progress at comparable evaluation budgets."
+    how: "Record evaluation count, feasible nondominated count and hypervolume from callback F and FEAS using a fixed declared reference point and fixed objective scaling across snapshots."
+    source: "pymoo Part IV Analysis of Convergence, https://pymoo.org/getting_started/part_4.html"
+  - id: "conditioning"
+    text: "Measure the condition number of the data that enters the formulation."
+    how: "Use numpy.linalg.cond(matrix) in the 2-norm on each adapter-declared finite data matrix and distinguish singularity from missing data."
+    source: "NumPy linear algebra, numpy.linalg.cond, https://numpy.org/doc/stable/reference/generated/numpy.linalg.cond.html"
+  - id: "data-scale"
+    text: "Report input scales so solver tolerances can be interpreted."
+    how: "Report matrix shape, min and max nonzero absolute entry and their ratio with the role and units supplied by the adapter."
+    source: "CVXPY Solver Features, Solver stats and Solver options, https://www.cvxpy.org/tutorial/solvers/"
+  - id: "fold-cutoff"
+    text: "Measure the actual fit and evaluation boundaries for every reviewed portfolio fold."
+    how: "Record fit and evaluation counts and latest and earliest comparable decision times from actual sliced indices."
+    source: "skfolio Model Selection, Walk-Forward Cross-Validation and Combinatorial Purged Cross-Validation, https://skfolio.org/user_guide/model_selection.html"
+  - id: "skfolio-saved-problem"
+    text: "Read available solve diagnostics from the problem skfolio fitted."
+    how: "Read the supported public problem_ after fitting with save_problem=True and reuse CVXPY extraction without solving it again."
+    source: "skfolio MeanRisk API, save_problem and problem_, https://skfolio.org/generated/skfolio.optimization.MeanRisk.html"
+  - id: "constraint-binding-hints"
+    text: "Record slack and multipliers separately from feasibility residuals."
+    how: "Report affine inequality slack in original units and the CVXPY dual_value where defined, and report pymoo candidate G/H as raw margins."
+    source: "Boyd and Vandenberghe, Convex Optimization, pp. 140–141, https://web.stanford.edu/~boyd/cvxbook/bv_cvxbook.pdf"
+questions:
+  - id: "objective-units"
+    text: "Is the objective in the units that matter for the decision?"
+    look: "Inspect the objective formula, direction, horizon, risk and return units, and weights on competing terms."
+    source: "Task brief, Checklist entity"
+  - id: "convexity"
+    text: "Is the problem convex, and why is this solve method appropriate?"
+    look: "Inspect curvature, variable signs and domains, integrality, equalities, solve mode and any reformulation alongside the DCP result."
+    source: "CVXPY Disciplined Convex Programming, The DCP rules and Example 2, https://www.cvxpy.org/tutorial/dcp/"
+  - id: "binding-constraints"
+    text: "Which constraints bind at the solution or selected front point?"
+    look: "Inspect original-unit slack, tolerances and dual values where meaningful, and name the selected candidate for a front."
+    source: "Boyd and Vandenberghe, Convex Optimization, pp. 140–141, https://web.stanford.edu/~boyd/cvxbook/bv_cvxbook.pdf"
+  - id: "constraint-units"
+    text: "Do both sides of each constraint use the same units and period?"
+    look: "Trace coefficient units, return frequency, currency conversions, percentage representation and any normalization."
+    source: "skfolio Portfolio, Periodicity Convention, https://skfolio.org/user_guide/portfolio.html"
+  - id: "solver-acceptance"
+    text: "Which statuses, gaps and residuals are acceptable for this solve, and what happens otherwise?"
+    look: "Inspect status guards, numeric tolerances, solver settings and failure or fallback paths."
+    source: "CVXPY Solver Features, Solver stats and Solver options, https://www.cvxpy.org/tutorial/solvers/"
+  - id: "input-scaling"
+    text: "Are input scaling and conditioning suitable for this solve?"
+    look: "Inspect matrix roles, magnitudes, singularity, normalization and tolerances in original units."
+    source: "CVXPY Solver Features, Solver stats and Solver options, https://www.cvxpy.org/tutorial/solvers/"
+  - id: "portfolio-validation"
+    text: "Could information from the evaluation period reach any portfolio fit?"
+    look: "Inspect fold times, fit and transformation inputs, labels and availability, purge or embargo and whether a fit is for deployment only."
+    source: "skfolio Model Selection, Walk-Forward Cross-Validation and Combinatorial Purged Cross-Validation, https://skfolio.org/user_guide/model_selection.html"
+  - id: "portfolio-implementation"
+    text: "Do portfolio costs and limits represent the intended trades?"
+    look: "Inspect existing weights, costs, holding periods, turnover, leverage, budget and fallback settings."
+    source: "skfolio Optimization, https://skfolio.org/user_guide/optimization.html"
+  - id: "front-quality"
+    text: "Has the feasible front improved enough for the decision?"
+    look: "Inspect the hypervolume trace and evaluation count, objective direction and fixed reference, seed, spread and chosen trade-off."
+    source: "pymoo Part IV Analysis of Convergence, https://pymoo.org/getting_started/part_4.html"
+  - id: "diagnostic-coverage"
+    text: "Is the solve evidence sufficient for this problem?"
+    look: "Inspect adapter coverage and metric reasons, verify input and solver versions, and cite a project check or independent evidence for material gaps."
+    source: "Task brief, Adapter"
+  - id: "discover-api"
+    text: "What indexed call or rule supports this choice?"
+    look: "Use xpd find and xpd api to verify the call or rule, and use official documentation for unindexed symbols."
+    source: "rules/xpd/playbooks/plotly-chart.md:61 and website/src/content/docs/guides/gates.md:101"
+  - id: "development-evidence"
+    text: "Can the recorded evidence be reproduced without consuming the final test set?"
+    look: "Inspect the adapter inputs, fit and development folds, and final holdout boundaries."
+    source: "rules/xpd/playbooks/model-review.md:28"
+rules:
+  cvxpy/constraint-unit-mismatch: constraint-unit-mismatch
+  cvxpy/dense-identity-quad-form: pack-rule
+  cvxpy/implicit-reshape-order: pack-rule
+  cvxpy/mutate-problem-constraints: pack-rule
+  cvxpy/non-dcp-problem: non-dcp-problem
+  cvxpy/solve-result-as-status: pack-rule
+  cvxpy/star-matmul: pack-rule
+  cvxpy/unchecked-solver-status: unchecked-solver-status
+  pymoo/algorithm-read-after-minimize: pack-rule
+  pymoo/constraint-not-declared: pack-rule
+  pymoo/decision-weights: pack-rule
+  pymoo/elementwise-runner: pack-rule
+  pymoo/evaluate-indexing: pack-rule
+  pymoo/evaluate-returns-value: pack-rule
+  pymoo/has-terminated-assignment: pack-rule
+  pymoo/hv-reference-point: pack-rule
+  pymoo/ignored-problem-keyword: pack-rule
+  pymoo/indicator-normalize-ignored: pack-rule
+  pymoo/minimize-ignored-keyword: pack-rule
+  pymoo/moead-arguments: pack-rule
+  pymoo/mutation-prob-per-individual: pack-rule
+  pymoo/n-constr-keyword: pack-rule
+  pymoo/numpy-seed-ignored: pack-rule
+  pymoo/objectives-stacked-by-row: pack-rule
+  pymoo/positional-problem-bounds: pack-rule
+  pymoo/reused-algorithm-without-copy: pack-rule
+  pymoo/setup-positional-termination: pack-rule
+  pymoo/unread-history: pack-rule
+  pymoo/unseeded-run: pack-rule
+  skfolio/skfolio-base-hierarchical-check: pack-rule
+  skfolio/skfolio-cost-periodicity: pack-rule
+  skfolio/skfolio-cpcv-zero-purge: pack-rule
+  skfolio/skfolio-estimator-on-optimizer: pack-rule
+  skfolio/skfolio-factor-model-class: pack-rule
+  skfolio/skfolio-fit-loop-vs-online: pack-rule
+  skfolio/skfolio-fit-on-holdout: fit-on-holdout
+  skfolio/skfolio-grid-search-vs-online: pack-rule
+  skfolio/skfolio-hierarchical-seriation: pack-rule
+  skfolio/skfolio-invalid-convex-bounds: pack-rule
+  skfolio/skfolio-log-returns-in-optimizer: pack-rule
+  skfolio/skfolio-metadata-routing-setup: pack-rule
+  skfolio/skfolio-missing-fallback-in-cv: pack-rule
+  skfolio/skfolio-panel-inactive-policy: pack-rule
+  skfolio/skfolio-preselection-before-split: pack-rule
+  skfolio/skfolio-prices-not-returns: pack-rule
+  skfolio/skfolio-shuffled-returns-split: pack-rule
+  skfolio/skfolio-sklearn-cross-val-predict: pack-rule
+  skfolio/skfolio-string-enum-option: pack-rule
+  skfolio/skfolio-unchecked-failed-portfolio: pack-rule
+  skfolio/skfolio-unseeded-estimator: pack-rule
+  skfolio/skfolio-weight-drift-uncompounded: pack-rule

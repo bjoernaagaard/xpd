@@ -1,0 +1,6 @@
+id: constraint-unit-mismatch
+language: python
+severity: warning
+message: Convert both sides of the CVXPY constraint to the same units before comparing them.
+rule:
+  kind: comparison_operator

@@ -7,6 +7,9 @@ syntax. The examples were verified with CVXPY 1.9.3.
 
 - mutate-problem-constraints
 - solve-result-as-status
+- non-dcp-problem
+- unchecked-solver-status
+- constraint-unit-mismatch
 
 ## Expression construction
 
