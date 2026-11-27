@@ -1,0 +1,26 @@
+facts:
+  - id: code-lines
+    text: "How many lines of code the measured paths hold."
+    how: "Counted at start and at each gate. A shorter fix proves itself with this count."
+  - id: equiv-result
+    text: "Whether a data script gives the same result before and after a fix."
+    how: "xpd equiv prints equivalent true or false for the two scripts. The gate text names it and the agent records it in the commit."
+questions:
+  - id: one-purpose
+    text: "Can the purpose of this module be said in one sentence that names what it holds?"
+    look: "The definitions in the module and whether one name covers them all."
+  - id: changes-together
+    text: "Does everything in this module change for the same reason?"
+    look: "The git history of the module and the findings that name its files."
+  - id: no-dead-weight
+    text: "Is every definition in this module used, and does each parameter earn its place?"
+    look: "Unreferenced, constant-parameter, one-caller-parameter and pass-through findings in the module."
+  - id: copies-together
+    text: "Is any code in this module written again in another module?"
+    look: "Copy and near-copy findings that name this module and the other places."
+  - id: imports-stable
+    text: "Does this module import only modules that change less often than it does?"
+    look: "Volatile-import, import-cycle and private-reach findings on its imports."
+  - id: no-special-case
+    text: "Does this module hold a branch or a parameter that exists for one caller or one value?"
+    look: "One-value-branch and one-caller-parameter findings, and who the one caller is."

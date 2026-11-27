@@ -1,16 +1,7 @@
-//! `xpd optimize`: the ledger of the places where code does work that a shorter or faster
-//! program would not do, combining rulekit checks with whole-function and cross-place analysis.
-//!
-//! It reads the files and runs no code. Near copies are found in every language ast-grep parses
-//! as code. Rulekit checks, repeated calls and masks, loop-invariant calls, linear scans in
-//! loops, default arguments, pairwise matrices built to be reduced and full materializations
-//! indexed for one element are read from Python, with defaults from the index that `xpd api`
-//! reads.
-
 mod python;
+mod runtime;
 
-use std::collections::{BTreeSet, HashMap, HashSet};
-use std::fs;
+use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
@@ -20,36 +11,111 @@ use clap::ValueEnum;
 use rayon::prelude::*;
 use serde::Serialize;
 
-use crate::catalog::Filters;
-use crate::index::{self, Library, Method};
 use crate::ledger::gix_source::Listing;
-use crate::ledger::{self, Ledger, Place, Select, Tree, twins};
+use crate::ledger::{self, AdapterPolicy, Ledger, Place, Select, SurveyOutput, Tree};
 use crate::output::Format;
 use crate::source;
-use crate::style::Style;
 use crate::syntax;
 use crate::workspace::Workspace;
 
-use python::{Callee, Keyword};
-
 type Finding = ledger::Finding<Kind>;
-type Entry = ledger::Entry<Kind>;
-
-/// How many texts that near copies differ in the evidence names.
-const SWAPS_SHOWN: usize = 3;
-/// How many characters of one such text the evidence quotes.
-const SWAP_CHARS: usize = 30;
-/// How many classes with a method the evidence names.
-const CLASSES_SHOWN: usize = 3;
+const PERFORMANCE_RULES: &[&str] = &[
+    "arch/fit-output-in-loop",
+    "arch/forecast-per-origin",
+    "category_encoders/sklearn-ships-encoder",
+    "cvxpy/dense-identity-quad-form",
+    "mapie/refit-per-confidence-level",
+    "numpy/eig-on-symmetric",
+    "numpy/einsum-optimize",
+    "numpy/element-loop",
+    "numpy/file-roundtrip",
+    "numpy/growth-in-loop",
+    "numpy/inv-then-multiply",
+    "numpy/mask-per-label",
+    "numpy/mergesort-kind",
+    "numpy/needless-copy",
+    "numpy/np-vectorize",
+    "numpy/per-value-comprehension",
+    "numpy/random-draw-loop",
+    "numpy/recurrence-loop",
+    "numpy/rng-in-loop",
+    "numpy/slice-fill-loop",
+    "numpy/sort-then-select",
+    "pandas/aggregate-then-merge-back",
+    "pandas/apply-arithmetic",
+    "pandas/apply-axis-1",
+    "pandas/apply-cast",
+    "pandas/apply-comparison",
+    "pandas/apply-condition",
+    "pandas/apply-date-expression",
+    "pandas/apply-date-method",
+    "pandas/apply-date-part",
+    "pandas/apply-known-function",
+    "pandas/apply-math-function",
+    "pandas/apply-on-dates",
+    "pandas/apply-parse-date",
+    "pandas/apply-pd-series",
+    "pandas/apply-recomputes-aggregate",
+    "pandas/apply-text-method",
+    "pandas/chunked-csv-concat",
+    "pandas/column-loop",
+    "pandas/column-loop-to-long",
+    "pandas/concat-in-loop",
+    "pandas/copy-after-indexing",
+    "pandas/copy-in-chain",
+    "pandas/frame-growth-in-loop",
+    "pandas/groupby-apply",
+    "pandas/groupby-filter-lambda",
+    "pandas/groupby-lambda",
+    "pandas/groupby-lambda-arithmetic",
+    "pandas/groupby-lambda-window",
+    "pandas/groupby-loop-collects",
+    "pandas/groupby-then-reset-index",
+    "pandas/index-loop",
+    "pandas/list-over-column",
+    "pandas/lookup-per-row",
+    "pandas/named-agg-lambda",
+    "pandas/numpy-round-trip",
+    "pandas/read-csv-converters",
+    "pandas/read-json-lines-engine",
+    "pandas/read-then-head",
+    "pandas/repeated-reset-index",
+    "pandas/rolling-apply",
+    "pandas/row-loop",
+    "pandas/sort-then-head",
+    "pandas/strftime-date-part",
+    "pandas/strftime-round-trip",
+    "pandas/zip-over-columns",
+    "polars/polars-collect-in-loop",
+    "polars/polars-concat-in-loop",
+    "polars/polars-eager-read-before-query",
+    "polars/polars-groupby-join-over",
+    "polars/polars-sort-then-head",
+    "pymoo/unread-history",
+    "python/counting-loop-without-counter",
+    "python/front-insert-in-loop",
+    "python/setdefault-without-defaultdict",
+    "scipy/callable-metric",
+    "scipy/distance-per-pair",
+    "scipy/per-value-scipy-call",
+    "scipy/query-per-point",
+    "scipy/solve-in-loop",
+    "scipy/sparse-inv-then-multiply",
+    "sklearn/cross-val-score-per-metric",
+    "sklearn/predict-and-predict-proba",
+    "sklearn/predict-per-row",
+    "sklearn/refit-per-n-estimators",
+    "sklearn/vectorizer-fit-then-transform",
+    "sklego/group-time-series-split-folds",
+    "xgboost/dmatrix-rebuilt-for-predict",
+];
 
 /// The kinds of work that code does for nothing.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize)]
 #[serde(rename_all = "kebab-case")]
 pub(crate) enum Group {
     Rulekit,
-    WrittenTwice,
     DoneAgain,
-    AlreadyGuaranteed,
     LargerThanTheAnswer,
 }
 
@@ -59,16 +125,12 @@ pub(crate) enum Group {
 pub(crate) enum Kind {
     /// A rule of `xpd check` or the project's own rule pack fires on this line.
     RuleIssue,
-    /// Two stretches of code are the same but for a few names or values.
-    NearCopy,
     /// A function computes the same call more than once, with nothing changed in between.
     RepeatedCall,
     /// A function computes the same boolean mask or masked slice more than once.
     RepeatedMask,
     /// A loop or comprehension computes a call on every pass and changes nothing it reads.
     LoopInvariantCall,
-    /// A keyword argument passes the value that the library function defaults to.
-    DefaultArgument,
     /// A matrix of every element against every other is built and then reduced or contracted.
     MatrixReduced,
     /// A full diff, sort or cumulative sum is built only to read one element or a short head.
@@ -80,22 +142,21 @@ pub(crate) enum Kind {
 impl ledger::Kind for Kind {
     type Group = Group;
 
+    const GOALS: &'static [ledger::Goal] = &[
+        ledger::Goal::Faster,
+        ledger::Goal::Both,
+        ledger::Goal::Design,
+    ];
+
     const COMMAND: &'static str = "optimize";
 
-    const GROUPS: &'static [Group] = &[
-        Group::Rulekit,
-        Group::WrittenTwice,
-        Group::DoneAgain,
-        Group::AlreadyGuaranteed,
-        Group::LargerThanTheAnswer,
-    ];
+    const GROUPS: &'static [Group] =
+        &[Group::Rulekit, Group::DoneAgain, Group::LargerThanTheAnswer];
 
     fn group(self) -> Group {
         match self {
             Self::RuleIssue => Group::Rulekit,
-            Self::NearCopy => Group::WrittenTwice,
             Self::RepeatedCall | Self::RepeatedMask | Self::LoopInvariantCall => Group::DoneAgain,
-            Self::DefaultArgument => Group::AlreadyGuaranteed,
             Self::MatrixReduced | Self::MaterializedForOne | Self::LinearScanInLoop => {
                 Group::LargerThanTheAnswer
             }
@@ -107,14 +168,8 @@ impl ledger::Kind for Kind {
             Group::Rulekit => {
                 "Rulekit: issues that `xpd check` and the project's own rules already report"
             }
-            Group::WrittenTwice => {
-                "Written twice: code that is the same but for a few names, which one function with a parameter replaces"
-            }
             Group::DoneAgain => {
                 "Done again: a value computed more than once, which one computation serves"
-            }
-            Group::AlreadyGuaranteed => {
-                "Already guaranteed: an argument that changes nothing, because the library does the same without it"
             }
             Group::LargerThanTheAnswer => {
                 "Larger than the answer: work or storage that is much larger than the result"
@@ -124,7 +179,7 @@ impl ledger::Kind for Kind {
 }
 
 /// What a run read.
-#[derive(Debug, Clone, Copy, Serialize)]
+#[derive(Debug, Serialize)]
 struct Read {
     /// The files of code.
     files: usize,
@@ -132,39 +187,41 @@ struct Read {
     python: usize,
     /// Total lines across the files of code.
     lines: usize,
+    workloads: Vec<runtime::Workload>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    adapter_error: Option<String>,
 }
 
-/// List the places where code does work that a shorter or faster program would not do.
-///
-/// It reads the files and runs no code, combining `xpd check` rules with whole-function and
-/// cross-place analysis. Near copies are found in every programming language ast-grep parses.
-/// Rulekit issues, repeated calls and boolean masks, calls repeated by a loop or comprehension,
-/// arguments that pass a library default, pairwise matrices built to be reduced or contracted,
-/// full materializations indexed for one element and linear scans inside loops are read from
-/// Python. A finding is a place to read, and not yet a change: the code may differ in a way the
-/// syntax does not show. The JSON has `read`, `summary` with the count of each kind, and
-/// `findings`, each with `id`, `kind`, `places` and `evidence`. `--since` shows the count at an
-/// earlier commit beside the count of today.
+/// Find work that spends CPU, memory or I/O the result does not need.
 #[derive(Debug, clap::Args)]
 #[command(after_long_help = "Examples:
   xpd optimize
   xpd optimize src/ --format json
-  xpd optimize --kind near-copy,repeated-call,matrix-reduced --limit 0
+  xpd optimize --kind repeated-call,matrix-reduced --limit 0
   xpd optimize --since main")]
 pub(crate) struct OptimizeArgs {
     #[command(flatten)]
     select: Select<Kind>,
+    #[arg(long)]
+    questions: bool,
+    #[arg(long, value_name = "ADAPTER")]
+    adapter: Option<String>,
 }
 
 impl OptimizeArgs {
     pub(crate) fn run(self, default: Format) -> Result<ExitCode> {
+        let catalog = ledger::Catalog::load(include_str!("../rules/xpd/optimize.yml"))?;
+        if self.questions {
+            return catalog.print(self.select.format_override().unwrap_or(default));
+        }
         let header = |ledger: &Ledger<Kind, Read>| {
             let Read {
                 files,
                 python,
                 lines,
-            } = ledger.read;
-            let files = if files == 1 {
+                ..
+            } = &ledger.read;
+            let files = if *files == 1 {
                 "1 file".to_owned()
             } else {
                 format!("{files} files")
@@ -174,10 +231,25 @@ impl OptimizeArgs {
                 ledger.count()
             )
         };
-        (self.select).print(
+        self.select.print_with(
             default,
-            |paths, files, top, commit| {
-                survey(paths, files, &Listing::of(paths, files, top, commit)?)
+            self.adapter.as_deref(),
+            |paths, tree, top, commit, adapter, policy| {
+                let listing = Listing::of(paths, tree, top, commit)?;
+                let work_dir = tree
+                    .top
+                    .map_or_else(std::env::current_dir, |top| Ok(top.to_path_buf()))?;
+                let (workloads, adapter_error) = match adapter
+                    .map(|adapter| runtime::measure(adapter, &work_dir))
+                    .transpose()
+                {
+                    Ok(workloads) => (workloads.unwrap_or_default(), None),
+                    Err(error) if policy == AdapterPolicy::BestEffort => {
+                        (Vec::new(), Some(error.to_string()))
+                    }
+                    Err(error) => return Err(error),
+                };
+                survey(paths, tree, &listing, workloads, adapter_error, &catalog)
             },
             header,
         )
@@ -191,7 +263,6 @@ struct Surveyed {
     /// commit.
     named: String,
     lines: usize,
-    shapes: twins::Shapes,
     python: Option<python::Facts>,
     rules: Vec<(usize, String, String)>,
 }
@@ -214,171 +285,25 @@ fn read(
         for found in &linted.found {
             let issue = found.issue();
             let line = issue.position.map_or(1, |at| at.line);
-            rules.push((line, issue.id.to_string(), issue.message));
+            let rule = issue.id.to_string();
+            if issue.severity != crate::severity::Severity::Error
+                && PERFORMANCE_RULES.contains(&rule.as_str())
+            {
+                rules.push((line, rule, issue.message));
+            }
         }
     }
     Some(Surveyed {
         named: tree.tracked(&absolute).unwrap_or_else(|| shown.clone()),
         shown,
         lines: text.lines().count(),
-        shapes: twins::shapes(&root.root()),
         python: (language == SupportLang::Python).then(|| python::facts(path, &root)),
         rules,
     })
 }
 
-/// `text` on one line, cut to the length the evidence quotes for a text that differs.
-fn swapped(text: &str) -> String {
-    crate::output::quote_one_line(text, SWAP_CHARS)
-}
-
-/// The near copies among the files.
-fn near_copies(files: &[(&str, twins::Shapes)]) -> Vec<Finding> {
-    (twins::groups(files).into_iter())
-        .map(|twins| {
-            let (_, block) = twins.members[0];
-            let lines = block.lines.1 - block.lines.0 + 1;
-            let mut differ: Vec<String> = (twins.swaps.iter().take(SWAPS_SHOWN))
-                .map(|(here, there)| format!("`{}` and `{}`", swapped(here), swapped(there)))
-                .collect();
-            if twins.swaps.len() > SWAPS_SHOWN {
-                differ.push(format!("{} more", twins.swaps.len() - SWAPS_SHOWN));
-            }
-            let swaps: Vec<String> = (twins.swaps.iter())
-                .map(|(here, there)| format!("{here}\t{there}"))
-                .collect();
-            Finding {
-                kind: Kind::NearCopy,
-                key: format!("{:016x}\n{}", block.shape, swaps.join("\n")),
-                places: (twins.members.iter())
-                    .map(|(file, block)| Place::lines(file, block.lines))
-                    .collect(),
-                evidence: format!(
-                    "These {} stretches of {lines} lines are the same code but for {}.",
-                    twins.members.len(),
-                    differ.join(", ")
-                ),
-                weight: block.tokens * twins.members.len(),
-            }
-        })
-        .collect()
-}
-
-/// The name and the default of a parameter as the source of a library writes it, as
-/// `observed: bool = True`. `None` for a parameter with no default, or with one that a stub
-/// file leaves out.
-fn default_of(written: &str) -> Option<(&str, &str)> {
-    let (name, default) = match written.split_once(':') {
-        Some((name, annotated)) => (name, annotated.rsplit_once(" = ")?.1),
-        None => written.split_once('=')?,
-    };
-    let (name, default) = (name.trim(), default.trim());
-    (!name.starts_with('*') && default != "...").then_some((name, default))
-}
-
-/// Whether the literal `passed` is the value `default`, whichever quotes a string has.
-fn same_value(passed: &str, default: &str) -> bool {
-    let unquoted = |text: &str| {
-        let quote = text.chars().next().filter(|c| matches!(c, '"' | '\''))?;
-        text.strip_prefix(quote)?
-            .strip_suffix(quote)
-            .map(str::to_owned)
-    };
-    match (unquoted(passed), unquoted(default)) {
-        (Some(passed), Some(default)) => passed == default,
-        (None, None) => passed == default,
-        _ => false,
-    }
-}
-
-/// The defaults of the library functions that the files call.
-struct Defaults {
-    library: Library,
-    /// The parameters of each name that was looked up. `None` for a name the index lacks.
-    symbols: HashMap<String, Option<Vec<String>>>,
-    methods: HashMap<String, Vec<Method>>,
-    /// The functions that the project defines, whose calls are not calls of a library.
-    own: HashSet<String>,
-}
-
-impl Defaults {
-    fn new(surveyed: &[Surveyed]) -> Result<Self> {
-        let facts = || surveyed.iter().filter_map(|file| file.python.as_ref());
-        let packages: BTreeSet<String> = facts()
-            .flat_map(|facts| facts.packages.iter().cloned())
-            .collect();
-        let library = index::load(None)?;
-        Ok(Self {
-            methods: index::methods(&library, &packages)?,
-            library,
-            symbols: HashMap::new(),
-            own: (facts().flat_map(|facts| facts.functions.iter().cloned())).collect(),
-        })
-    }
-
-    fn symbol(&mut self, name: &str) -> Result<Option<&[String]>> {
-        if !self.symbols.contains_key(name) {
-            let parameters = index::api(&self.library, name)?.map(|entry| entry.parameters_written);
-            self.symbols.insert(name.to_owned(), parameters);
-        }
-        Ok(self.symbols[name].as_deref())
-    }
-
-    /// The evidence that `keyword` passes a default. `packages` holds the packages that its
-    /// file imports. A method counts when every class of those packages that has a method of
-    /// the name, with the parameter, gives it this default.
-    fn passed(&mut self, keyword: &Keyword, packages: &BTreeSet<String>) -> Result<Option<String>> {
-        let is_default = |written: &String| {
-            default_of(written).is_some_and(|(name, default)| {
-                name == keyword.name && same_value(&keyword.value, default)
-            })
-        };
-        let written = format!("`{}={}`", keyword.name, keyword.value);
-        let method = match &keyword.callee {
-            Callee::Symbol(symbol) => match self.symbol(symbol)? {
-                Some(parameters) => {
-                    return Ok((parameters.iter().any(is_default))
-                        .then(|| format!("{written} passes the default of `{symbol}`.")));
-                }
-                None => symbol.rsplit('.').next().unwrap_or(symbol),
-            },
-            Callee::Method(method) => method,
-        };
-        if self.own.contains(method) {
-            return Ok(None);
-        }
-        let has = |written: &String| {
-            default_of(written).is_some_and(|(name, _)| name == keyword.name)
-                || written.split([':', '=']).next().map(str::trim) == Some(keyword.name.as_str())
-        };
-        let classes: Vec<&Method> = (self.methods.get(method).into_iter().flatten())
-            .filter(|(class, parameters)| {
-                packages.contains(class.split('.').next().unwrap_or(class))
-                    && parameters.iter().any(has)
-            })
-            .collect();
-        let agree = !classes.is_empty()
-            && (classes.iter()).all(|(_, parameters)| parameters.iter().any(is_default));
-        Ok(agree.then(|| {
-            let mut names: Vec<String> = (classes.iter().take(CLASSES_SHOWN))
-                .map(|(class, _)| class.clone())
-                .collect();
-            if classes.len() > CLASSES_SHOWN {
-                names.push(format!("{} more", classes.len() - CLASSES_SHOWN));
-            }
-            format!(
-                "{written} passes the default that `{method}` has in {}.",
-                names.join(", ")
-            )
-        }))
-    }
-}
-
-/// The findings of the Python files: the ones each file holds on its own, and the keyword
-/// arguments that pass a default of a library.
-fn python_findings(surveyed: &[Surveyed]) -> Result<Vec<Finding>> {
+fn python_findings(surveyed: &[Surveyed]) -> Vec<Finding> {
     let mut findings = Vec::new();
-    let mut defaults = None;
     for file in surveyed {
         let Some(facts) = &file.python else {
             continue;
@@ -394,27 +319,8 @@ fn python_findings(surveyed: &[Surveyed]) -> Result<Vec<Finding>> {
                 weight: local.weight,
             });
         }
-        for keyword in &facts.keywords {
-            let defaults = match &mut defaults {
-                Some(defaults) => defaults,
-                None => defaults.insert(Defaults::new(surveyed)?),
-            };
-            let Some(evidence) = defaults.passed(keyword, &facts.packages)? else {
-                continue;
-            };
-            let callee = match &keyword.callee {
-                Callee::Symbol(name) | Callee::Method(name) => name,
-            };
-            findings.push(Finding {
-                kind: Kind::DefaultArgument,
-                key: format!("{}\n{callee}\n{}", file.named, keyword.name),
-                places: vec![Place::line(&file.shown, keyword.line)],
-                evidence,
-                weight: 1,
-            });
-        }
     }
-    Ok(findings)
+    findings
 }
 
 /// The rule issues from `xpd check` and any project rule packs on the surveyed files.
@@ -434,37 +340,22 @@ fn rule_findings(surveyed: &[Surveyed]) -> Vec<Finding> {
     findings
 }
 
-/// The workspace of rules that applies to `paths`, respecting project config and style settings.
-fn rules_workspace(paths: &[PathBuf], tree: Tree<'_>) -> Result<Workspace> {
-    let root = tree
-        .top
-        .map(Path::to_path_buf)
-        .or_else(|| {
-            let first = paths.first()?;
-            let absolute = fs::canonicalize(first).ok()?;
-            Some(if absolute.is_dir() {
-                absolute
-            } else {
-                absolute.parent().unwrap_or(&absolute).to_path_buf()
-            })
-        })
-        .unwrap_or_else(|| PathBuf::from("."));
-    let filters = Filters {
-        rules: Vec::new(),
-        severity: None,
-    };
-    Workspace::open(root, None, &filters).or_else(|_| Workspace::bundled(Style::Default))
-}
-
 /// What was read and every finding of the files under `paths`, which `listing` lists and reads.
-fn survey(paths: &[PathBuf], tree: Tree<'_>, listing: &Listing) -> Result<(Read, Vec<Entry>)> {
+fn survey(
+    paths: &[PathBuf],
+    tree: Tree<'_>,
+    listing: &Listing,
+    workloads: Vec<runtime::Workload>,
+    adapter_error: Option<String>,
+    catalog: &ledger::Catalog,
+) -> Result<SurveyOutput<Kind, Read>> {
     let files = &listing.files;
     let workspace = (files
         .iter()
         .any(|(_, language)| *language == SupportLang::Python))
-    .then(|| rules_workspace(paths, tree))
+    .then(|| ledger::rules_workspace(paths, tree))
     .transpose()?;
-    let mut surveyed: Vec<Surveyed> = (files.par_iter())
+    let surveyed: Vec<Surveyed> = (files.par_iter())
         .filter_map(|(path, language)| {
             let ws = workspace
                 .as_ref()
@@ -472,16 +363,46 @@ fn survey(paths: &[PathBuf], tree: Tree<'_>, listing: &Listing) -> Result<(Read,
             read(path, *language, tree, listing, ws)
         })
         .collect();
-    let read = Read {
-        files: surveyed.len(),
-        python: surveyed.iter().filter(|file| file.python.is_some()).count(),
-        lines: surveyed.iter().map(|file| file.lines).sum(),
-    };
     let mut findings = rule_findings(&surveyed);
-    findings.extend(python_findings(&surveyed)?);
-    let shapes: Vec<(&str, twins::Shapes)> = (surveyed.iter_mut())
-        .map(|file| (file.shown.as_str(), std::mem::take(&mut file.shapes)))
+    findings.extend(python_findings(&surveyed));
+    let by_path: BTreeMap<_, _> = surveyed
+        .iter()
+        .map(|file| (file.shown.as_str(), file))
         .collect();
-    findings.extend(near_copies(&shapes));
-    Ok((read, ledger::named(findings)))
+    let mut entities = BTreeSet::new();
+    for place in findings.iter().flat_map(|finding| &finding.places) {
+        let Some(file) = by_path.get(place.path.as_str()) else {
+            continue;
+        };
+        let Some(line) = place.line else { continue };
+        let Some(facts) = &file.python else { continue };
+        if let Some((name, _, _)) = facts
+            .functions
+            .iter()
+            .filter(|(_, start, end)| (*start..=*end).contains(&line))
+            .min_by_key(|(_, start, end)| end - start)
+        {
+            entities.insert((format!("{}:{name}", file.named), file.named.clone()));
+        }
+    }
+    for function in workloads.iter().flat_map(|workload| &workload.functions) {
+        if function.cpu_share >= 0.05
+            && !Path::new(&function.file).is_absolute()
+            && !function.file.starts_with(['<', '~'])
+        {
+            let file = function.file.clone();
+            entities.insert((format!("{file}:{}", function.name), file));
+        }
+    }
+    Ok(SurveyOutput {
+        read: Read {
+            files: surveyed.len(),
+            python: surveyed.iter().filter(|file| file.python.is_some()).count(),
+            lines: surveyed.iter().map(|file| file.lines).sum(),
+            workloads,
+            adapter_error,
+        },
+        findings: ledger::named(findings),
+        checklist: catalog.checklist(entities, "function"),
+    })
 }

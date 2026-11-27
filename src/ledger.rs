@@ -19,14 +19,21 @@ use clap::ValueEnum;
 use serde::Serialize;
 use siphasher::sip::SipHasher13;
 
+use crate::catalog::Filters;
 use crate::git;
+use crate::style::Style;
+use crate::workspace::Workspace;
 
+mod catalog;
 #[cfg(feature = "ledger-durable")]
 mod durable;
 pub(crate) mod gix_source;
 #[cfg(feature = "ledger-durable")]
 mod orchestration;
+pub(crate) mod python;
 mod run;
+pub(crate) use catalog::Catalog;
+pub(crate) use run::Goal;
 #[cfg(feature = "ledger-incremental")]
 pub(crate) mod salsa_db;
 pub(crate) mod twins;
@@ -49,6 +56,7 @@ pub(crate) trait Kind:
 
     /// The name of the command that lists findings of this kind, such as `untangle`.
     const COMMAND: &'static str;
+    const GOALS: &'static [Goal] = &[Goal::Shorter, Goal::Faster, Goal::Both, Goal::Design];
 
     fn group(self) -> Self::Group;
 
@@ -415,31 +423,6 @@ impl<K: Kind> Select<K> {
         self.format
     }
 
-    /// Prints the ledger of the paths, or runs a stage of a refactor run. `survey` reads the files under the paths it gets, which
-    /// are in the folders of the tree, and returns what it read and the findings. It also gets
-    /// the top of the repository and the commit that the files are from, which is `HEAD` for
-    /// the files of today. `header` writes the first lines of the text.
-    pub(crate) fn print<R: Serialize>(
-        self,
-        default: Format,
-        survey: impl Fn(&[PathBuf], Tree<'_>, Option<&Path>, &str) -> Result<(R, Vec<Entry<K>>)>,
-        header: impl FnOnce(&Ledger<K, R>) -> String,
-    ) -> Result<ExitCode> {
-        self.print_with(
-            default,
-            None,
-            |paths, files, top, commit, _, _| {
-                let (read, findings) = survey(paths, files, top, commit)?;
-                Ok(SurveyOutput {
-                    read,
-                    findings,
-                    checklist: Vec::new(),
-                })
-            },
-            header,
-        )
-    }
-
     /// Prints the ledger of the paths, or runs a stage of a ledger run, forwarding an optional
     /// runtime `adapter` and any per-figure checklist items returned by `survey`.
     pub(crate) fn print_with<R: Serialize>(
@@ -643,6 +626,10 @@ impl<K: Kind, R> Ledger<K, R> {
         if !self.checklist.is_empty() {
             let _ = writeln!(text, "\nChecklist: {} items", self.checklist.len());
             for item in &self.checklist {
+                if item.page == 0 {
+                    let _ = writeln!(text, "  {}  {}", item.id, item.text);
+                    continue;
+                }
                 let _ = writeln!(
                     text,
                     "  {}  {} ({}, page {})  {}",
@@ -660,7 +647,8 @@ fn repository(path: &Path) -> Option<PathBuf> {
         path
     } else {
         path.parent()
-            .filter(|folder| !folder.as_os_str().is_empty())?
+            .filter(|folder| !folder.as_os_str().is_empty())
+            .unwrap_or_else(|| Path::new("."))
     };
     let top = git::output(folder, &["rev-parse", "--show-toplevel"]).ok()?;
     fs::canonicalize(top.trim_end_matches(['\r', '\n'])).ok()
@@ -788,4 +776,24 @@ pub(crate) fn files(paths: &[PathBuf]) -> Vec<(PathBuf, SupportLang)> {
     files.sort_by(|a, b| a.0.cmp(&b.0));
     files.dedup_by(|a, b| a.0 == b.0);
     files
+}
+pub(crate) fn rules_workspace(paths: &[PathBuf], tree: Tree<'_>) -> Result<Workspace> {
+    let root = tree
+        .top
+        .map(Path::to_path_buf)
+        .or_else(|| {
+            let first = paths.first()?;
+            let absolute = fs::canonicalize(first).ok()?;
+            Some(if absolute.is_dir() {
+                absolute
+            } else {
+                absolute.parent().unwrap_or(&absolute).to_path_buf()
+            })
+        })
+        .unwrap_or_else(|| PathBuf::from("."));
+    let filters = Filters {
+        rules: Vec::new(),
+        severity: None,
+    };
+    Workspace::open(root, None, &filters).or_else(|_| Workspace::bundled(Style::Default))
 }

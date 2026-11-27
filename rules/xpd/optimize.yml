@@ -1,0 +1,32 @@
+facts:
+  - id: wall-time
+    text: "The median wall time of a representative workload."
+    how: "Median of 5 timed runs after 1 warmup, in milliseconds. The gate rejects a kept fix that is more than 15 percent slower."
+  - id: cpu-time
+    text: "The share of CPU time each function of a workload takes."
+    how: "cProfile over the adapter workloads. Each function gets its cumulative time and its share of the total, in the project Python."
+  - id: peak-memory
+    text: "The most memory a workload holds at one time."
+    how: "tracemalloc peak in bytes for each adapter workload, taken on each of the 5 runs and reported as the largest peak."
+  - id: call-count
+    text: "How many times a workload calls each function."
+    how: "cProfile call counts per function for each adapter workload, in the project Python."
+questions:
+  - id: hot-or-repeated
+    text: "Does this function spend its time on work the result does not need?"
+    look: "The adapter cpu-time share of the function and the static findings in its body."
+  - id: computed-once
+    text: "Is each value this function needs computed once and then reused?"
+    look: "Repeated calls, masks and loop invariant calls in the body, and any write between two calls."
+  - id: sized-to-answer
+    text: "Is the largest thing this function builds no larger than the answer it returns?"
+    look: "Pairwise matrices, full sorts and scans, and the size of what the caller keeps."
+  - id: measured-before
+    text: "Was this function measured before it was changed, and is the change faster on the same workload?"
+    look: "The --bench timing and the adapter cpu-time and peak-memory before and after."
+  - id: edge-cases-kept
+    text: "Does the faster form keep the empty, tie and missing value cases of the old form?"
+    look: "The old code beside the new code on empty input, tied values and missing values."
+  - id: library-does-it
+    text: "Does a library the project already uses do this work in one call?"
+    look: "xpd find for the task and xpd api for the call that replaces the hand written work."

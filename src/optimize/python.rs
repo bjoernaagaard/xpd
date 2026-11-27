@@ -1,10 +1,10 @@
 //! The work that Python code does again or for nothing, read from the syntax of one file at a
-//! time: a call that a function computes more than once, a call that a loop repeats, a keyword
-//! argument that a library may already default to, and a matrix that is built to be reduced.
+//! time, including repeated calls and matrices built only to reduce them.
 
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::path::Path;
 
+use crate::ledger::python::{called, imports_of, root_name};
 use crate::source;
 use crate::syntax::{Node, Root};
 
@@ -214,33 +214,10 @@ pub(super) struct Local {
     pub(super) weight: usize,
 }
 
-/// What a call names as the thing it calls.
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub(super) enum Callee {
-    /// A name of a library with its module, as `numpy.linspace`.
-    Symbol(String),
-    /// A method of a value whose class the file does not say, as `groupby`.
-    Method(String),
-}
-
-/// A keyword argument with a literal value, which may repeat the default of the callee.
-#[derive(Debug)]
-pub(super) struct Keyword {
-    pub(super) line: usize,
-    pub(super) callee: Callee,
-    pub(super) name: String,
-    pub(super) value: String,
-}
-
-/// What one Python file gives the ledger.
 #[derive(Debug, Default)]
 pub(super) struct Facts {
     pub(super) local: Vec<Local>,
-    pub(super) keywords: Vec<Keyword>,
-    /// The packages the file imports, by the first part of the module name.
-    pub(super) packages: BTreeSet<String>,
-    /// The names of the functions the file defines.
-    pub(super) functions: Vec<String>,
+    pub(super) functions: Vec<(String, usize, usize)>,
 }
 
 fn line(node: &Node<'_>) -> usize {
@@ -282,18 +259,6 @@ fn scope<'t>(node: &Node<'t>, nodes: &mut Vec<Node<'t>>) {
     }
 }
 
-/// The name at the left end of `node`, as `frame` in `frame.loc[rows].sum`.
-fn root_name(node: &Node<'_>) -> Option<String> {
-    match node.kind().as_ref() {
-        "identifier" => Some(node.text().into_owned()),
-        "attribute" => root_name(&node.field("object")?),
-        "subscript" => root_name(&node.field("value")?),
-        "call" => root_name(&node.field("function")?),
-        "parenthesized_expression" => root_name(&node.child(1)?),
-        _ => None,
-    }
-}
-
 /// The names that `target`, the left side of an assignment or a loop, binds or changes.
 fn targets(target: &Node<'_>, names: &mut Vec<String>) {
     match target.kind().as_ref() {
@@ -303,16 +268,6 @@ fn targets(target: &Node<'_>, names: &mut Vec<String>) {
                 targets(&child, names);
             }
         }
-    }
-}
-
-/// The last name of what `call` calls, as `groupby` in `frame.groupby(keys)`.
-fn called(call: &Node<'_>) -> Option<String> {
-    let function = call.field("function")?;
-    match function.kind().as_ref() {
-        "identifier" => Some(function.text().into_owned()),
-        "attribute" => Some(function.field("attribute")?.text().into_owned()),
-        _ => None,
     }
 }
 
@@ -1256,122 +1211,22 @@ fn reduced(functions: &[Function<'_>]) -> Vec<Local> {
     found
 }
 
-/// The names that the import statement `import` binds, each with the module or the name of a
-/// module that it stands for. A relative import is left out.
-fn imports_of(import: &Node<'_>) -> Vec<(String, String)> {
-    let dotted = |name: &Node<'_>| -> Option<(String, Option<String>)> {
-        match name.kind().as_ref() {
-            "dotted_name" => Some((name.text().into_owned(), None)),
-            "aliased_import" => Some((
-                name.field("name")?.text().into_owned(),
-                Some(name.field("alias")?.text().into_owned()),
-            )),
-            _ => None,
-        }
-    };
-    let names = import
-        .field_children("name")
-        .filter_map(|name| dotted(&name));
-    match import.kind().as_ref() {
-        "import_statement" => names
-            .map(|(module, alias)| {
-                let package = module.split('.').next().unwrap_or(&module).to_owned();
-                alias.map_or_else(
-                    || (package.clone(), package.clone()),
-                    |alias| (alias, module.clone()),
-                )
-            })
-            .collect(),
-        "import_from_statement" => {
-            let module = (import.field("module_name"))
-                .filter(|module| module.kind() == "dotted_name")
-                .map(|module| module.text().into_owned());
-            let Some(module) = module else {
-                return Vec::new();
-            };
-            names
-                .map(|(name, alias)| {
-                    let full = format!("{module}.{name}");
-                    (alias.unwrap_or(name), full)
-                })
-                .collect()
-        }
-        _ => Vec::new(),
-    }
-}
-
-/// The text of `node` when it is a literal that a default could equal.
-fn literal(node: &Node<'_>) -> Option<String> {
-    let number = |node: &Node<'_>| matches!(node.kind().as_ref(), "integer" | "float");
-    let plain = match node.kind().as_ref() {
-        "integer" | "float" | "true" | "false" | "none" => true,
-        "string" => crate::syntax::string_literal(node).is_some(),
-        "unary_operator" => node.field("argument").is_some_and(|inner| number(&inner)),
-        _ => false,
-    };
-    plain.then(|| node.text().into_owned())
-}
-
-/// What `call` calls, by the imports of the file. `None` for a call of the object itself.
-fn callee(call: &Node<'_>, imports: &HashMap<String, String>) -> Option<Callee> {
-    let function = call.field("function")?;
-    let dotted = function.text();
-    let plain = (dotted.split('.'))
-        .all(|part| !part.is_empty() && part.chars().all(|c| c.is_alphanumeric() || c == '_'));
-    let root = root_name(&function)?;
-    if let (true, Some(module)) = (plain, imports.get(&root)) {
-        let rest = dotted.strip_prefix(root.as_str()).unwrap_or("");
-        return Some(Callee::Symbol(format!("{module}{rest}")));
-    }
-    let method = function.kind() == "attribute" && !matches!(root.as_str(), "self" | "cls");
-    method.then(|| called(call).map(Callee::Method)).flatten()
-}
-
 /// The facts of the Python file at `path`, whose parsed source is `root`. A test repeats a call
 /// to say what it checks, so the calls of a test file are left out.
 pub(super) fn facts(path: &Path, root: &Root) -> Facts {
     let mut facts = Facts::default();
-    let mut imports = HashMap::new();
     let mut functions = Vec::new();
     for node in root.root().dfs() {
-        match node.kind().as_ref() {
-            "import_statement" | "import_from_statement" => {
-                for (bound, module) in imports_of(&node) {
-                    facts
-                        .packages
-                        .extend(module.split('.').next().map(str::to_owned));
-                    imports.insert(bound, module);
-                }
+        if node.kind() == "function_definition" {
+            if let Some(name) = node.field("name") {
+                facts.functions.push((
+                    name.text().into_owned(),
+                    line(&node),
+                    node.end_pos().line() + 1,
+                ));
             }
-            "function_definition" => functions.extend(Function::new(node)),
-            _ => {}
+            functions.extend(Function::new(node));
         }
-    }
-    for call in root.root().dfs().filter(|node| node.kind() == "call") {
-        let Some(arguments) = call.field("arguments") else {
-            continue;
-        };
-        let keywords: Vec<(String, String)> = (arguments.children())
-            .filter(|argument| argument.kind() == "keyword_argument")
-            .filter_map(|argument| {
-                let value = literal(&argument.field("value")?)?;
-                Some((argument.field("name")?.text().into_owned(), value))
-            })
-            .collect();
-        if keywords.is_empty() {
-            continue;
-        }
-        let Some(callee) = callee(&call, &imports) else {
-            continue;
-        };
-        facts
-            .keywords
-            .extend(keywords.into_iter().map(|(name, value)| Keyword {
-                line: line(&call),
-                callee: callee.clone(),
-                name,
-                value,
-            }));
     }
     let test = source::is_test(path);
     for function in &functions {
@@ -1383,7 +1238,6 @@ pub(super) fn facts(path: &Path, root: &Root) -> Facts {
             facts.local.extend(function.materialized_for_one());
             facts.local.extend(function.linear_scans());
         }
-        facts.functions.push(function.name.clone());
     }
     facts.local.extend(reduced(&functions));
     facts

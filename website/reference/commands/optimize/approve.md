@@ -1,10 +1,10 @@
-Record that the user said yes to a fix whose plan sets `changes_interface`. The gate refuses such a fix until then, so an agent asks the user first and runs this only after a yes.
+Record approval for a fix that changes what callers or users see.
 
-The [`xpd optimize`](../../optimize/#a-recorded-run) page shows a whole run.
+Run `xpd optimize approve fix-id`.
 
 ## Example
 
 ```console
-$ xpd optimize approve --help
-...
+$ xpd optimize approve --help | sed -n '/^Usage:/p'
+Usage: xpd optimize approve [OPTIONS] <FIX>
 ```

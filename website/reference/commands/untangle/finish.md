@@ -1,10 +1,10 @@
-End the run. xpd compares the findings with the commit the run started from, and prints how many were fixed, added and left without a reason. It exits 1 while a fix is open, or while a finding that is new since the start has no reason.
+Compare against the starting commit. An open fix, a new finding without an accepted reason or an unanswered checklist item causes a failure.
 
-The [`xpd untangle`](../../untangle/#a-recorded-run) page shows a whole run.
+Run `xpd untangle finish`.
 
 ## Example
 
 ```console
-$ xpd untangle finish --help
-...
+$ xpd untangle finish --help | sed -n '/^Usage:/p'
+Usage: xpd untangle finish [OPTIONS]
 ```

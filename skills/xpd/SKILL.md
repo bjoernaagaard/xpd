@@ -89,24 +89,9 @@ Use `xpd` whenever you write or change Python code.
 - `xpd rules run --pattern '<code>' <paths…> --json`: find code by its syntax, such as
   `'$X.iterrows()'`. Add `--rewrite '<code>'` to preview a replacement, and
   `--update-all` to write every match.
-- `xpd untangle <paths…> --format json`: the ledger of a codebase refactor, read from the
-  files and the git history without running anything. It counts copies, files that change
-  together, import cycles, unused definitions and special cases, each finding with an `id`,
-  its places and evidence. Run it before a refactor of a codebase and after each round, and
-  add `--since <commit>` to see which findings are fixed and which are new since that
-  commit. Copies and files that change together are found in every language, and the rest
-  in Python. `xpd untangle start` begins a run that xpd records, with a plan, a gate for each fix
-  and `xpd untangle status` for the stage that comes next. The `xpd-untangle` skill holds
-  the steps.
-- `xpd optimize <paths…> --format json`: the places where code does work that a shorter or
-  faster program would not do, combining rulekit checks with whole-function and cross-place
-  analysis without running code: rule issues, near copies, repeated calls and boolean masks,
-  loop-invariant calls, default arguments, pairwise matrices built to be reduced or contracted,
-  full materializations indexed for one element, and linear scans in loops, each with an `id`,
-  its places and evidence. `xpd optimize start <paths> --check "<tests>" --bench "<workload>"`
-  begins a recorded run that tracks code lines, benchmark timing and a gate for each fix, with
-  `xpd optimize status` for the stage that comes next. Near copies are found in every language,
-  and the rest in Python. The `xpd-optimize` skill holds the steps.
+- `xpd untangle <paths…> --format json` finds structural dependencies and dead weight. The `xpd-untangle` skill covers the recorded run.
+- `xpd optimize <paths…> --format json` finds work that spends CPU, memory or I/O the result does not need. The `xpd-optimize` skill covers workload measurement.
+- `xpd harden <paths…> --format json` finds silent failures, fixed waits and unreliable tests. The `xpd-harden` skill covers the reliability gate and checklist.
 - `xpd refit <contract.json>`: refit a saved scikit-learn Pipeline on its raw
   training rows and compare outputs and scores with the contract. Needs pandas
   and scikit-learn.

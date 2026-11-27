@@ -389,8 +389,9 @@ impl Receipt {
 }
 
 /// Whether a fix is kept, with the exact rules of the journal gate.
-pub(crate) fn judge(fix: &FixState, output: &GateOutput) -> Result<Compared, String> {
+fn judge(command: &str, fix: &FixState, output: &GateOutput) -> Result<Compared, String> {
     judge_fix(&GateEvidence {
+        command,
         findings: &fix.findings,
         questions: &fix.questions,
         goal: fix.goal,
@@ -506,6 +507,7 @@ async fn apply_plan(
 
 async fn apply_gate(
     ctx: &OrchestrationContext,
+    command: &str,
     state: &mut JournalState,
     id: &str,
     head: &str,
@@ -546,7 +548,7 @@ async fn apply_gate(
     }
     let judged = {
         let fix = state.fix_mut(id)?;
-        judge(fix, &output)
+        judge(command, fix, &output)
     };
     let questions = {
         let fix = state.fix_mut(id)?;
@@ -683,7 +685,9 @@ pub(crate) async fn ledger_run(ctx: OrchestrationContext, input: String) -> Resu
             Command::Approve { fix } => state.fix_mut(&fix).map(|fix| {
                 fix.approved = true;
             }),
-            Command::Gate { fix, head } => apply_gate(&ctx, &mut state, &fix, &head).await,
+            Command::Gate { fix, head } => {
+                apply_gate(&ctx, &command, &mut state, &fix, &head).await
+            }
             Command::Drop { fix, reason, head } => {
                 if head == state.current {
                     state.fix_mut(&fix).map(|fix| {

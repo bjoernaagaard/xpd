@@ -1,13 +1,7 @@
-//! `xpd untangle`: the ledger of the places where a codebase gets one question wrong, which is
-//! whether two pieces of it should change together.
-//!
-//! It reads the files and the git history, and runs no code. Copies and files that change
-//! together are found in every language ast-grep parses as code. The import graph, the
-//! parameters and the special cases are read from Python.
-
 mod copies;
 mod history;
 mod python;
+mod redundancy;
 
 use std::collections::{BTreeSet, HashMap, HashSet};
 use std::fmt::Write as _;
@@ -20,7 +14,7 @@ use clap::ValueEnum;
 use rayon::prelude::*;
 use serde::Serialize;
 
-use crate::ledger::{self, Ledger, Place, Select, Tree};
+use crate::ledger::{self, Ledger, Place, Select, SurveyOutput, Tree, twins};
 use crate::output::Format;
 use crate::source;
 use crate::style::Style;
@@ -31,7 +25,6 @@ use crate::ledger::gix_source::Listing;
 use history::History;
 
 type Finding = ledger::Finding<Kind>;
-type Entry = ledger::Entry<Kind>;
 
 /// The three ways to get the question wrong, and the code that stands outside the design.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize)]
@@ -71,16 +64,14 @@ pub(crate) enum Kind {
     OneValueBranch,
     /// One call alone passes a parameter that has a default.
     OneCallerParameter,
-    /// An exception is caught and dropped.
-    SwallowedException,
-    /// Code waits a fixed time, or runs again when it fails.
-    SleepOrRetry,
-    /// A test is skipped, or may fail while the run passes.
-    DisabledTest,
+    NearCopy,
+    DefaultArgument,
 }
 
 impl ledger::Kind for Kind {
     type Group = Group;
+
+    const GOALS: &'static [ledger::Goal] = &[ledger::Goal::Shorter, ledger::Goal::Design];
 
     const COMMAND: &'static str = "untangle";
 
@@ -93,16 +84,17 @@ impl ledger::Kind for Kind {
 
     fn group(self) -> Group {
         match self {
-            Self::Copy | Self::ChangesTogether | Self::SharedState => Group::HiddenLink,
+            Self::Copy | Self::NearCopy | Self::ChangesTogether | Self::SharedState => {
+                Group::HiddenLink
+            }
             Self::VolatileImport | Self::ImportCycle | Self::PrivateReach | Self::VagueModule => {
                 Group::NeedlessLink
             }
-            Self::PassThrough | Self::Unreferenced | Self::ConstantParameter => Group::Surplus,
-            Self::OneValueBranch
-            | Self::OneCallerParameter
-            | Self::SwallowedException
-            | Self::SleepOrRetry
-            | Self::DisabledTest => Group::SpecialCase,
+            Self::DefaultArgument
+            | Self::PassThrough
+            | Self::Unreferenced
+            | Self::ConstantParameter => Group::Surplus,
+            Self::OneValueBranch | Self::OneCallerParameter => Group::SpecialCase,
         }
     }
 
@@ -129,8 +121,6 @@ impl Kind {
         match rule {
             "python/pass-through-function" => Some(Self::PassThrough),
             "python/vague-module-name" => Some(Self::VagueModule),
-            "python/test-skip" => Some(Self::DisabledTest),
-            "python/test-sleep" | "python/test-rerun" => Some(Self::SleepOrRetry),
             _ => None,
         }
     }
@@ -163,15 +153,31 @@ struct Read {
 pub(crate) struct UntangleArgs {
     #[command(flatten)]
     select: Select<Kind>,
+    #[arg(long)]
+    questions: bool,
 }
 
 impl UntangleArgs {
     pub(crate) fn run(self, default: Format) -> Result<ExitCode> {
-        let survey = |paths: &[PathBuf], files: Tree<'_>, top: Option<&Path>, commit: &str| {
+        let catalog = ledger::Catalog::load(include_str!("../rules/xpd/untangle.yml"))?;
+        if self.questions {
+            return catalog.print(self.select.format_override().unwrap_or(default));
+        }
+        let survey = |paths: &[PathBuf],
+                      files: Tree<'_>,
+                      top: Option<&Path>,
+                      commit: &str,
+                      _: Option<&str>,
+                      _| {
             let history = top.map_or_else(History::default, |top| History::read(top, commit));
-            survey(files, &Listing::of(paths, files, top, commit)?, &history)
+            survey(
+                files,
+                &Listing::of(paths, files, top, commit)?,
+                &history,
+                &catalog,
+            )
         };
-        self.select.print(default, survey, header)
+        self.select.print_with(default, None, survey, header)
     }
 }
 
@@ -199,6 +205,8 @@ struct Surveyed {
     shown: String,
     tracked: Option<String>,
     blocks: Vec<copies::Block>,
+    shapes: twins::Shapes,
+    defaults: Option<redundancy::Facts>,
     python: Option<(PathBuf, python::Facts)>,
     /// The findings that rules of `xpd check` report.
     ruled: Vec<python::Local>,
@@ -233,6 +241,8 @@ fn read(
         shown: tree.shown(path),
         tracked,
         blocks: copies::blocks(&root.root()),
+        shapes: twins::shapes(&root.root()),
+        defaults: (language == SupportLang::Python).then(|| redundancy::facts(&root)),
         python,
         ruled,
     })
@@ -331,14 +341,19 @@ fn changed_together(
 /// What was read and every finding of the files that `listing` lists, by group, kind and
 /// strength. The rules of `xpd check` take a
 /// moment to compile, so they are loaded only when a Python file is read.
-fn survey(tree: Tree<'_>, listing: &Listing, history: &History) -> Result<(Read, Vec<Entry>)> {
+fn survey(
+    tree: Tree<'_>,
+    listing: &Listing,
+    history: &History,
+    catalog: &ledger::Catalog,
+) -> Result<SurveyOutput<Kind, Read>> {
     let files = &listing.files;
     let workspace = (files
         .iter()
         .any(|(_, language)| *language == SupportLang::Python))
     .then(|| Workspace::bundled(Style::Default))
     .transpose()?;
-    let surveyed: Vec<Surveyed> = (files.par_iter())
+    let mut surveyed: Vec<Surveyed> = (files.par_iter())
         .filter_map(|(path, language)| {
             let workspace = workspace
                 .as_ref()
@@ -353,6 +368,21 @@ fn survey(tree: Tree<'_>, listing: &Listing, history: &History) -> Result<(Read,
     };
     let mut findings = copied(&surveyed);
     findings.extend(local(&surveyed));
+    findings.extend(redundancy::default_arguments(&surveyed)?);
+    let shapes: Vec<_> = surveyed
+        .iter_mut()
+        .map(|file| (file.shown.as_str(), std::mem::take(&mut file.shapes)))
+        .collect();
+    findings.extend(redundancy::near_copies(&shapes));
+    let tracked: HashMap<_, _> = surveyed
+        .iter()
+        .map(|file| {
+            (
+                file.shown.clone(),
+                file.tracked.clone().unwrap_or_else(|| file.shown.clone()),
+            )
+        })
+        .collect();
     let shown_as: HashMap<String, String> = (surveyed.iter())
         .filter_map(|file| Some((file.tracked.clone()?, file.shown.clone())))
         .collect();
@@ -373,5 +403,5 @@ fn survey(tree: Tree<'_>, listing: &Listing, history: &History) -> Result<(Read,
         &shown_as,
         &python::imports(&modules),
     ));
-    Ok((read, ledger::named(findings)))
+    Ok(catalog.modules(read, findings, |path| tracked.get(path).cloned()))
 }

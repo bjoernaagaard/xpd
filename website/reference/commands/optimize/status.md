@@ -1,10 +1,10 @@
-Print the run and the stage that comes next, with what to do in it. Run it after a break, since the run is recorded in the git folder of the repository and belongs to no session. With `--format json` it prints `run`, the whole record, and `next`, with `stage` and `text`.
+Show the current run, its recorded answers and the next stage.
 
-The [`xpd optimize`](../../optimize/#a-recorded-run) page shows a whole run.
+Run `xpd optimize status`.
 
 ## Example
 
 ```console
-$ xpd optimize status --help
-...
+$ xpd optimize status --help | sed -n '/^Usage:/p'
+Usage: xpd optimize status [OPTIONS]
 ```

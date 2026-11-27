@@ -56,7 +56,7 @@ pub(crate) enum Action {
         /// How many timed runs each benchmark measurement takes.
         #[arg(long, default_value_t = 5)]
         bench_runs: usize,
-        /// A Python adapter file or shell command that emits rendered figure specs for runtime checks.
+        /// A Python adapter file or shell command that emits runtime measurements.
         #[arg(long, value_name = "ADAPTER")]
         adapter: Option<String>,
         /// Replace a run that is not finished.
@@ -70,7 +70,8 @@ pub(crate) enum Action {
     /// `{"fixes": [{"id": "one-price-rule", "title": "...", "findings": ["d81b64d1"],
     /// "changes_interface": false}], "accepted": [{"finding": "cc6bc6e7", "reason": "..."}]}`.
     /// A fix with no static finding id may set `"goal": "shorter"`, `"faster"` or `"both"` so
-    /// the gate checks line count and `--bench` timing instead.
+    /// the gate measures line count and `--bench` timing. A design goal names checklist items
+    /// in `"questions"`, and `"answered"` records verdicts with reasons.
     Plan {
         /// The JSON file of the plan, or `-` for stdin.
         file: PathBuf,
@@ -127,7 +128,7 @@ struct Bench {
 /// What proves a fix that names no static finding id.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
-pub(super) enum Goal {
+pub(crate) enum Goal {
     /// Must reduce total code lines in the measured paths.
     Shorter,
     /// Must reduce median `--bench` time by at least 2%.
@@ -143,7 +144,9 @@ pub(super) enum Goal {
 #[serde(rename_all = "kebab-case")]
 pub(super) enum Verdict {
     Pass,
+    #[serde(rename = "na", alias = "not-applicable")]
     NotApplicable,
+    #[serde(rename = "accepted", alias = "exception")]
     Exception,
 }
 
@@ -322,7 +325,7 @@ impl Journal {
                 stage: "plan",
                 text: format!(
                     "Read the ledger with `xpd {command} --format json` and judge each finding \
-                     against the code. Group the findings that have one cause under one fix, \
+                     against the code. Settle each checklist item in a design fix or an answered verdict. Group the findings that have one cause under one fix, \
                      and accept a finding that is right as it is with a reason. Write the plan \
                      as JSON, {{\"fixes\": [{{\"id\": \"short-name\", \"title\": \"...\", \
                      \"findings\": [\"<id>\"], \"changes_interface\": false}}], \"accepted\": \
@@ -585,6 +588,7 @@ pub(super) struct Compared {
 /// All measurements that [`judge_fix`] evaluates without touching files or commands.
 #[derive(Debug)]
 pub(super) struct GateEvidence<'a> {
+    pub(super) command: &'a str,
     pub(super) findings: &'a [String],
     pub(super) questions: &'a [String],
     pub(super) goal: Option<Goal>,
@@ -610,7 +614,7 @@ fn check_design_questions(evidence: &GateEvidence<'_>) -> Result<(), String> {
             missing_questions.join(", ")
         ));
     }
-    if evidence.findings.is_empty()
+    if (evidence.findings.is_empty() || evidence.command != "chart-review")
         && (!evidence.questions.is_empty() || evidence.goal == Some(Goal::Design))
     {
         if evidence.questions.is_empty() {
@@ -647,11 +651,14 @@ pub(super) fn judge_fix(evidence: &GateEvidence<'_>) -> Result<Compared, String>
     if let Some(reason) = cited_missing(evidence.findings, evidence.before) {
         return Err(reason);
     }
+    let finding_removed = evidence
+        .findings
+        .iter()
+        .any(|id| !evidence.after.contains(id));
+    let chart_review = evidence.command == "chart-review";
     if !evidence.findings.is_empty()
-        && !evidence
-            .findings
-            .iter()
-            .any(|id| !evidence.after.contains(id))
+        && !finding_removed
+        && (chart_review || evidence.goal.is_none())
     {
         return Err("None of the findings the fix was to remove is gone.".to_owned());
     }
@@ -669,7 +676,9 @@ pub(super) fn judge_fix(evidence: &GateEvidence<'_>) -> Result<Compared, String>
         ));
     }
     check_design_questions(evidence)?;
-    if let Some(goal) = evidence.goal {
+    if let Some(goal) = evidence.goal
+        && (chart_review || !finding_removed)
+    {
         let (lines_before, lines_after) = evidence.lines;
         if matches!(goal, Goal::Shorter | Goal::Both) && lines_after >= lines_before {
             return Err(format!(
@@ -691,8 +700,8 @@ pub(super) fn judge_fix(evidence: &GateEvidence<'_>) -> Result<Compared, String>
     if let Some((tb, ta)) = evidence.timing
         && tb.median_ms > 0.0
         && ta.median_ms > tb.median_ms * MAX_SLOWDOWN
-        && ta.median_ms - tb.median_ms > 5.0
-        && ta.min_ms > tb.max_ms
+        && (evidence.command == "optimize"
+            || (ta.median_ms - tb.median_ms > 5.0 && ta.min_ms > tb.max_ms))
     {
         return Err(format!(
             "Benchmark regressed from {:.2} ms to {:.2} ms ({:.2}x slower).",
@@ -727,15 +736,45 @@ pub(super) fn changed_files(top: &Path, current: &str, head: &str) -> Result<BTr
 }
 
 /// Runs each check that passed at the start and returns the ones that fail now.
-pub(super) fn broken_checks<'a>(checks: impl IntoIterator<Item = (&'a str, bool)>) -> Vec<String> {
-    checks
-        .into_iter()
-        .filter(|(_, passed)| *passed)
-        .filter_map(|(command, _)| {
-            let (passed, printed) = passes(command);
-            (!passed).then(|| format!("{command}\n{printed}"))
-        })
-        .collect()
+pub(super) fn broken_checks<'a>(
+    ledger: &str,
+    checks: impl IntoIterator<Item = (&'a str, bool)>,
+) -> Vec<String> {
+    let mut broken = Vec::new();
+    let mut first = None;
+    for (index, (command, passed)) in checks.into_iter().enumerate() {
+        if passed || (ledger == "harden" && index == 0) {
+            match check_output(command) {
+                Ok(output) => {
+                    if passed && !output.status.success() {
+                        broken.push(format!("{command}\n{}", check_text(&output)));
+                    }
+                    if ledger == "harden" && index == 0 {
+                        first = Some((command, output));
+                    }
+                }
+                Err(error) => broken.push(format!("{command}\ncannot start: {error}")),
+            }
+        }
+    }
+    if broken.is_empty()
+        && let Some((command, output)) = first
+    {
+        use sha2::{Digest as _, Sha256};
+
+        match check_output(command) {
+            Ok(repeat)
+                if repeat.status == output.status
+                    && Sha256::digest(&repeat.stdout) == Sha256::digest(&output.stdout) => {}
+            Ok(_) => broken.push(format!(
+                "determinism repeat disagreed for {command}: exit status or stdout changed"
+            )),
+            Err(error) => broken.push(format!(
+                "determinism repeat could not run {command}: {error}"
+            )),
+        }
+    }
+    broken
 }
 
 /// The repository of a run and where its journal is.
@@ -809,6 +848,13 @@ fn git_path(top: &Path, name: &str) -> Result<PathBuf> {
 
 /// Whether `command` exits 0 in the working folder, with the end of what it printed.
 pub(super) fn passes(command: &str) -> (bool, String) {
+    match check_output(command) {
+        Ok(output) => (output.status.success(), check_text(&output)),
+        Err(error) => (false, format!("cannot start: {error}")),
+    }
+}
+
+fn check_output(command: &str) -> std::io::Result<std::process::Output> {
     let mut shell = if cfg!(windows) {
         let mut shell = Command::new("cmd");
         shell.arg("/C");
@@ -818,21 +864,17 @@ pub(super) fn passes(command: &str) -> (bool, String) {
         shell.arg("-c");
         shell
     };
-    match shell.arg(command).stdin(Stdio::null()).output() {
-        Ok(output) => {
-            let mut printed = String::from_utf8_lossy(&output.stdout).into_owned();
-            printed.push_str(&String::from_utf8_lossy(&output.stderr));
-            let from = printed.len().saturating_sub(OUTPUT_KEPT);
-            let from = (from..printed.len())
-                .find(|at| printed.is_char_boundary(*at))
-                .unwrap_or(printed.len());
-            (
-                output.status.success(),
-                printed[from..].trim_end().to_owned(),
-            )
-        }
-        Err(error) => (false, format!("cannot start: {error}")),
-    }
+    shell.arg(command).stdin(Stdio::null()).output()
+}
+
+fn check_text(output: &std::process::Output) -> String {
+    let mut printed = String::from_utf8_lossy(&output.stdout).into_owned();
+    printed.push_str(&String::from_utf8_lossy(&output.stderr));
+    let from = printed.len().saturating_sub(OUTPUT_KEPT);
+    let from = (from..printed.len())
+        .find(|at| printed.is_char_boundary(*at))
+        .unwrap_or(printed.len());
+    printed[from..].trim_end().to_owned()
 }
 
 /// The findings and per-figure checklist items (`id -> tracked file`) of a run at a commit,
@@ -943,7 +985,7 @@ fn plan_text(here: &Path, file: &Path) -> Result<String> {
 }
 
 /// Reads the plan in `text`, when the run is at a stage that takes a plan.
-fn read_plan(journal: &Journal, text: &str, command: &str) -> Result<Plan> {
+fn read_plan<K: Kind>(journal: &Journal, text: &str, command: &str) -> Result<Plan> {
     ensure!(!journal.finished, "the run is finished");
     if let Some(open) = journal.open() {
         bail!(
@@ -951,8 +993,23 @@ fn read_plan(journal: &Journal, text: &str, command: &str) -> Result<Plan> {
             open.id
         );
     }
-    serde_json::from_str(text)
-        .with_context(|| format!("the plan is not the JSON that `xpd {command} plan --help` shows"))
+    let plan: Plan = serde_json::from_str(text).with_context(|| {
+        format!("the plan is not the JSON that `xpd {command} plan --help` shows")
+    })?;
+    for fix in &plan.fixes {
+        ensure!(
+            command == "chart-review" || fix.questions.is_empty() || fix.goal == Some(Goal::Design),
+            "the fix {} names checklist items, which need the design goal",
+            fix.id
+        );
+        if let Some(goal) = fix.goal {
+            ensure!(
+                K::GOALS.contains(&goal),
+                "xpd {command} does not accept goal {goal:?}"
+            );
+        }
+    }
+    Ok(plan)
 }
 
 /// Adds `plan` to the journal, after checking it against `known` and `checklist` of today.
@@ -1067,7 +1124,12 @@ struct Measured {
 }
 
 /// Measures the commit that is checked out against the commit the run stands at.
-fn measure_gate(journal: &Journal, place: &Place, found: Found<'_>) -> Result<Measured> {
+fn measure_gate(
+    journal: &Journal,
+    place: &Place,
+    found: Found<'_>,
+    command: &str,
+) -> Result<Measured> {
     place.clean()?;
     let commit = place.head()?;
     ensure!(
@@ -1076,6 +1138,7 @@ fn measure_gate(journal: &Journal, place: &Place, found: Found<'_>) -> Result<Me
         journal.current
     );
     let broken = broken_checks(
+        command,
         journal
             .checks
             .iter()
@@ -1109,12 +1172,19 @@ fn measure_gate(journal: &Journal, place: &Place, found: Found<'_>) -> Result<Me
 
 /// Gates the fix `id` at the commit that is checked out. Returns whether the fix is kept.
 #[cfg(not(feature = "ledger-durable"))]
-fn gate(journal: &mut Journal, place: &Place, id: &str, found: Found<'_>) -> Result<bool> {
+fn gate(
+    journal: &mut Journal,
+    place: &Place,
+    id: &str,
+    found: Found<'_>,
+    command: &str,
+) -> Result<bool> {
     check_gate(journal, id)?;
-    let measured = measure_gate(journal, place, found)?;
+    let measured = measure_gate(journal, place, found, command)?;
     let (judged, questions) = {
         let fix = journal.fix_mut(id)?;
         let judged = judge_fix(&GateEvidence {
+            command,
             findings: &fix.findings,
             questions: &fix.questions,
             goal: fix.goal,
@@ -1274,7 +1344,7 @@ fn finish(journal: &mut Journal, place: &Place, found: Found<'_>) -> Result<bool
 /// Runs one stage on the JSON journal of the worktree. Returns the run and whether the stage
 /// kept what it measured.
 #[cfg(not(feature = "ledger-durable"))]
-fn act_journal(
+fn act_journal<K: Kind>(
     action: Action,
     place: &Place,
     here: &Path,
@@ -1310,7 +1380,7 @@ fn act_journal(
         Action::Plan { file } => {
             let mut journal = place.read(command)?;
             let text = plan_text(here, &file)?;
-            let read = read_plan(&journal, &text, command)?;
+            let read = read_plan::<K>(&journal, &text, command)?;
             let (known, checklist) = found(&journal, None)?;
             plan(&mut journal, read, &known, &checklist)?;
             journal
@@ -1333,7 +1403,7 @@ fn act_journal(
         }
         Action::Gate { fix } => {
             let mut journal = place.read(command)?;
-            kept = gate(&mut journal, place, &fix, found)?;
+            kept = gate(&mut journal, place, &fix, found, command)?;
             journal
         }
         Action::Status => place.read(command)?,
@@ -1858,7 +1928,7 @@ mod durable_run {
 
     /// Runs one stage on the run in the ledger store. Returns the run and whether the stage
     /// kept what it measured.
-    pub(super) fn act(
+    pub(super) fn act<K: super::Kind>(
         action: Action,
         place: &Place,
         here: &Path,
@@ -1906,7 +1976,7 @@ mod durable_run {
         match action {
             Action::Start { .. } => unreachable!("a start returned above"),
             Action::Status => Ok((at.journal, true)),
-            Action::Plan { file } => plan_run(&at, &plan_text(here, &file)?, found),
+            Action::Plan { file } => plan_run::<K>(&at, &plan_text(here, &file)?, found),
             Action::Approve { fix } => approve_run(at, fix),
             Action::Drop { fix, reason } => drop_run(at, fix, reason),
             Action::Gate { fix } => gate_run(&at, &fix, found),
@@ -2034,8 +2104,12 @@ mod durable_run {
         Ok((journal_of(&snapshot.run)?, true))
     }
 
-    fn plan_run(at: &At<'_>, text: &str, found: Found<'_>) -> Result<(Journal, bool)> {
-        let plan = read_plan(&at.journal, text, at.store.command)?;
+    fn plan_run<K: super::Kind>(
+        at: &At<'_>,
+        text: &str,
+        found: Found<'_>,
+    ) -> Result<(Journal, bool)> {
+        let plan = read_plan::<K>(&at.journal, text, at.store.command)?;
         let (known, checklist) = found(&at.journal, None)?;
         let measurements = Measurements {
             known: Some(ValidatePlanOutput { known, checklist }),
@@ -2078,7 +2152,7 @@ mod durable_run {
     fn gate_run(at: &At<'_>, fix: &str, found: Found<'_>) -> Result<(Journal, bool)> {
         check_gate(&at.journal, fix)?;
         let failed_before = attempts(&at.journal, fix);
-        let measured = measure_gate(&at.journal, at.place, found)?;
+        let measured = measure_gate(&at.journal, at.place, found, at.store.command)?;
         let head = measured.commit.clone();
         let measurements = Measurements {
             gate: Some((fix.to_owned(), convert(&measured)?)),
@@ -2195,7 +2269,7 @@ pub(super) fn act<K: Kind, R>(
         Ok((ids, checklist))
     };
     #[cfg(not(feature = "ledger-durable"))]
-    let (journal, kept) = act_journal(action, &place, &here, command, &found)?;
+    let (journal, kept) = act_journal::<K>(action, &place, &here, command, &found)?;
     #[cfg(feature = "ledger-durable")]
     let renamed = |journal: &Journal, commit: Option<&str>| -> Result<BTreeMap<String, String>> {
         Ok((surveyed(journal, commit)?.findings.into_iter())
@@ -2203,7 +2277,7 @@ pub(super) fn act<K: Kind, R>(
             .collect())
     };
     #[cfg(feature = "ledger-durable")]
-    let (journal, kept) = durable_run::act(action, &place, &here, command, &found, &renamed)?;
+    let (journal, kept) = durable_run::act::<K>(action, &place, &here, command, &found, &renamed)?;
     match format {
         Format::Json => println!(
             "{}",

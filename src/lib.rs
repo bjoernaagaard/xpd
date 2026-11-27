@@ -18,6 +18,7 @@ mod frames;
 mod git;
 mod graph;
 mod graph_diagnostic;
+mod harden;
 mod hook;
 mod impact;
 mod imports;

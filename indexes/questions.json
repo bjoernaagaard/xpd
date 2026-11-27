@@ -320,5 +320,9 @@
     "open": true,
     "query": "I need to come up with a testable way to find the best scaler method",
     "answer": "At least you could suggest scaling with a diverse set of scalers."
+  },
+  {
+    "query": "Harden flaky Python tests and swallowed exceptions with xpd harden",
+    "expected": "xpd/recipe/reliability"
   }
 ]

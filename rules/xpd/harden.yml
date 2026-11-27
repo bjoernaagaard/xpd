@@ -1,0 +1,26 @@
+facts:
+  - id: check-result
+    text: "Whether the project checks pass."
+    how: "Each check command runs at start and at each gate. A check that failed at start gates nothing."
+  - id: determinism
+    text: "Whether the same check gives the same result twice on the same code."
+    how: "The first --check command runs twice back to back at each harden gate. The gate keeps the fix only when both runs exit with the same code and the sha256 of stdout is the same."
+questions:
+  - id: fails-loudly
+    text: "Does every failure in this module raise or log with the cause, and is nothing caught and dropped?"
+    look: "Except blocks, suppress calls and bare returns on error in the module."
+  - id: no-fixed-wait
+    text: "Does this module wait for a result itself instead of waiting a fixed time or trying again blindly?"
+    look: "Sleep, retry and backoff calls, and what each one could wait on instead."
+  - id: tests-run
+    text: "Does every test in this module run, and can each one fail?"
+    look: "Skipped, xfail and rerun markers, and a test with no way to fail."
+  - id: same-every-run
+    text: "Does this module give the same result on every run with the same input?"
+    look: "Seeds, clocks, random draws, set order and any read of the environment."
+  - id: errors-are-true
+    text: "Does each error this module raises name the real cause and the value that caused it?"
+    look: "Raise sites and error rules of xpd check that fire in the module."
+  - id: honest-test
+    text: "Does each test in this module run the real code on real input, with no mock standing in for it?"
+    look: "Mock imports and patched names in the test files of the module."

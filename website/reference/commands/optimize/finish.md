@@ -1,10 +1,10 @@
-End the run. xpd compares the findings, line count and recorded benchmark median time with the commit the run started from, and prints how many findings were fixed, added and left without a reason. It exits 1 while a fix is open, or while a finding that is new since the start has no reason.
+Compare against the starting commit. An open fix, a new finding without an accepted reason or an unanswered checklist item causes a failure.
 
-The [`xpd optimize`](../../optimize/#a-recorded-run) page shows a whole run.
+Run `xpd optimize finish`.
 
 ## Example
 
 ```console
-$ xpd optimize finish --help
-...
+$ xpd optimize finish --help | sed -n '/^Usage:/p'
+Usage: xpd optimize finish [OPTIONS]
 ```
