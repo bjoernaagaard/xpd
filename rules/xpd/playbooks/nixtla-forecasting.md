@@ -2,6 +2,8 @@
 
 Use a chronological holdout to score a forecast hierarchy. Backtest the statistical baseline on earlier windows, check that the machine learning model has future features for each date, and pass fitted base forecasts to MinTrace before scoring the reconciled forecasts. The example uses two made-up store series and their total.
 
+Before fitting, use `xpd ts-review start` and the bare `xpd ts-review` list to inspect the series. Record decisions with `xpd ts-review plan`, use `approve`, `gate` or `drop` for fixes, and use `status` and `finish` to close the review.
+
 ## Asks
 
 - forecast and reconcile a Nixtla hierarchy

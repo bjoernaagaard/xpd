@@ -1,0 +1,80 @@
+facts:
+  - id: L63
+    text: "Report whether each series is a time series at all and what its cadence is."
+    how: "py/series_facts.py parses ds, infers the modal step, and reports n, first, last, inferred freq, share of steps equal to the modal step, and is_time_series false when ds is unparsable, has fewer than 8 distinct stamps, or the modal step share is under 0.5."
+  - id: L64
+    text: "Report missing stamps, duplicates and unsorted stamps inside each series."
+    how: "py/series_facts.py counts expected stamps between first and last at the modal step minus observed, duplicate ds count, and out-of-order count after grouping by unique_id."
+  - id: L65
+    text: "Classify each series by intermittency with ADI and CV squared."
+    how: "py/series_facts.py computes ADI as n divided by the count of nonzero demands and CV2 as the squared coefficient of variation of nonzero demand sizes, then labels smooth (ADI<1.32, CV2<0.49), erratic (ADI<1.32, CV2>=0.49), intermittent (ADI>=1.32, CV2<0.49) or lumpy (both high) after Syntetos-Boylan."
+  - id: L66
+    text: "Report whether each series level is stationary and whether a trend or unit root is present."
+    how: "py/series_facts.py runs statsmodels adfuller (result_object=True) and kpss on the level and on the first difference for series with at least 30 points, reporting both p-values and the chosen reading stationary, difference-stationary, trend or unclear when the tests disagree."
+  - id: L67
+    text: "Report ARCH effects and changing variance in each series."
+    how: "py/series_facts.py runs statsmodels het_arch (Engle LM) on demeaned y and on squared residuals of a lag-1 fit, and reports variance of the second half divided by the first. p under 0.05 names ARCH effects. Series under 30 points report null."
+  - id: L68
+    text: "Report structural breaks and level or variance shifts in each series."
+    how: "py/series_facts.py compares first and second half means and variances and runs a CUSUM statistic on demeaned y; a candidate break is the argmax CUSUM stamp when the half mean shift exceeds 2 standard errors."
+  - id: L69
+    text: "Report the strength and phase of each candidate seasonality in each series."
+    how: "py/series_facts.py computes a periodogram (FFT power by period) for periods 2 to n/2 and, when statsmodels is present, MSTL seasonal strength 1 minus var(resid) divided by var(deseasonalised) per declared or detected period; it reports the top 3 periods with strength and the peak position (phase) in cycle units."
+  - id: L70
+    text: "Report trend strength, sample entropy proxy and scale of each series."
+    how: "py/series_facts.py reports OLS slope of y on time divided by residual sd (trend strength), lag-1 autocorrelation, coefficient of variation, min, max and zero share. Entropy is approximated by the histogram entropy of first differences in 20 bins; it is evidence for grouping, not a gate."
+  - id: L71
+    text: "Report series that are not time series so they leave the forecasting scope."
+    how: "Derived in Rust from the cadence fact: is_time_series false, fewer than 8 stamps, constant y, or ds that is only an identifier. Such a series gets one finding kind not-a-time-series (warning, group identity) and no seasonality or stationarity questions."
+  - id: L72
+    text: "Build one profile per series for grouping from seasonal strength per period, phase, trend, intermittency, entropy, scale and cadence."
+    how: "py/series_facts.py emits one profile object per unique_id with the fields of the cadence, intermittency, seasonality and trend-entropy-scale facts, normalised by z-score per field across series."
+  - id: L73
+    text: "Measure how much of each profile field each metadata column explains."
+    how: "py/series_facts.py computes one-way ANOVA eta squared of each numeric profile field by each metadata column with at least 2 and at most 50 levels, and a silhouette score of the metadata labels in profile space when sklearn is present."
+  - id: L74
+    text: "Cluster normalised seasonal profiles to surface groups no metadata column names."
+    how: "py/series_facts.py runs sklearn KMeans (k from 2 to min(6, n_series-1), seed 0) on the z-scored profile when at least 6 series exist, reporting cluster id, size, mean profile and silhouette; below 6 series it reports pairwise profile correlations instead."
+  - id: L75
+    text: "Say whether each metadata or cluster group is coherent enough for pooling or hierarchical reconciliation."
+    how: "A group is coherent when its mean silhouette contribution is at least 0.25 or its within-group mean pairwise seasonal-profile correlation is at least 0.7, and incoherent groups get one finding kind incoherent-group (warning, group grouping) naming the outlying series. Coherence is evidence for the strategy question; it never picks a model itself."
+  - id: L76
+    text: "Report whether series that share a declared group also share period and phase."
+    how: "From seasonality facts, per group, the share of series whose top period differs from the group modal period or whose phase differs by more than one cycle step. A mismatch above one third names the group in the grouping checklist look text."
+questions:
+  - id: driver-of-period
+    text: "What calendar or physical driver explains this period, and is its length fixed or does it drift?"
+    look: "The seasonality fact for this entity: top periods, strength and phase, plus the ds range. Name the driver (weekday, month, tidal, billing cycle) or answer na when the period is a sampling artifact; a period with strength above 0.3 and no named driver blocks a pass."
+  - id: is-it-time
+    text: "Is this entity a time series at all, and is ds a time or only an ordering or identifier?"
+    look: "The cadence and not-a-series facts. Answer na with the reason when ds is an id or an unordered category, and the series then leaves every other question."
+  - id: break-cause
+    text: "What caused each candidate break in this entity, and should the model train before it, after it, or with a break term?"
+    look: "The breaks fact stamps and the code or calendar at those stamps. Pass only when each candidate break over the threshold has a named cause or is marked accepted as unexplained with its training window stated."
+  - id: intermittency-strategy
+    text: "Given the ADI and CV squared class of this entity, is the planned method fit for intermittent or lumpy demand?"
+    look: "The intermittency fact and class. Pass when the plan names a count or intermittent method (Croston family, TSB, ADIDA, or a hurdle model) or accepted with why a mean method still serves; MAPE scoring on this entity fails the pass."
+  - id: stationarity-strategy
+    text: "Does the planned transform match the stationarity reading of this entity?"
+    look: "The stationarity fact on level and difference. Pass when differencing, detrending or a unit-root model matches the reading, or accepted when the model handles the root itself (for example SARIMAX with d chosen by test)."
+  - id: variance-strategy
+    text: "Does the plan handle the changing variance or ARCH effects in this entity?"
+    look: "The heteroscedasticity fact. Pass when the plan names a variance model (arch GARCH family), a log or Box-Cox transform, or weighted fit, or na when het_arch p is at least 0.05 and the half variance ratio is under 1.5."
+  - id: exogenous-future
+    text: "Which exogenous drivers does this entity need, and are their future values known or must they be forecast?"
+    look: "The static missing-future-exog findings, the metadata columns, and calendar features in the code. Pass only when every driver is known ahead (calendar, price, planned promotion) or itself forecast in the plan."
+  - id: group-membership
+    text: "Is this entity in the right group, and does it share period and phase with the rest of the group?"
+    look: "The series profile, hidden cluster id and group-seasonality-match fact. Pass when the entity sits in its cluster or metadata group with matching phase, or accepted when it is modelled alone despite the mismatch."
+  - id: strategy
+    text: "Should this entity be modelled independently, pooled with its group, or reconciled in a hierarchy?"
+    look: "The group-coherence fact, hierarchy fact, series length and intermittency class. Independent when the group is incoherent or the series is long and idiosyncratic; pooled when the group is coherent and series are short; hierarchical only when a summing hierarchy exists and coherence passes. The answer names one of the three words. For reconciliation, verify that forecast and holdout keys match one to one and parents equal their leaf sums at each date. For backtests, review the recorded cross-validation windows, cutoffs, step size and horizon."
+  - id: metric-fit
+    text: "Does the scoring metric fit this entity, and is it computed on a chronological holdout with its training frame?"
+    look: "The evaluation findings (random-time-split, mape-on-intermittent, mase-without-train-df) and the intermittency class. Pass when the metric is MASE, MAE, RMSSE or pinball on a time-ordered holdout; MAPE on an intermittent entity cannot pass."
+  - id: length-and-history
+    text: "Is this entity long enough for the periods claimed, with at least two full cycles of the longest period?"
+    look: "The cadence fact n and the longest detected period. Pass when n covers two cycles, or the plan drops the long period claim; a 365 day period on 182 stamps cannot pass."
+  - id: derived-knowledge
+    text: "What does this entity teach about its drivers, its regimes before and after each break, and the group it behaves like?"
+    look: "all facts for the entity and its group."

@@ -1,0 +1,15 @@
+id: missing-future-exog
+language: python
+severity: error
+message: Provide future exogenous rows for each series and date, and check them with get_missing_future.
+rule:
+  kind: call
+  has:
+    field: function
+    any:
+      - kind: identifier
+        regex: '^(predict|forecast)$'
+      - kind: attribute
+        has:
+          field: attribute
+          regex: '^(predict|forecast)$'

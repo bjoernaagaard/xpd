@@ -39,6 +39,8 @@ Use `xpd` whenever you write or change Python code.
   `xpd-chart-review` skill holds the steps.
 - For model data preparation, use `xpd data-prep <paths>` with a column adapter and
   follow the `xpd-data-prep` skill.
+- For a time series review before forecasting, use `xpd ts-review <paths>` with a
+  series adapter and follow the `xpd-ts-review` skill.
 - `xpd find "<task>"`: discover separately ranked symbols, rules and recipes before choosing a library.
   Defaults are five symbols, three rules and three recipes. `--limit` sets the maximum per
   kind and `--kind` selects one. JSON has `symbols`, `rules` and `recipes` lists.

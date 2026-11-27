@@ -351,6 +351,8 @@ enum Cmd {
     ChartReview(crate::chart_review::ChartReviewArgs),
     /// Audit the preparation of features and targets, from raw data through scaling.
     DataPrep(crate::data_prep::DataPrepArgs),
+    /// Review time series, seasonalities, and groups before forecasting.
+    TsReview(crate::ts_review::TsReviewArgs),
     Untangle(crate::untangle::UntangleArgs),
     Optimize(crate::optimize::OptimizeArgs),
     Harden(crate::harden::HardenArgs),
@@ -485,6 +487,7 @@ pub fn run() -> ExitCode {
         } => command_result(graph(&paths, format.unwrap_or(default_format))),
         Cmd::ChartReview(args) => command_result(args.run(default_format)),
         Cmd::DataPrep(args) => command_result(args.run(default_format)),
+        Cmd::TsReview(args) => command_result(args.run(default_format)),
         Cmd::Untangle(args) => command_result(args.run(default_format)),
         Cmd::Harden(args) => command_result(args.run(default_format)),
         Cmd::Optimize(args) => command_result(args.run(default_format)),

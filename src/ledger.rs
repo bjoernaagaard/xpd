@@ -233,6 +233,8 @@ pub(crate) struct ChecklistEntry {
     pub(crate) principle: String,
     pub(crate) text: String,
     pub(crate) look: String,
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    pub(crate) requires_na: bool,
 }
 
 /// What a ledger survey returns: what it read, its mechanical findings, and any checklist items.
@@ -243,11 +245,34 @@ pub(crate) struct SurveyOutput<K, R> {
     pub(crate) checklist: Vec<ChecklistEntry>,
 }
 
+#[derive(Debug)]
+pub(crate) struct ChecklistOwner {
+    file: String,
+    requires_na: bool,
+}
+
+type ChecklistOwners = BTreeMap<String, ChecklistOwner>;
+
+fn checklist_files(owners: ChecklistOwners) -> BTreeMap<String, String> {
+    owners
+        .into_iter()
+        .map(|(id, owner)| (id, owner.file))
+        .collect()
+}
+
 impl<K, R> SurveyOutput<K, R> {
-    pub(crate) fn checklist_files(&self) -> BTreeMap<String, String> {
+    pub(crate) fn checklist_owners(&self) -> ChecklistOwners {
         self.checklist
             .iter()
-            .map(|entry| (entry.id.clone(), entry.file.clone()))
+            .map(|entry| {
+                (
+                    entry.id.clone(),
+                    ChecklistOwner {
+                        file: entry.file.clone(),
+                        requires_na: entry.requires_na,
+                    },
+                )
+            })
             .collect()
     }
 }
@@ -463,7 +488,16 @@ impl<K: Kind> Select<K> {
                         self.paths[0].display()
                     )
                 })?;
-                let then = at_commit(&self.paths, top, commit, |then, files, resolved| {
+                let commit = if K::COMMAND == "ts-review"
+                    && commit == "HEAD"
+                    && crate::git::output(top, &["diff", "HEAD", "--quiet"]).is_ok()
+                    && crate::git::output(top, &["rev-parse", "--verify", "HEAD^"]).is_ok()
+                {
+                    "HEAD^".to_owned()
+                } else {
+                    commit.clone()
+                };
+                let then = at_commit(&self.paths, top, &commit, |then, files, resolved| {
                     Ok(survey(
                         then,
                         files,
@@ -474,7 +508,7 @@ impl<K: Kind> Select<K> {
                     )?
                     .findings)
                 })?;
-                Some((commit.clone(), then.unwrap_or_default()))
+                Some((commit, then.unwrap_or_default()))
             }
             None => None,
         };

@@ -1,0 +1,15 @@
+id: ungrouped-lag
+language: python
+severity: error
+message: Sort by series and time, then compute each lag within its own series.
+rule:
+  kind: call
+  has:
+    field: function
+    any:
+      - kind: identifier
+        regex: '^(shift|rolling|diff|transform|MLForecast)$'
+      - kind: attribute
+        has:
+          field: attribute
+          regex: '^(shift|rolling|diff|transform|MLForecast)$'

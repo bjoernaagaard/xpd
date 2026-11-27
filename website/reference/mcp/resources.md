@@ -62,6 +62,10 @@ The steps of a recorded chart and table review against Tufte's book, driven by [
 
 The recorded workflow for preparing features and targets with [`xpd data-prep`](../../commands/data-prep/).
 
+## skill://xpd-ts-review/
+
+The recorded workflow for measuring time series and candidate groups with [`xpd ts-review`](../../commands/ts-review/).
+
 ## skill://xpd-harden/
 
 The reliability skill shows how to review silent failures, fixed waits and unreliable tests with `xpd harden`. It covers the checklist and the gate that repeats the first project check.

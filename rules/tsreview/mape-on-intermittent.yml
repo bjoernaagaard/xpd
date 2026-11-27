@@ -1,0 +1,15 @@
+id: mape-on-intermittent
+language: python
+severity: warning
+message: Use MASE, MAE, or RMSSE when intermittent demand can have zero actuals.
+rule:
+  kind: call
+  has:
+    field: function
+    any:
+      - kind: identifier
+        regex: '^(evaluate|mape)$'
+      - kind: attribute
+        has:
+          field: attribute
+          regex: '^(evaluate|mape)$'
