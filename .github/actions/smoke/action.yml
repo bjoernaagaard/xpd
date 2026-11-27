@@ -16,7 +16,14 @@ runs:
         PUBLISHED: ${{ inputs.published }}
       run: |
         if [[ "$PUBLISHED" != true ]]; then
-          wheels=(./dist/*.whl)
+          arch=$(uname -m)
+          wheels=(./dist/*manylinux*"$arch"*.whl)
+          if [[ ! -e "${wheels[0]}" ]]; then
+            wheels=(./dist/*"$arch"*.whl)
+          fi
+          if [[ ! -e "${wheels[0]}" ]]; then
+            wheels=(./dist/*.whl)
+          fi
           package=${wheels[0]}
           uv run --isolated --no-project --python 3.13 --with "$package" -- xpd check samples/good.py --format text
         else
