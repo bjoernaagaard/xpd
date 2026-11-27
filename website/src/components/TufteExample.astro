@@ -1,0 +1,141 @@
+---
+const { id, example, table, version, publicVariants, csv, rules } = Astro.props;
+const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+const assets = `${base}/tufte-examples`;
+const variants = ['before', 'after'];
+---
+<p>{example.question}</p>
+<p>{example.source}</p>
+<blockquote>
+  <p>“{example.book.quote}”</p>
+  <footer>Edward Tufte, <cite>The Visual Display of Quantitative Information</cite>, second edition, p. {example.book.page}.</footer>
+</blockquote>
+
+{variants.map((variant, index) => (
+  <section>
+    <h2 id={variant}>{variant === 'before' ? 'Before' : 'After'}</h2>
+    <figure aria-labelledby={variant} aria-describedby={`${variant}-caption example-values`}>
+      {publicVariants[index] && (
+        <>
+          <div class="chart" data-plotly-spec={`${assets}/${id}/${variant}.json`}
+            data-plotly-bundle={`${assets}/plotly-${version}.min.js`} aria-hidden="true"></div>
+          <p data-plotly-error hidden>Interactive chart unavailable.</p>
+        </>
+      )}
+      <figcaption id={`${variant}-caption`}>{example[variant].caption}</figcaption>
+    </figure>
+    <p><a href={`${assets}/${id}/${variant}.py`} download>Download {variant} Python code</a></p>
+  </section>
+))}
+
+<h2 id="values">Values</h2>
+<div id="example-values">
+  <p>{example.before.summary}</p>
+  <p>{example.after.summary}</p>
+</div>
+{table && (
+  <table>
+    <caption>Values used in both charts</caption>
+    <thead><tr>{table.columns.map((column: string) => <th scope="col">{column}</th>)}</tr></thead>
+    <tbody>
+      {table.rows.map(([label, ...cells]: (string | number | null)[]) => (
+        <tr><th scope="row">{label ?? 'Missing'}</th>{cells.map((cell) => <td>{cell ?? 'Missing'}</td>)}</tr>
+      ))}
+    </tbody>
+  </table>
+)}
+{csv && <p><a href={`${assets}/${id}/values.csv`} download>Download all values as CSV</a></p>}
+
+{rules.length > 0 && (
+  <>
+    <h2 id="rules">Related rules</h2>
+    <ul>{rules.map((rule: string) => <li><a href={`${base}/rules/${rule}/`}>{rule}</a></li>)}</ul>
+  </>
+)}
+
+<style>
+  figure {
+    margin-inline: 0;
+  }
+
+  .chart {
+    width: 100%;
+    color-scheme: light;
+  }
+
+  .chart:empty {
+    display: none;
+  }
+
+  .chart[data-plotly-loading] {
+    display: block;
+  }
+
+  figcaption {
+    margin-block-start: 0.5rem;
+  }
+</style>
+
+<script>
+  type FigureSpec = {
+    data: unknown[];
+    layout: { width?: number; height?: number };
+    frames?: unknown[];
+  };
+
+  type Plotly = {
+    newPlot: (chart: HTMLElement, spec: FigureSpec & { config: object }) => Promise<unknown>;
+    relayout: (chart: HTMLElement, layout: object) => Promise<unknown>;
+  };
+
+  let bundle: Promise<Plotly> | undefined;
+
+  function loadPlotly(src: string) {
+    bundle ??= new Promise((resolve, reject) => {
+      const script = document.createElement('script');
+      script.src = src;
+      script.onload = () => resolve((window as Window & { Plotly: Plotly }).Plotly);
+      script.onerror = reject;
+      document.head.append(script);
+    });
+    return bundle;
+  }
+
+  async function draw(chart: HTMLElement) {
+    try {
+      const [plotly, response] = await Promise.all([
+        loadPlotly(chart.dataset.plotlyBundle!),
+        fetch(chart.dataset.plotlySpec!),
+      ]);
+      if (!response.ok) throw new Error(`Plotly figure request failed: ${response.status}`);
+      const spec: FigureSpec = await response.json();
+      const { width = 700, height = 450 } = spec.layout ?? {};
+      chart.dataset.plotlyLoading = '';
+      const size = () => {
+        const available = Math.min(width, chart.clientWidth);
+        return { width: available, height: Math.round(available * height / width) };
+      };
+      let lastWidth = size().width;
+      await plotly.newPlot(chart, {
+        ...spec,
+        layout: { ...spec.layout, ...size() },
+        config: { displayModeBar: false, responsive: true },
+      });
+      chart.dataset.plotlyReady = '';
+      new ResizeObserver(() => {
+        const dimensions = size();
+        if (dimensions.width === lastWidth) return;
+        lastWidth = dimensions.width;
+        void plotly.relayout(chart, dimensions);
+      }).observe(chart);
+    } catch (error) {
+      console.error(error);
+      chart.replaceChildren();
+      chart.parentElement?.querySelector<HTMLElement>('[data-plotly-error]')?.removeAttribute('hidden');
+    } finally {
+      delete chart.dataset.plotlyLoading;
+    }
+  }
+
+  document.querySelectorAll<HTMLElement>('[data-plotly-spec]').forEach((chart) => void draw(chart));
+</script>

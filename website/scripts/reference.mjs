@@ -8,6 +8,7 @@ import { exampleRunner } from './examples.mjs';
 import { generateMcpReference } from './mcp-reference.mjs';
 import { generateCommandReference } from './command-reference.mjs';
 import { buildXpd, run as exec } from './exec.mjs';
+import { generateTufteExamples } from './tufte-examples.mjs';
 
 const website = join(dirname(fileURLToPath(import.meta.url)), '..');
 const repository = join(website, '..');
@@ -56,8 +57,9 @@ const NO_EXAMPLE = {
   discovery_gate: 'Its arguments hold a discovery record, which is 28 kB for samples/pipeline.',
 };
 
-export async function generateReference(xpd) {
+export async function generateReference(xpd, tufteIds) {
   const python = serverPython();
+  const exampleIds = generateTufteExamples(xpd, python, tufteIds);
   const examples = exampleRunner({ repository, xpd, python, pythonPath: join(repository, 'python') });
   const commands = JSON.parse(run(xpd, ['commands']));
   const commandFolder = join(authored, 'commands');
@@ -175,6 +177,7 @@ export async function generateReference(xpd) {
     `reference.mjs: ran ${ran.commands.length} commands and ${ran.tools.length} tool calls of the examples, and wrote ${commands.length} command pages and ${mcp.tools.length} tool pages, with ` +
       `${mcp.resources.length} resources, ${mcp.resource_templates.length} templates and ${mcp.prompts.length} prompts`,
   );
+  return exampleIds;
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {

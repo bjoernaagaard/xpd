@@ -74,8 +74,10 @@ function stripInline(line) {
 }
 
 function checkFile(repository, file) {
-  const rel = relative(repository, file);
-  const raw = readFileSync(file, 'utf8');
+  return proseIssues(readFileSync(file, 'utf8'), relative(repository, file));
+}
+
+export function proseIssues(raw, rel) {
   const lines = raw.split('\n');
   const issues = [];
   let index = 0;

@@ -25,3 +25,6 @@ __pycache__/
 /website/src/content/docs/commands/
 /website/src/content/docs/mcp/
 /website/.mcp-venv/
+
+/website/src/content/docs/guides/tufte-examples/
+/website/public/tufte-examples/

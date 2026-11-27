@@ -37,7 +37,17 @@ export default defineConfig({
       editLink: { baseUrl: editUrl('website/') },
       sidebar: [
         { label: 'Get started', link: '/' },
-        { label: 'Guides', items: [{ autogenerate: { directory: 'guides' } }] },
+        {
+          label: 'Guides',
+          items: [
+            ...['claude-code', 'mcp', 'gates', 'editors', 'write-a-rule', 'chart-review', 'animate'].map((id) => ({ slug: `guides/${id}` })),
+            {
+              label: 'Tufte examples',
+              collapsed: true,
+              items: [{ autogenerate: { directory: 'guides/tufte-examples' } }],
+            },
+          ],
+        },
         {
           label: 'Rules',
           items: [

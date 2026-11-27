@@ -7,6 +7,8 @@ sidebar:
 
 Run `xpd chart-review <paths>` to audit charts and presentation tables in Python (Plotly, Dash, Dash AG Grid, Matplotlib, Seaborn, pandas) and React/TypeScript (`react-plotly.js`, `plotly.js`, `ag-grid-react`, `ag-grid-community`) against all 57 principles from Edward Tufte's "The Visual Display of Quantitative Information" (second edition). Add `--adapter` to measure rendered figures and `xpd chart-review start` to run a gated review ledger.
 
+The [Tufte examples](../tufte-examples/) compare Plotly charts before and after applying each principle.
+
 ```mermaid
 flowchart LR
     Code["Python and TSX files"] --> Survey["Detect figures and run static Tufte checks"]
