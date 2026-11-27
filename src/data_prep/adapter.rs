@@ -4,7 +4,7 @@ use anyhow::{Context as _, Result, ensure};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-use crate::chart_review::runtime::invoke_adapter;
+use crate::ledger::adapter::invoke_adapter;
 
 const PROFILE: &str = include_str!("../../py/profile.py");
 const RUNNER: &str = include_str!("../../py/data_facts.py");

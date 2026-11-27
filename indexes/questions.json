@@ -352,5 +352,21 @@
   {
     "query": "mape-on-intermittent",
     "expected": "tsreview/mape-on-intermittent"
+  },
+  {
+    "query": "rolling-includes-current",
+    "expected": "feature-review/rolling-includes-current"
+  },
+  {
+    "query": "rolling-crosses-groups",
+    "expected": "feature-review/rolling-crosses-groups"
+  },
+  {
+    "query": "target-encoder-before-outer-cv",
+    "expected": "feature-review/target-encoder-before-outer-cv"
+  },
+  {
+    "query": "duplicate-feature-computation",
+    "expected": "feature-review/duplicate-feature-computation"
   }
 ]

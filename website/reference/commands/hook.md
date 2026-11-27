@@ -3,7 +3,7 @@ Use `xpd hook` as the hook command for Claude Code, Codex, or any Agent Plugins 
 | Event | Action |
 | --- | --- |
 | `SessionStart` | Saves HEAD, uncommitted blob IDs, and profile baseline, then prints a short project brief |
-| `UserPromptSubmit` | Routes matching prompts to `chart-review`, `data-prep`, `ts-review`, `profile`, `untangle`, `harden`, `optimize`, `equiv`, a playbook, or open issues |
+| `UserPromptSubmit` | Routes matching prompts to `chart-review`, `data-prep`, `ts-review`, `feature-review`, `profile`, `untangle`, `harden`, `optimize`, `equiv`, a playbook, or open issues |
 | `PostToolUse` | Lints edited files (plus single-file `xpd graph` checks) and reports issues immediately |
 | `Stop` | Lints every Python file changed in the session and blocks the turn while errors, warnings, or new profile drift remain |
 
@@ -70,6 +70,7 @@ Chart or table task: run `xpd chart-review <paths>` on the files that draw chart
 
 ```console
 $ echo '{"cwd":"/tmp/project","hook_event_name":"UserPromptSubmit","prompt":"build a pandas pipeline for feature engineering"}' | xpd hook
+Model feature task: run `xpd feature-review <paths>` to list cutoff findings and domain questions. Use `xpd feature-review start` to record the review, follow the `xpd-feature-review` skill, and read `xpd api xpd/recipe/feature-module`.
 xpd has a playbook for this prompt: xpd/recipe/pandas-pipeline, "A pandas pipeline of step functions".
 ...
 ```

@@ -14,6 +14,7 @@ mod data_prep;
 mod docs;
 pub mod doctor;
 mod embed;
+mod feature_review;
 mod fix_safety;
 mod frames;
 mod git;

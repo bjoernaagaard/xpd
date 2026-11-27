@@ -18,7 +18,7 @@ A feature module in the house style has one function for each feature. The funct
 Each function is named for the column it returns, and each parameter names the feature or the
 input column it reads. `xpd graph` reads the module as a dataflow without running it.
 
-    inputs: price, load, wind
+    inputs: published_price, load, wind
     ├── residual_load()          load that wind does not cover
     ├── price_day_mean()         the mean price of the last 24 hours
     ├── price_above_day_mean()   how far the price is above that mean
@@ -34,17 +34,23 @@ def residual_load(load: pd.Series, wind: pd.Series) -> pd.Series:
     return load - wind
 
 
-def price_day_mean(price: pd.Series) -> pd.Series:
-    return price.rolling(HOURS_IN_DAY).mean()
+def price_day_mean(published_price: pd.Series) -> pd.Series:
+    return published_price.shift(1).rolling(HOURS_IN_DAY).mean()
 
 
-def price_above_day_mean(price: pd.Series, price_day_mean: pd.Series) -> pd.Series:
-    return price - price_day_mean
+def price_above_day_mean(published_price: pd.Series, price_day_mean: pd.Series) -> pd.Series:
+    return published_price - price_day_mean
 
 
-def scarcity(price: pd.Series, residual_load: pd.Series) -> pd.Series:
-    return price / residual_load.where(residual_load > 0)
+def scarcity(published_price: pd.Series, residual_load: pd.Series) -> pd.Series:
+    return published_price / residual_load.where(residual_load > 0)
 ```
+
+## Domain mechanism
+
+Load minus offered wind approximates demand left to other suppliers. Greater residual demand can move the market up the supply curve. Compare load and wind forecast vintages and units. See `mazzi2018pricetaker` p. 2177 and `reguant2014online` p. 5, § B. Capacity and marginal fuel can change the effect. See `aid2015electricity` pp. 60–62.
+
+Use `published_price` only when the provider made it available before the cutoff. If the price in the delivery period is the target, investigate a historical or earlier-market value. Treat the historical mean and its deviation as distinct hypotheses. The scarcity ratio is a proxy to investigate, including behavior near zero and during low-wind or capacity-constrained periods. Group historical windows by entity in panel data.
 
 ## Commands
 
@@ -52,6 +58,9 @@ def scarcity(price: pd.Series, residual_load: pd.Series) -> pd.Series:
 2. `xpd graph <file> --format json` lists each feature with the names it reads. `inputs` are the columns that the caller passes, and a warning names an input that is one edit from a feature name.
 3. `xpd check <file> --format json` reports the issues of the module, and the code is done when it reports 0 issues.
 4. `xpd equiv old.py new.py` proves that the features equal the columns of the code they replace.
+
+5. Declare candidates and owners in `feature-review.json`. Run `xpd feature-review start` with a development adapter and a project check. List with bare `xpd feature-review`, then use `xpd feature-review plan` to record evidence and fixes.
+6. Commit each fix and run `xpd feature-review gate`. Use `xpd feature-review approve` for an approved interface change and `xpd feature-review drop` for an abandoned fix after reverting the change. Check `xpd feature-review status` and close with `xpd feature-review finish` once the current checklist is answered.
 
 ## Rules
 

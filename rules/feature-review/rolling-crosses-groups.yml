@@ -1,0 +1,6 @@
+id: rolling-crosses-groups
+language: python
+severity: error
+message: Keep the rolling window within the declared panel groups.
+rule:
+  pattern: $INPUT.rolling($$$WINDOW)

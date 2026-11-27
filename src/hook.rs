@@ -470,7 +470,13 @@ fn user_prompt(cwd: &Path, prompt: &str) -> Result<ExitCode> {
                 .to_owned(),
         );
     }
-    if !chart && ts_review_prompt(prompt) {
+    let feature_review = feature_review_prompt(prompt);
+    if feature_review {
+        text.push(
+            "Model feature task: run `xpd feature-review <paths>` to list cutoff findings and domain questions. Use `xpd feature-review start` to record the review, follow the `xpd-feature-review` skill, and read `xpd api xpd/recipe/feature-module`.".to_owned(),
+        );
+    }
+    if !chart && !feature_review && ts_review_prompt(prompt) {
         text.push(
             "Time series task: run `xpd ts-review <paths>` with `--adapter` to measure the series, then follow the `xpd-ts-review` skill.".to_owned(),
         );
@@ -825,6 +831,43 @@ fn chart_prompt(prompt: &str) -> bool {
         .filter(|word| WEAK.contains(word))
         .collect();
     strong || weak.len() >= 2
+}
+
+fn feature_review_prompt(prompt: &str) -> bool {
+    let prompt = prompt.to_lowercase();
+    if prompt
+        .split(|c: char| !c.is_alphanumeric() && c != '-')
+        .any(|word| word == "feature-review")
+    {
+        return true;
+    }
+    let words: Vec<_> = prompt
+        .split(|c: char| !c.is_alphanumeric())
+        .filter(|word| !word.is_empty())
+        .collect();
+    let phrase = |parts: &[&str]| words.windows(parts.len()).any(|window| window == parts);
+    let feature = words.contains(&"features") || words.contains(&"feature");
+    let model = words.contains(&"model") || words.contains(&"forecast");
+    let intent = [
+        "write", "add", "engineer", "build", "create", "audit", "run", "find", "review", "check",
+        "change", "make", "lav",
+    ]
+    .iter()
+    .any(|word| words.contains(word));
+    intent
+        && (phrase(&["feature", "engineering"])
+            || (feature
+                && model
+                && (words.contains(&"features") || !phrase(&["feature", "importance"])))
+            || (feature
+                && ["rolling", "lagged", "laggede", "hamilton", "ablation"]
+                    .iter()
+                    .any(|word| words.contains(word)))
+            || (phrase(&["target", "encoding"])
+                && ["leakage", "cv", "folds"]
+                    .iter()
+                    .any(|word| words.contains(word)))
+            || (feature && words.iter().any(|word| word.ends_with("prognose"))))
 }
 
 fn ts_review_prompt(prompt: &str) -> bool {

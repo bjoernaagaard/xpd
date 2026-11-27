@@ -103,3 +103,7 @@ The settings and metadata of a local render job.
 ## xpd://animation/{job_id}/render.log
 
 The saved log of a local render job.
+
+## skill://xpd-feature-review/
+
+Review feature mechanisms, cutoff and fold value with [`xpd feature-review`](../../commands/feature-review/).

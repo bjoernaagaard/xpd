@@ -37,6 +37,7 @@ Use `xpd` whenever you write or change Python code.
   `status`, and `finish` until every defect and checklist item is resolved. Run
   `xpd chart-review --questions --format json` to inspect the full 57-question catalog. The
   `xpd-chart-review` skill holds the steps.
+- For model feature engineering, use `xpd feature-review` and follow the `xpd-feature-review` skill.
 - For model data preparation, use `xpd data-prep <paths>` with a column adapter and
   follow the `xpd-data-prep` skill.
 - For a time series review before forecasting, use `xpd ts-review <paths>` with a

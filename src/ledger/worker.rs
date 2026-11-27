@@ -26,7 +26,7 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::Duration;
 
-use anyhow::{Context, Result, bail};
+use anyhow::{Context, Result, bail, ensure};
 use duroxide::providers::Provider;
 use duroxide::runtime::registry::{ActivityRegistry, OrchestrationRegistry};
 use duroxide::runtime::{Runtime, RuntimeOptions};
@@ -36,18 +36,21 @@ use serde::de::DeserializeOwned;
 
 use crate::git;
 
+use super::ChecklistOwner;
 use super::durable::{
     LedgerOrchestratorClient, PG_SCHEMA_VAR, PG_URL_VAR, REMOTE_VAR, open_postgres_store,
     orchestration_registry, run_branch,
 };
+use super::feature_evidence::FeatureEvidence;
 use super::orchestration::{
     ACT_FINISH_RUN, ACT_GATE_FIX, ACT_INIT_BASELINE, ACT_VALIDATE_PLAN, BaselineOutput, BenchState,
     CheckState, FinishOutput, GateOutput, RunStartInput, Snapshot, Timing, ValidatePlanOutput,
 };
+use super::run::SurveyedFindings;
 use super::run::{
-    broken_checks, changed_files, count_lines, host_fingerprint, measure_bench, passes,
+    broken_checks, changed_files, count_lines, gate_checklist_files, host_fingerprint,
+    measure_bench, passes,
 };
-use super::{ChecklistOwner, ChecklistOwners};
 
 /// Serve the ledger runs of a PostgreSQL store: take their orchestration turns, and gate
 /// their fixes in detached worktrees of a clone of the repository.
@@ -479,11 +482,13 @@ impl Worker {
             (ACT_VALIDATE_PLAN, Some(snapshot)) => {
                 let paths: Vec<String> = decode(input)?;
                 let worktree = self.worktree(&head)?;
-                let (known, checklist) =
+                self.require_feature_head(command, &head, snapshot)?;
+                let (known, checklist, feature_evidence) =
                     self.findings(&worktree, command, &paths, snapshot.run.adapter.as_deref())?;
                 encode(&ValidatePlanOutput {
                     known,
                     checklist: super::checklist_files(checklist),
+                    feature_evidence,
                 })
             }
             (ACT_GATE_FIX, Some(snapshot)) => {
@@ -547,7 +552,7 @@ impl Worker {
         command: &str,
         paths: &[String],
         adapter: Option<&str>,
-    ) -> Result<(BTreeSet<String>, ChecklistOwners)> {
+    ) -> Result<SurveyedFindings> {
         let mut cmd = Command::new(&self.xpd);
         cmd.args([command, "--format", "json", "--limit", "0"]);
         if let Some(adapter) = adapter {
@@ -596,7 +601,10 @@ impl Worker {
                 }
             }
         }
-        Ok((ids, checklist))
+        let feature_evidence = (command == "feature-review")
+            .then(|| FeatureEvidence::from_read(&ledger["read"]))
+            .transpose()?;
+        Ok((ids, checklist, feature_evidence))
     }
 
     /// The checks, benchmark, findings and lines of the commit a run starts from.
@@ -609,7 +617,7 @@ impl Worker {
     ) -> Result<BaselineOutput> {
         let base = self.resolve(head)?;
         let worktree = self.worktree(&base)?;
-        let (checks, was, was_lines) = {
+        let (checks, was, was_lines, feature_evidence) = {
             let _in = InFolder::enter(&worktree)?;
             let checks = (start.checks.iter())
                 .map(|command| CheckState {
@@ -617,17 +625,19 @@ impl Worker {
                     command: command.clone(),
                 })
                 .collect();
-            let was = self
-                .findings(
-                    &worktree,
-                    &start.command,
-                    &start.paths,
-                    start.adapter.as_deref(),
-                )?
-                .0
-                .len();
+            let (findings, _, feature_evidence) = self.findings(
+                &worktree,
+                &start.command,
+                &start.paths,
+                start.adapter.as_deref(),
+            )?;
             let paths: Vec<PathBuf> = start.paths.iter().map(PathBuf::from).collect();
-            (checks, was, count_lines(&paths))
+            (
+                checks,
+                findings.len(),
+                count_lines(&paths),
+                feature_evidence,
+            )
         };
         drop(worktree);
         let bench = (start.bench.as_ref())
@@ -657,6 +667,7 @@ impl Worker {
             adapter: start.adapter.clone(),
             was,
             was_lines,
+            feature_evidence,
         })
     }
 
@@ -674,7 +685,7 @@ impl Worker {
         let commit = self.resolve(&request.head)?;
         let current = self.resolve(&request.current)?;
         let after_tree = self.worktree(&commit)?;
-        let (broken, after, lines_after) = {
+        let (broken, after, lines_after, checklist_after, feature_after) = {
             let _in = InFolder::enter(&after_tree)?;
             let broken = broken_checks(
                 command,
@@ -682,9 +693,16 @@ impl Worker {
                     .iter()
                     .map(|check| (check.command.as_str(), check.passed)),
             );
-            let (after, _) = self.findings(&after_tree, command, &request.paths, adapter)?;
+            let (after, checklist_after, feature_after) =
+                self.findings(&after_tree, command, &request.paths, adapter)?;
             let paths: Vec<PathBuf> = request.paths.iter().map(PathBuf::from).collect();
-            (broken, after, count_lines(&paths))
+            (
+                broken,
+                after,
+                count_lines(&paths),
+                checklist_after,
+                feature_after,
+            )
         };
         drop(after_tree);
         let timed = match &run.bench {
@@ -707,7 +725,7 @@ impl Worker {
         let paired = timed.as_ref().is_some_and(|reply| reply.paired);
         let timing = timed.map(|reply| (reply.before.unwrap_or(reply.after), reply.after));
         let before_tree = self.worktree(&current)?;
-        let (before, checklist_before) =
+        let (before, checklist_before, feature_before) =
             self.findings(&before_tree, command, &request.paths, adapter)?;
         let changed = changed_files(&self.top, &current, &commit)?;
         Ok(GateOutput {
@@ -719,9 +737,27 @@ impl Worker {
             lines_after,
             timing,
             paired,
+            checklist_before: gate_checklist_files(
+                command,
+                checklist_before,
+                &checklist_after,
+                &changed,
+            ),
             changed_files: changed,
-            checklist_before: super::checklist_files(checklist_before),
+            feature_before,
+            feature_after,
         })
+    }
+
+    fn require_feature_head(&self, command: &str, head: &str, snapshot: &Snapshot) -> Result<()> {
+        if command == "feature-review" {
+            ensure!(
+                self.resolve(head)? == snapshot.run.current,
+                "feature review must measure the last kept commit {}",
+                snapshot.run.current
+            );
+        }
+        Ok(())
     }
 
     /// What `finish` compares: the findings of the start commit and of the last published
@@ -733,16 +769,18 @@ impl Worker {
         head: &str,
         snapshot: &Snapshot,
     ) -> Result<FinishOutput> {
+        self.require_feature_head(command, head, snapshot)?;
         let adapter = snapshot.run.adapter.as_deref();
         let head_tree = self.worktree(&self.resolve(head)?)?;
-        let (after, checklist) = self.findings(&head_tree, command, paths, adapter)?;
+        let (after, checklist, feature_evidence) =
+            self.findings(&head_tree, command, paths, adapter)?;
         let current_lines = {
             let _in = InFolder::enter(&head_tree)?;
             count_lines(&paths.iter().map(PathBuf::from).collect::<Vec<_>>())
         };
         drop(head_tree);
         let base_tree = self.worktree(&self.resolve(&snapshot.run.base)?)?;
-        let (before, _) = self.findings(&base_tree, command, paths, adapter)?;
+        let (before, _, _) = self.findings(&base_tree, command, paths, adapter)?;
         Ok(FinishOutput {
             before,
             after,
@@ -753,6 +791,7 @@ impl Worker {
                 .map(|(id, _)| id.clone())
                 .collect(),
             checklist_after: checklist.into_keys().collect(),
+            feature_evidence,
         })
     }
 }

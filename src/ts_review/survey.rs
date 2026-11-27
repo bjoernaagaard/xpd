@@ -8,7 +8,7 @@ use serde::Serialize;
 use serde_json::{Value, json};
 
 use crate::catalog::Filters;
-use crate::chart_review::runtime::invoke_adapter;
+use crate::ledger::adapter::invoke_adapter;
 use crate::ledger::gix_source::Listing;
 use crate::ledger::{
     self, AdapterPolicy, Catalog, ChecklistEntry, Finding, Place, SurveyOutput, Tree,
