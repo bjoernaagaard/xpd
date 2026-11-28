@@ -13,9 +13,10 @@
 //! alone. Each tracked query caps how many of its values stay in memory, and evicted values
 //! leave only their dependency record behind.
 
+use std::cell::RefCell;
 use std::collections::HashMap;
 use std::fmt::Write as _;
-use std::sync::{Arc, LazyLock, Mutex};
+use std::sync::Arc;
 
 use ast_grep_language::SupportLang;
 use salsa::Durability;
@@ -281,8 +282,9 @@ impl SurveyCache {
     }
 }
 
-static SURVEY_CACHE: LazyLock<Mutex<SurveyCache>> =
-    LazyLock::new(|| Mutex::new(SurveyCache::new()));
+thread_local! {
+    static SURVEY_CACHE: RefCell<SurveyCache> = RefCell::new(SurveyCache::new());
+}
 
 fn content_hash(text: &str) -> String {
     let digest = Sha256::digest(text.as_bytes());
@@ -293,18 +295,18 @@ fn content_hash(text: &str) -> String {
     hex
 }
 
-/// Returns memoized `xpd untangle` per-file stretches and shapes via Salsa, keyed by path,
-/// content hash, and language so unchanged files across `--since` and `gate` are parsed once.
+/// Returns memoized `xpd untangle` per-file stretches and shapes via a thread-local Salsa
+/// database, keyed by path, content hash, and language without cross-thread lock contention.
 pub(crate) fn cached_untangle_facts(
     rel_path: &str,
     text: &str,
     lang: SupportLang,
 ) -> Arc<UntangleFileSummary> {
-    let mut cache = SURVEY_CACHE
-        .lock()
-        .unwrap_or_else(std::sync::PoisonError::into_inner);
-    let source = cache.source(rel_path, text, lang);
-    Arc::clone(copies::untangle_file_facts(&cache.db, source))
+    SURVEY_CACHE.with(|cell| {
+        let mut cache = cell.borrow_mut();
+        let source = cache.source(rel_path, text, lang);
+        Arc::clone(copies::untangle_file_facts(&cache.db, source))
+    })
 }
 
 /// Returns memoized `xpd optimize` per-file line counts and shape stretches via Salsa.
@@ -314,13 +316,13 @@ pub(crate) fn cached_optimize_facts(
     lang: SupportLang,
     rules_fingerprint: &str,
 ) -> Arc<OptimizeFileSummary> {
-    let mut cache = SURVEY_CACHE
-        .lock()
-        .unwrap_or_else(std::sync::PoisonError::into_inner);
-    let source = cache.source(rel_path, text, lang);
-    let rules_input = cache.rules(rules_fingerprint);
-    let key = rules_key(&cache.db, rules_input);
-    Arc::clone(optimize_file_facts(&cache.db, source, key))
+    SURVEY_CACHE.with(|cell| {
+        let mut cache = cell.borrow_mut();
+        let source = cache.source(rel_path, text, lang);
+        let rules_input = cache.rules(rules_fingerprint);
+        let key = rules_key(&cache.db, rules_input);
+        Arc::clone(optimize_file_facts(&cache.db, source, key))
+    })
 }
 
 /// Returns memoized changed files for a commit pair key via Salsa's `commit_changed_files`.
@@ -328,17 +330,17 @@ pub(crate) fn cached_commit_diff(
     commit_key: &str,
     load: impl FnOnce() -> anyhow::Result<Vec<String>>,
 ) -> anyhow::Result<Arc<[String]>> {
-    let mut cache = SURVEY_CACHE
-        .lock()
-        .unwrap_or_else(std::sync::PoisonError::into_inner);
-    let diff = if let Some(&existing) = cache.commits.get(commit_key) {
-        existing
-    } else {
-        let changed = load()?;
-        let created = CommitDiff::new(&cache.db, commit_key.to_owned(), changed);
-        cache.commits.insert(commit_key.to_owned(), created);
-        created
-    };
-    let id = CommitId::new(&cache.db, commit_key.to_owned());
-    Ok(Arc::clone(commit_changed_files(&cache.db, id, diff)))
+    SURVEY_CACHE.with(|cell| {
+        let mut cache = cell.borrow_mut();
+        let diff = if let Some(&existing) = cache.commits.get(commit_key) {
+            existing
+        } else {
+            let changed = load()?;
+            let created = CommitDiff::new(&cache.db, commit_key.to_owned(), changed);
+            cache.commits.insert(commit_key.to_owned(), created);
+            created
+        };
+        let id = CommitId::new(&cache.db, commit_key.to_owned());
+        Ok(Arc::clone(commit_changed_files(&cache.db, id, diff)))
+    })
 }

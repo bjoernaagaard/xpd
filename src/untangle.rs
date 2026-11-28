@@ -565,31 +565,33 @@ pub(crate) fn workspace_hints(root: &Path) -> HashMap<PathBuf, Vec<WorkspaceHint
     let files: Vec<PathBuf> = crate::ledger::walk_code_files(&[root.to_path_buf()])
         .into_iter()
         .filter(|(_, lang)| *lang == SupportLang::Python)
-        .take(MAX_LSP_HINT_FILES)
+        .take(MAX_LSP_HINT_FILES + 1)
         .map(|(path, _)| path)
         .collect();
-    if files.is_empty() {
+    if files.is_empty() || files.len() > MAX_LSP_HINT_FILES {
         return hints;
     }
-    let mut modules = Vec::with_capacity(files.len());
-    let mut canonical_by_shown: HashMap<String, PathBuf> = HashMap::new();
-    for path in &files {
-        let Ok(text) = std::fs::read_to_string(path) else {
-            continue;
-        };
-        let Ok(absolute) = std::fs::canonicalize(path).or_else(|_| std::path::absolute(path))
-        else {
-            continue;
-        };
-        let shown = absolute
-            .strip_prefix(root)
-            .unwrap_or(&absolute)
-            .to_string_lossy()
-            .replace('\\', "/");
-        let parsed = syntax::parse_as(&text, SupportLang::Python);
-        let facts = python_facts::extract_module_facts(&absolute, &parsed, &text, |candidate| {
-            candidate.is_file()
-        });
+    let extracted: Vec<_> = files
+        .par_iter()
+        .filter_map(|path| {
+            let text = std::fs::read_to_string(path).ok()?;
+            let absolute = std::fs::canonicalize(path)
+                .or_else(|_| std::path::absolute(path))
+                .ok()?;
+            let shown = absolute
+                .strip_prefix(root)
+                .unwrap_or(&absolute)
+                .to_string_lossy()
+                .replace('\\', "/");
+            let parsed = syntax::parse_as(&text, SupportLang::Python);
+            let facts =
+                python_facts::extract_module_facts(&absolute, &parsed, &text, Path::is_file);
+            Some((shown, absolute, facts))
+        })
+        .collect();
+    let mut modules = Vec::with_capacity(extracted.len());
+    let mut canonical_by_shown: HashMap<String, PathBuf> = HashMap::with_capacity(extracted.len());
+    for (shown, absolute, facts) in extracted {
         for (kind, line, message, _) in &facts.local {
             if matches!(
                 kind,

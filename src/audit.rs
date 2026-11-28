@@ -7,12 +7,13 @@ use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
 use anyhow::{Context, Result};
+use rayon::prelude::*;
 use serde::Serialize;
 
 use crate::check::FixMode;
 use crate::ledger::{self, AuditSurvey, RecordedDebt, Tree, WorkflowId};
 use crate::output::Format;
-use crate::report::Issue;
+use crate::report::{Issue, Position};
 use crate::severity::Severity;
 
 /// Default static workflows run when `--workflows` is not passed.
@@ -23,11 +24,14 @@ const DEFAULT_WORKFLOWS: &[WorkflowId] = &[
     WorkflowId::Discover,
 ];
 
+/// Maximum regression entries printed inline in text mode.
+const MAX_TEXT_REGRESSIONS: usize = 20;
+
 /// Run a unified, read-only audit across `xpd check` and registered static ledger workflows.
 ///
-/// Aggregates linter issue counts, static workflow findings, optional `--since` regression deltas,
-/// and recorded ledger debt from the worktree store without executing project code or runtime
-/// adapters.
+/// Aggregates linter issue counts, static workflow findings, optional `--since` regression deltas
+/// with file and line locations, and recorded ledger debt from the worktree store without
+/// executing project code or runtime adapters.
 #[derive(Debug, clap::Args)]
 #[command(after_long_help = "Examples:
   xpd audit
@@ -86,6 +90,15 @@ struct WorkflowSummary {
     debt: Option<RecordedDebt>,
 }
 
+/// One newly introduced issue or finding (or blocking `check` error without `--since`).
+#[derive(Debug, Clone, Serialize)]
+struct AuditRegression {
+    source: String,
+    kind: String,
+    place: String,
+    message: String,
+}
+
 /// Aggregate totals across `check` and all audited workflows.
 #[derive(Debug, Serialize)]
 struct AuditTotals {
@@ -114,19 +127,28 @@ struct AuditReport {
     since: Option<String>,
     check: CheckSummary,
     workflows: Vec<WorkflowSummary>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    regressions: Vec<AuditRegression>,
     totals: AuditTotals,
     regression: bool,
 }
 
 /// Snapshot of `check` issues and all selected workflow surveys at one tree.
 struct TreeAudit {
-    issues: Vec<IssueKey>,
+    issues: Vec<IssueRecord>,
     severities: SeverityCounts,
     workflows: Vec<(WorkflowId, AuditSurvey)>,
 }
 
 /// Stable fingerprint for comparing `xpd check` issues across commits.
 type IssueKey = (String, String, String);
+
+/// Captured `xpd check` issue with its fingerprint, severity, and display place.
+struct IssueRecord {
+    key: IssueKey,
+    severity: Severity,
+    place: String,
+}
 
 /// Severity tally for a single `xpd check` pass.
 #[derive(Debug, Default, Clone, Copy)]
@@ -215,14 +237,24 @@ fn run_tree_audit(
     commit: &str,
     workflows: &[WorkflowId],
 ) -> Result<TreeAudit> {
-    let workspace = ledger::rules_workspace(paths, tree)?;
-    let check_report = workspace.check(paths, FixMode::Apply(None))?;
-    let (issues, severities) = summarize_issues(&check_report.issues, tree);
-    let mut surveyed = Vec::with_capacity(workflows.len());
-    for &workflow in workflows {
-        let result = run_static_workflow(workflow, paths, tree, top, commit)?;
-        surveyed.push((workflow, result));
-    }
+    let (check_res, workflows_res) = rayon::join(
+        || {
+            let workspace = ledger::rules_workspace(paths, tree)?;
+            let check_report = workspace.check(paths, FixMode::Apply(None))?;
+            Ok::<_, anyhow::Error>(summarize_issues(&check_report.issues, tree))
+        },
+        || {
+            workflows
+                .par_iter()
+                .map(|&workflow| {
+                    let result = run_static_workflow(workflow, paths, tree, top, commit)?;
+                    Ok((workflow, result))
+                })
+                .collect::<Result<Vec<(WorkflowId, AuditSurvey)>>>()
+        },
+    );
+    let (issues, severities) = check_res?;
+    let surveyed = workflows_res?;
     Ok(TreeAudit {
         issues,
         severities,
@@ -230,8 +262,8 @@ fn run_tree_audit(
     })
 }
 
-fn summarize_issues(issues: &[Issue], tree: Tree<'_>) -> (Vec<IssueKey>, SeverityCounts) {
-    let mut keys = Vec::with_capacity(issues.len());
+fn summarize_issues(issues: &[Issue], tree: Tree<'_>) -> (Vec<IssueRecord>, SeverityCounts) {
+    let mut records = Vec::with_capacity(issues.len());
     let mut counts = SeverityCounts {
         total: issues.len(),
         ..SeverityCounts::default()
@@ -244,13 +276,18 @@ fn summarize_issues(issues: &[Issue], tree: Tree<'_>) -> (Vec<IssueKey>, Severit
             Severity::Hint => counts.hints += 1,
             Severity::Off => {}
         }
-        keys.push((
-            tree.shown(&issue.file),
-            issue.id.to_string(),
-            issue.message.clone(),
-        ));
+        let shown = tree.shown(&issue.file);
+        let place = match issue.position {
+            Some(Position { line, column }) => format!("{shown}:{line}:{column}"),
+            None => shown.clone(),
+        };
+        records.push(IssueRecord {
+            key: (shown, issue.id.to_string(), issue.message.clone()),
+            severity: issue.severity,
+            place,
+        });
     }
-    (keys, counts)
+    (records, counts)
 }
 
 fn run_static_workflow(
@@ -293,7 +330,13 @@ fn build_report(
         Some((commit, None)) => (Some(commit), Some(Vec::new()), Some(BTreeMap::new())),
         None => (None, None, None),
     };
-    let check = build_check_summary(&current.issues, current.severities, base_issues.as_deref());
+    let mut regressions = Vec::new();
+    let check = build_check_summary(
+        &current.issues,
+        current.severities,
+        base_issues.as_deref(),
+        &mut regressions,
+    );
     let mut workflows = Vec::with_capacity(current.workflows.len());
     for (workflow, survey) in current.workflows {
         let base_survey = base_workflows
@@ -304,6 +347,7 @@ fn build_report(
             &survey,
             base_survey.as_ref(),
             debt.remove(&workflow),
+            &mut regressions,
         ));
     }
     let totals = aggregate_totals(&check, &workflows, since.as_deref());
@@ -321,22 +365,42 @@ fn build_report(
         since,
         check,
         workflows,
+        regressions,
         totals,
         regression,
     }
 }
 
 fn build_check_summary(
-    current: &[IssueKey],
+    current: &[IssueRecord],
     counts: SeverityCounts,
-    baseline: Option<&[IssueKey]>,
+    baseline: Option<&[IssueRecord]>,
+    regressions: &mut Vec<AuditRegression>,
 ) -> CheckSummary {
-    let (was, fresh, resolved) = match baseline {
-        Some(before) => {
-            let (added, gone) = diff_issue_multisets(before, current);
-            (Some(before.len()), Some(added), Some(gone))
+    let (was, fresh, resolved) = if let Some(before) = baseline {
+        let (added, gone, new_records) = diff_issue_records(before, current);
+        for record in new_records {
+            regressions.push(AuditRegression {
+                source: "check".to_owned(),
+                kind: record.key.1.clone(),
+                place: record.place.clone(),
+                message: record.key.2.clone(),
+            });
         }
-        None => (None, None, None),
+        (Some(before.len()), Some(added), Some(gone))
+    } else {
+        for record in current
+            .iter()
+            .filter(|record| record.severity == Severity::Error)
+        {
+            regressions.push(AuditRegression {
+                source: "check".to_owned(),
+                kind: record.key.1.clone(),
+                place: record.place.clone(),
+                message: record.key.2.clone(),
+            });
+        }
+        (None, None, None)
     };
     CheckSummary {
         total: counts.total,
@@ -350,24 +414,26 @@ fn build_check_summary(
     }
 }
 
-fn diff_issue_multisets(before: &[IssueKey], current: &[IssueKey]) -> (usize, usize) {
-    let mut before_counts: BTreeMap<&IssueKey, usize> = BTreeMap::new();
-    for key in before {
-        *before_counts.entry(key).or_default() += 1;
+fn diff_issue_records<'a>(
+    before: &[IssueRecord],
+    current: &'a [IssueRecord],
+) -> (usize, usize, Vec<&'a IssueRecord>) {
+    let mut remaining_before: BTreeMap<&IssueKey, usize> = BTreeMap::new();
+    for record in before {
+        *remaining_before.entry(&record.key).or_default() += 1;
     }
-    let mut current_counts: BTreeMap<&IssueKey, usize> = BTreeMap::new();
-    for key in current {
-        *current_counts.entry(key).or_default() += 1;
+    let mut new_records = Vec::new();
+    for record in current {
+        if let Some(count) = remaining_before.get_mut(&record.key)
+            && *count > 0
+        {
+            *count -= 1;
+        } else {
+            new_records.push(record);
+        }
     }
-    let fresh = current_counts
-        .iter()
-        .map(|(key, &count)| count.saturating_sub(before_counts.get(key).copied().unwrap_or(0)))
-        .sum();
-    let resolved = before_counts
-        .iter()
-        .map(|(key, &count)| count.saturating_sub(current_counts.get(key).copied().unwrap_or(0)))
-        .sum();
-    (fresh, resolved)
+    let resolved = remaining_before.values().sum();
+    (new_records.len(), resolved, new_records)
 }
 
 fn build_workflow_summary(
@@ -375,6 +441,7 @@ fn build_workflow_summary(
     current: &AuditSurvey,
     baseline: Option<&AuditSurvey>,
     debt: Option<RecordedDebt>,
+    regressions: &mut Vec<AuditRegression>,
 ) -> WorkflowSummary {
     let mut by_kind: BTreeMap<String, usize> = BTreeMap::new();
     for finding in &current.findings {
@@ -384,11 +451,18 @@ fn build_workflow_summary(
         Some(before) => {
             let had: HashSet<&str> = before.findings.iter().map(|f| f.id.as_str()).collect();
             let has: HashSet<&str> = current.findings.iter().map(|f| f.id.as_str()).collect();
-            let added = current
-                .findings
-                .iter()
-                .filter(|f| !had.contains(f.id.as_str()))
-                .count();
+            let mut added = 0;
+            for finding in &current.findings {
+                if !had.contains(finding.id.as_str()) {
+                    added += 1;
+                    regressions.push(AuditRegression {
+                        source: workflow.as_str().to_owned(),
+                        kind: finding.kind.clone(),
+                        place: finding.place.clone(),
+                        message: finding.evidence.clone(),
+                    });
+                }
+            }
             let gone = before
                 .findings
                 .iter()
@@ -493,6 +567,28 @@ fn format_text(report: &AuditReport) -> String {
             workflow.findings,
             workflow.checklist_items
         );
+    }
+    if !report.regressions.is_empty() {
+        let heading = if report.since.is_some() {
+            "Regressions"
+        } else {
+            "Blocking errors"
+        };
+        let _ = writeln!(out, "{heading}: {}", report.regressions.len());
+        for item in report.regressions.iter().take(MAX_TEXT_REGRESSIONS) {
+            let _ = writeln!(
+                out,
+                "  [{} / {}] {}  {}",
+                item.source, item.kind, item.place, item.message
+            );
+        }
+        if report.regressions.len() > MAX_TEXT_REGRESSIONS {
+            let _ = writeln!(
+                out,
+                "  and {} more (use --format json for the full list)",
+                report.regressions.len() - MAX_TEXT_REGRESSIONS
+            );
+        }
     }
     let totals = &report.totals;
     let _ = writeln!(

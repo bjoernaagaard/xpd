@@ -541,6 +541,8 @@ struct Server<'c> {
     package_files: HashMap<PathBuf, Uri>,
     /// Workspace-level structural hints per project root, keyed by canonical file path.
     structural_hints: HashMap<PathBuf, HashMap<PathBuf, Vec<crate::untangle::WorkspaceHint>>>,
+    /// Last time workspace-level structural hints were computed per project root.
+    structural_hints_at: HashMap<PathBuf, std::time::Instant>,
     /// The open documents whose issues the client does not have yet, when the server pushes
     /// them.
     unpublished: BTreeSet<String>,
@@ -572,6 +574,7 @@ impl<'c> Server<'c> {
             documents: HashMap::new(),
             package_files: HashMap::new(),
             structural_hints: HashMap::new(),
+            structural_hints_at: HashMap::new(),
             unpublished: BTreeSet::new(),
             pending_packages: BTreeSet::new(),
             sent_requests: 0,
@@ -882,14 +885,23 @@ impl<'c> Server<'c> {
             .collect()
     }
 
+    /// Minimum interval between workspace-wide structural hint rescans for one project root.
+    const STRUCTURAL_HINTS_COOLDOWN: std::time::Duration = std::time::Duration::from_secs(2);
+
     /// Reads the venv of the project in `root` again, and brings what the client shows for the
     /// project up to date.
     fn refresh_project(&mut self, root: &Path, reload: Reload) -> Result<()> {
-        let should_scan_hints =
-            matches!(reload, Reload::WithImports) || !self.structural_hints.contains_key(root);
+        let now = std::time::Instant::now();
+        let cooled_down = self
+            .structural_hints_at
+            .get(root)
+            .is_none_or(|last| now.duration_since(*last) >= Self::STRUCTURAL_HINTS_COOLDOWN);
+        let should_scan_hints = !self.structural_hints.contains_key(root)
+            || (matches!(reload, Reload::WithImports) && cooled_down);
         if should_scan_hints {
             self.structural_hints
                 .insert(root.to_path_buf(), crate::untangle::workspace_hints(root));
+            self.structural_hints_at.insert(root.to_path_buf(), now);
         }
         if self.workspace.refresh(root)? || matches!(reload, Reload::WithImports) {
             self.lint_again(root);
@@ -918,6 +930,7 @@ impl<'c> Server<'c> {
     fn close_project(&mut self, root: &Path) {
         self.pending_packages.remove(root);
         self.structural_hints.remove(root);
+        self.structural_hints_at.remove(root);
         if let Some(file) = self.package_files.remove(root) {
             self.notify::<PublishDiagnostics>(PublishDiagnosticsParams::new(
                 file,
@@ -1044,6 +1057,8 @@ impl<'c> Server<'c> {
                 if !self.structural_hints.contains_key(&root) {
                     self.structural_hints
                         .insert(root.clone(), crate::untangle::workspace_hints(&root));
+                    self.structural_hints_at
+                        .insert(root.clone(), std::time::Instant::now());
                 }
                 append_structural_hints(
                     &self.structural_hints,

@@ -131,7 +131,7 @@ impl FindingPlace {
         }
     }
 
-    fn text(&self) -> String {
+    pub(crate) fn text(&self) -> String {
         match (self.line, self.end_line) {
             (Some(line), Some(end)) => format!("{}:{line}-{end}", self.path),
             (Some(line), None) => format!("{}:{line}", self.path),
@@ -181,7 +181,7 @@ pub(crate) struct LedgerEntry<K> {
 impl<K> LedgerEntry<K> {
     /// The finding on one line: its id, `new` when the commit of `--since` did not have it,
     /// its first places and its evidence.
-    fn text(&self) -> String {
+    pub(crate) fn text(&self) -> String {
         let finding = &self.finding;
         let mut places: Vec<_> = (finding
             .places
@@ -280,6 +280,8 @@ pub(crate) struct ChecklistEntry {
 pub(crate) struct AuditFinding {
     pub(crate) id: String,
     pub(crate) kind: String,
+    pub(crate) place: String,
+    pub(crate) evidence: String,
 }
 
 /// Compact static survey snapshot consumed by `xpd audit`.
@@ -290,15 +292,24 @@ pub(crate) struct AuditSurvey {
 }
 
 impl AuditSurvey {
-    /// Extracts stable finding IDs, kind names, and checklist count from a workflow survey.
+    /// Extracts stable finding IDs, kind names, places, evidence, and checklist count.
     pub(crate) fn from_output<K: LedgerKind, R>(output: SurveyOutput<K, R>) -> Self {
         Self {
             findings: output
                 .findings
                 .into_iter()
-                .map(|entry| AuditFinding {
-                    id: entry.id,
-                    kind: entry.finding.kind.name(),
+                .map(|entry| {
+                    let place = entry
+                        .finding
+                        .places
+                        .first()
+                        .map_or_else(String::new, FindingPlace::text);
+                    AuditFinding {
+                        id: entry.id,
+                        kind: entry.finding.kind.name(),
+                        place,
+                        evidence: entry.finding.evidence,
+                    }
                 })
                 .collect(),
             checklist_items: output.checklist.len(),

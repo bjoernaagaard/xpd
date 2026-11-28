@@ -296,6 +296,9 @@ fn rewrite_imports_for_move(
         .rsplit_once('.')
         .map_or(("", new_mod), |(parent, leaf)| (parent, leaf));
 
+    let moved_dir_changed = old_parent != new_parent;
+    let is_moved_file = file == from_abs;
+
     for node in tree.root().dfs() {
         match node.kind().as_ref() {
             "import_from_statement" => {
@@ -316,27 +319,30 @@ fn rewrite_imports_for_move(
                         replacement: new_mod.to_owned(),
                     });
                 } else if !old_parent.is_empty() && resolved.as_deref() == Some(old_parent) {
-                    for name_node in node.field_children("name") {
-                        let raw = name_node.text();
-                        let imported_name = raw.split(" as ").next().unwrap_or("").trim();
-                        if imported_name == old_leaf {
-                            let stmt_range = node.range();
-                            let replacement = if let Some((_, alias)) = raw.split_once(" as ") {
-                                format!("from {new_parent} import {new_leaf} as {}", alias.trim())
-                            } else if new_leaf == old_leaf {
-                                format!("from {new_parent} import {new_leaf}")
-                            } else {
-                                format!("from {new_parent} import {new_leaf} as {old_leaf}")
-                            };
-                            if node.field_children("name").count() == 1 {
-                                edits.push(ByteEdit {
-                                    start: stmt_range.start,
-                                    end: stmt_range.end,
-                                    replacement,
-                                });
-                            }
-                        }
-                    }
+                    let rel_mode = if is_moved_file && moved_dir_changed {
+                        MovedRelativeMode::MakeAbsolute
+                    } else {
+                        MovedRelativeMode::KeepOriginal
+                    };
+                    rewrite_parent_from_import(
+                        &node,
+                        source,
+                        &module_node,
+                        (old_leaf, new_parent, new_leaf),
+                        rel_mode,
+                        &mut edits,
+                    );
+                } else if is_moved_file
+                    && moved_dir_changed
+                    && module_node.kind() == "relative_import"
+                    && let Some(abs_target) = resolved
+                {
+                    let range = module_node.range();
+                    edits.push(ByteEdit {
+                        start: range.start,
+                        end: range.end,
+                        replacement: abs_target,
+                    });
                 }
             }
             "import_statement" => {
@@ -367,6 +373,85 @@ fn rewrite_imports_for_move(
 
     let count = edits.len();
     (apply_byte_edits(source, edits), count)
+}
+
+#[derive(Clone, Copy)]
+enum MovedRelativeMode {
+    KeepOriginal,
+    MakeAbsolute,
+}
+
+fn rewrite_parent_from_import(
+    node: &Node<'_>,
+    source: &str,
+    module_node: &Node<'_>,
+    moved: (&str, &str, &str),
+    mode: MovedRelativeMode,
+    edits: &mut Vec<ByteEdit>,
+) {
+    let (old_leaf, new_parent, new_leaf) = moved;
+    let mut kept = Vec::new();
+    let mut moved_line: Option<String> = None;
+    for name_node in node.field_children("name") {
+        let raw = name_node.text();
+        let trimmed = raw.trim();
+        let imported_name = trimmed.split(" as ").next().unwrap_or("").trim();
+        if imported_name == old_leaf {
+            let line = if new_parent.is_empty() {
+                if let Some((_, alias)) = trimmed.split_once(" as ") {
+                    format!("import {new_leaf} as {}", alias.trim())
+                } else if new_leaf == old_leaf {
+                    format!("import {new_leaf}")
+                } else {
+                    format!("import {new_leaf} as {old_leaf}")
+                }
+            } else if let Some((_, alias)) = trimmed.split_once(" as ") {
+                format!("from {new_parent} import {new_leaf} as {}", alias.trim())
+            } else if new_leaf == old_leaf {
+                format!("from {new_parent} import {new_leaf}")
+            } else {
+                format!("from {new_parent} import {new_leaf} as {old_leaf}")
+            };
+            moved_line = Some(line);
+        } else {
+            kept.push(trimmed.to_owned());
+        }
+    }
+    let Some(moved_stmt) = moved_line else {
+        if matches!(mode, MovedRelativeMode::MakeAbsolute)
+            && module_node.kind() == "relative_import"
+        {
+            let range = module_node.range();
+            let resolved_parent = moved.1;
+            if !resolved_parent.is_empty() {
+                edits.push(ByteEdit {
+                    start: range.start,
+                    end: range.end,
+                    replacement: resolved_parent.to_owned(),
+                });
+            }
+        }
+        return;
+    };
+    let stmt_range = node.range();
+    let replacement = if kept.is_empty() {
+        moved_stmt
+    } else {
+        let line_start = source[..stmt_range.start]
+            .rfind('\n')
+            .map_or(0, |pos| pos + 1);
+        let indent = &source[line_start..stmt_range.start];
+        format!(
+            "from {} import {}\n{indent}{moved_stmt}",
+            module_node.text(),
+            kept.join(", ")
+        )
+    };
+    edits.push(ByteEdit {
+        start: stmt_range.start,
+        end: stmt_range.end,
+        replacement,
+    });
 }
 
 fn resolve_from_target(
@@ -468,7 +553,13 @@ fn extract_facade_reexports(
                     facade_abs.display()
                 );
             }
-            _ => {}
+            "pass_statement" => {}
+            other => {
+                bail!(
+                    "{} contains `{other}` beyond re-exports and __all__; refusing to inline",
+                    facade_abs.display()
+                );
+            }
         }
     }
     Ok(map)
