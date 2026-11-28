@@ -1,4 +1,4 @@
-mod python;
+mod harden_python;
 
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
@@ -10,7 +10,9 @@ use clap::ValueEnum;
 use serde::Serialize;
 
 use crate::ledger::gix_source::Listing;
-use crate::ledger::{self, Catalog, Ledger, Place, Select, SurveyOutput, Tree};
+use crate::ledger::{
+    self, FindingPlace, Ledger, QuestionCatalog, Select, SurveyOutput, Tree, WorkflowId,
+};
 use crate::output::Format;
 use crate::severity::Severity;
 use crate::{source, syntax};
@@ -33,10 +35,10 @@ pub(crate) enum Kind {
     FlakyTest,
 }
 
-impl ledger::Kind for Kind {
+impl ledger::LedgerKind for Kind {
     type Group = Group;
 
-    const COMMAND: &'static str = "harden";
+    const WORKFLOW: WorkflowId = WorkflowId::Harden;
     const GOALS: &'static [ledger::Goal] = &[ledger::Goal::Design];
     const GROUPS: &'static [Group] = &[
         Group::SilentFailure,
@@ -92,7 +94,7 @@ pub(crate) struct HardenArgs {
 
 impl HardenArgs {
     pub(crate) fn run(self, default: Format) -> Result<ExitCode> {
-        let catalog = Catalog::load(include_str!("../rules/xpd/harden.yml"))?;
+        let catalog = QuestionCatalog::load(include_str!("../rules/xpd/harden.yml"))?;
         if self.questions {
             return catalog.print(self.select.format_override().unwrap_or(default));
         }
@@ -118,7 +120,7 @@ fn survey(
     paths: &[PathBuf],
     tree: Tree<'_>,
     listing: &Listing,
-    catalog: &Catalog,
+    catalog: &QuestionCatalog,
 ) -> Result<SurveyOutput<Kind, Read>> {
     let workspace = ledger::rules_workspace(paths, tree)?;
     let mut findings = Vec::new();
@@ -139,12 +141,12 @@ fn survey(
             let scope = root
                 .as_ref()
                 .filter(|_| kind == Kind::FlakyTest && in_test)
-                .map_or(line, |root| python::test_scope(root, line));
+                .map_or(line, |root| harden_python::test_scope(root, line));
             if seen.insert((kind, pattern, scope)) {
-                findings.push(ledger::Finding {
+                findings.push(ledger::LedgerFinding {
                     kind,
                     key,
-                    places: vec![Place::line(&shown, line)],
+                    places: vec![FindingPlace::line(&shown, line)],
                     evidence,
                     weight,
                 });
@@ -168,12 +170,14 @@ fn survey(
                     Kind::FlakyTest => (format!("{named}\n{rule}"), format!("`{rule}`: {message}")),
                     _ => (format!("{named}\n{message}"), message),
                 };
-                let pattern = python::rule_pattern(&rule).unwrap_or(&rule).to_owned();
+                let pattern = harden_python::rule_pattern(&rule)
+                    .unwrap_or(&rule)
+                    .to_owned();
                 emit(kind, line, key, evidence, pattern, 1);
             }
         }
         if let Some(root) = &root {
-            for (line, (kind, evidence, weight), pattern) in python::findings(root, path) {
+            for (line, (kind, evidence, weight), pattern) in harden_python::findings(root, path) {
                 let key = format!("{named}\n{evidence}");
                 emit(kind, line, key, evidence, pattern.to_owned(), weight);
             }

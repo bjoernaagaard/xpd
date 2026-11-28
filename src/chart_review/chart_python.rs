@@ -4,7 +4,7 @@
 use std::collections::{BTreeSet, HashMap};
 use std::path::Path;
 
-use crate::ledger::{self, Place};
+use crate::ledger::{self, FindingPlace};
 use crate::source;
 use crate::syntax::{self, Node, Root};
 use crate::workspace::Workspace;
@@ -70,7 +70,7 @@ pub(crate) fn survey_file(
                 .and_modify(|count| *count += 1)
                 .or_insert(1);
             let fig_key = format!("{tracked}\n{symbol}\n{kind}");
-            let id = ledger::id("figure", &fig_key, *nth);
+            let id = ledger::finding_id("figure", &fig_key, *nth);
             figures.push(Figure {
                 id,
                 file: shown.to_owned(),
@@ -111,7 +111,7 @@ pub(crate) fn survey_file(
             findings.push(Finding {
                 kind,
                 key: format!("{tracked}\nplotly/{rule_name}\n{}", issue.message),
-                places: vec![Place::line(shown, line)],
+                places: vec![FindingPlace::line(shown, line)],
                 evidence: format!("`plotly/{rule_name}`: {}", issue.message),
                 weight: 3,
             });
@@ -355,7 +355,7 @@ fn inspect_mpl_encoding(
         findings.push(Finding {
             kind: Kind::PieChart,
             key: format!("{tracked}\nmpl-pie\n{written}"),
-            places: vec![Place::line(shown, line)],
+            places: vec![FindingPlace::line(shown, line)],
             evidence: format!(
                 "`{written}` draws a pie chart (VDQI p. 178). Replace with a sorted bar chart or a table."
             ),
@@ -366,7 +366,7 @@ fn inspect_mpl_encoding(
         findings.push(Finding {
             kind: Kind::DualAxis,
             key: format!("{tracked}\nmpl-dual-axis\n{written}"),
-            places: vec![Place::line(shown, line)],
+            places: vec![FindingPlace::line(shown, line)],
             evidence: format!(
                 "`{written}` adds a second value axis (VDQI p. 61). Use small multiples with shared scales instead."
             ),
@@ -380,7 +380,7 @@ fn inspect_mpl_encoding(
         findings.push(Finding {
             kind: Kind::ExtraDimensions,
             key: format!("{tracked}\nmpl-3d\n{written}"),
-            places: vec![Place::line(shown, line)],
+            places: vec![FindingPlace::line(shown, line)],
             evidence: format!(
                 "`{written}` uses a 3D projection (VDQI p. 71). Keep depicted dimensions equal to data dimensions."
             ),
@@ -393,7 +393,7 @@ fn inspect_mpl_encoding(
         findings.push(Finding {
             kind: Kind::RainbowColorscale,
             key: format!("{tracked}\nmpl-rainbow\n{cmap}"),
-            places: vec![Place::line(shown, line)],
+            places: vec![FindingPlace::line(shown, line)],
             evidence: format!(
                 "`cmap=\"{cmap}\"` uses an unordered rainbow palette (VDQI p. 154). Use an ordered lightness scale."
             ),
@@ -406,7 +406,7 @@ fn inspect_mpl_encoding(
         findings.push(Finding {
             kind: Kind::PatternFill,
             key: format!("{tracked}\nmpl-hatch\n{hatch}"),
-            places: vec![Place::line(shown, line)],
+            places: vec![FindingPlace::line(shown, line)],
             evidence: format!(
                 "`hatch=\"{hatch}\"` introduces moire vibration (VDQI p. 108). Use flat muted tints or direct labels."
             ),
@@ -435,7 +435,7 @@ fn inspect_mpl_layout(
             findings.push(Finding {
                 kind: Kind::RotatedTicks,
                 key: format!("{tracked}\nmpl-rotated-ticks\n{written}"),
-                places: vec![Place::line(shown, line)],
+                places: vec![FindingPlace::line(shown, line)],
                 evidence: format!(
                     "`{written}` rotates tick labels by {angle} degrees (VDQI p. 183). Keep words running left to right."
                 ),
@@ -451,7 +451,7 @@ fn inspect_mpl_layout(
         findings.push(Finding {
             kind: Kind::AllCapsText,
             key: format!("{tracked}\nmpl-all-caps\n{title}"),
-            places: vec![Place::line(shown, line)],
+            places: vec![FindingPlace::line(shown, line)],
             evidence: format!(
                 "Title `{title}` is written in all capitals (VDQI p. 183). Use sentence case."
             ),
@@ -467,7 +467,7 @@ fn inspect_mpl_layout(
         findings.push(Finding {
             kind: Kind::VerticalAspectRatio,
             key: format!("{tracked}\nmpl-vertical-figsize\n{written}"),
-            places: vec![Place::line(shown, line)],
+            places: vec![FindingPlace::line(shown, line)],
             evidence: format!(
                 "`figsize=({width}, {height})` is taller than wide for a single panel (VDQI p. 186). Default to wider than tall."
             ),
@@ -484,7 +484,7 @@ fn inspect_mpl_layout(
             findings.push(Finding {
                 kind: Kind::ThickLine,
                 key: format!("{tracked}\nmpl-thick-line\n{written}"),
-                places: vec![Place::line(shown, line)],
+                places: vec![FindingPlace::line(shown, line)],
                 evidence: format!(
                     "`linewidth={width}` draws a heavy line (VDQI p. 185). Keep data lines thin and delicate."
                 ),
@@ -510,7 +510,7 @@ fn inspect_plotly_table(
                 findings.push(Finding {
                     kind: Kind::TableRawHeader,
                     key: format!("{tracked}\ngo-table-header\n{raw}"),
-                    places: vec![Place::line(shown, line)],
+                    places: vec![FindingPlace::line(shown, line)],
                     evidence: format!(
                         "`go.Table` header `{raw}` looks like a raw identifier or all-caps label (VDQI p. 183). Spell out headers in sentence case with units."
                     ),
@@ -528,7 +528,7 @@ fn inspect_plotly_table(
             findings.push(Finding {
                 kind: Kind::TableZebraStriping,
                 key: format!("{tracked}\ngo-table-zebra"),
-                places: vec![Place::line(shown, line)],
+                places: vec![FindingPlace::line(shown, line)],
                 evidence: "`go.Table` applies alternating row fill colors (VDQI p. 179). Remove zebra striping and separate topical row groups with thin horizontal rules.".to_owned(),
                 weight: 2,
             });
@@ -545,7 +545,7 @@ fn inspect_plotly_table(
             findings.push(Finding {
                 kind: Kind::TableVerticalRules,
                 key: format!("{tracked}\ngo-table-borders"),
-                places: vec![Place::line(shown, line)],
+                places: vec![FindingPlace::line(shown, line)],
                 evidence: format!(
                     "`go.Table` sets heavy cell borders (`line.width={width}`, VDQI p. 179). Avoid vertical cages and heavy cell boxes."
                 ),
@@ -574,7 +574,7 @@ fn inspect_dash_ag_grid(
             findings.push(Finding {
                 kind: Kind::TableVerticalRules,
                 key: format!("{tracked}\nag-grid-col-border"),
-                places: vec![Place::line(shown, line)],
+                places: vec![FindingPlace::line(shown, line)],
                 evidence: "AG Grid enables vertical `columnBorder` lines (VDQI p. 179). Remove vertical gridlines and rely on alignment and horizontal group dividers.".to_owned(),
                 weight: 2,
             });
@@ -583,7 +583,7 @@ fn inspect_dash_ag_grid(
             findings.push(Finding {
                 kind: Kind::TableZebraStriping,
                 key: format!("{tracked}\nag-grid-zebra"),
-                places: vec![Place::line(shown, line)],
+                places: vec![FindingPlace::line(shown, line)],
                 evidence: "AG Grid sets `oddRowBackgroundColor` zebra striping (VDQI p. 179). Use plain backgrounds with subtle horizontal topical dividers.".to_owned(),
                 weight: 2,
             });
@@ -617,7 +617,7 @@ fn inspect_dash_ag_grid_cols(
                 findings.push(Finding {
                     kind: Kind::TableRawHeader,
                     key: format!("{tracked}\nag-grid-header\n{hdr}"),
-                    places: vec![Place::line(shown, col_line)],
+                    places: vec![FindingPlace::line(shown, col_line)],
                     evidence: format!(
                         "AG Grid `headerName=\"{hdr}\"` is a raw identifier or all-caps label (VDQI p. 183). Spell out headers in sentence case with units."
                     ),
@@ -630,7 +630,7 @@ fn inspect_dash_ag_grid_cols(
             findings.push(Finding {
                 kind: Kind::TableRawHeader,
                 key: format!("{tracked}\nag-grid-field-no-header\n{fld}"),
-                places: vec![Place::line(shown, col_line)],
+                places: vec![FindingPlace::line(shown, col_line)],
                 evidence: format!(
                     "AG Grid column `field=\"{fld}\"` has no `headerName` (VDQI p. 183). Spell out the column header with units."
                 ),
@@ -655,7 +655,7 @@ fn inspect_dash_ag_grid_cols(
                 findings.push(Finding {
                     kind: Kind::TableUnformattedNumbers,
                     key: format!("{tracked}\nag-grid-unformatted\n{label}"),
-                    places: vec![Place::line(shown, col_line)],
+                    places: vec![FindingPlace::line(shown, col_line)],
                     evidence: format!(
                         "AG Grid numeric column `{label}` has no `valueFormatter` (VDQI p. 178). Format numbers to consistent decimal precision."
                     ),
@@ -666,7 +666,7 @@ fn inspect_dash_ag_grid_cols(
                 findings.push(Finding {
                     kind: Kind::TableNumberAlignment,
                     key: format!("{tracked}\nag-grid-align\n{label}"),
-                    places: vec![Place::line(shown, col_line)],
+                    places: vec![FindingPlace::line(shown, col_line)],
                     evidence: format!(
                         "AG Grid numeric column `{label}` is not right-aligned (VDQI p. 178). Set `type=\"numericColumn\"` or `type=\"rightAligned\"`."
                     ),
@@ -685,7 +685,7 @@ fn inspect_dash_ag_grid_cols(
             findings.push(Finding {
                 kind: Kind::TableAlphabeticalOrder,
                 key: format!("{tracked}\nag-grid-alpha-sort\n{label}"),
-                places: vec![Place::line(shown, col_line)],
+                places: vec![FindingPlace::line(shown, col_line)],
                 evidence: format!(
                     "AG Grid sorts text column `{label}` ascending while numeric columns are unsorted (VDQI p. 178). Order rows by content or value rather than alphabetically."
                 ),

@@ -506,7 +506,7 @@ pub fn run() -> ExitCode {
         Cmd::Optimize(args) => command_result(args.run(default_format)),
         #[cfg(feature = "ledger-distributed")]
         Cmd::Ledger(LedgerCommand::Worker(args)) => {
-            command_result(crate::ledger::worker::run(args))
+            command_result(crate::ledger::worker::run_ledger_worker(args))
         }
         Cmd::Profile { file } => run_py(PROFILE_PY, &[file]),
         Cmd::Refit { contract } => run_py(REFIT_PY, &[contract]),

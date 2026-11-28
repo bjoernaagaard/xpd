@@ -1,6 +1,7 @@
-use crate::ledger::python::{
-    args, assignments, called, identifier, local_nodes, owner, qualified, receiver, resolved_call,
-    resolved_name, scope,
+use crate::ledger::python_ast::{
+    assignments, call_receiver as receiver, called_method_name as called, enclosing_scope as owner,
+    identifier, is_python_scope as scope, local_nodes, positional_call_args as args, resolved_call,
+    resolved_name, scope_qualified_name as qualified,
 };
 use crate::names::{Binding, is_bound, is_parameter_name, origin};
 use crate::syntax::{Node, keyword_arg, string_literal};
@@ -225,7 +226,7 @@ pub(super) fn unit_mismatch<'t>(node: &Node<'t>) -> Option<Node<'t>> {
     let (left, _, right) = comparison(node)?;
     let list = node.parent()?;
     (unit_label(&left)? != unit_label(&right)?
-        && crate::ledger::python::local_nodes(&owner(node)?).any(|problem| {
+        && crate::ledger::python_ast::local_nodes(&owner(node)?).any(|problem| {
             call_is(&problem, "Problem")
                 && constraints(&problem).is_some_and(|owned| owned.node_id() == list.node_id())
         }))
@@ -334,7 +335,7 @@ pub(super) fn non_dcp<'t>(node: &Node<'t>) -> Option<Node<'t>> {
         return None;
     }
     let scope = owner(node)?;
-    crate::ledger::python::local_nodes(&scope)
+    crate::ledger::python_ast::local_nodes(&scope)
         .filter(default_dcp_solve)
         .filter_map(|solve| cvxpy_problem(&receiver(&solve)?))
         .any(|problem| {

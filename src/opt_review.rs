@@ -14,7 +14,8 @@ use serde_json::Value;
 use crate::catalog::Filters;
 use crate::ledger::gix_source::Listing;
 use crate::ledger::{
-    self, AdapterPolicy, Catalog, Finding, Goal, Place, Select, SurveyOutput, Tree,
+    self, AdapterPolicy, FindingPlace, Goal, LedgerFinding, QuestionCatalog, Select, SurveyOutput,
+    Tree, WorkflowId,
 };
 use crate::output::Format;
 use crate::syntax::{self, Node};
@@ -26,7 +27,7 @@ const SOLVER_FACTS: &str = include_str!("../py/solver_facts.py");
 #[derive(Deserialize, Serialize)]
 struct OptCatalog {
     #[serde(flatten)]
-    checklist: Catalog,
+    checklist: QuestionCatalog,
     rules: BTreeMap<String, Kind>,
 }
 
@@ -51,9 +52,9 @@ enum Kind {
     PackRule,
 }
 
-impl ledger::Kind for Kind {
+impl ledger::LedgerKind for Kind {
     type Group = Group;
-    const COMMAND: &str = "opt-review";
+    const WORKFLOW: WorkflowId = WorkflowId::OptReview;
     const GROUPS: &[Group] = &[
         Group::Formulation,
         Group::Solving,
@@ -116,7 +117,7 @@ impl OptReviewArgs {
                 println!("{}", serde_json::to_string(&catalog)?);
                 return Ok(ExitCode::SUCCESS);
             }
-            catalog.checklist.print(format)?;
+            let _ = catalog.checklist.print(format)?;
             println!(
                 "Rules\n  {}",
                 catalog
@@ -175,7 +176,7 @@ struct OptRead {
 fn validate_solver_facts(
     mut document: Value,
     problems: &[Problem],
-    catalog: &Catalog,
+    catalog: &QuestionCatalog,
 ) -> Result<Value> {
     let entries = document["problems"]
         .as_array_mut()
@@ -238,7 +239,7 @@ fn inventory_file(root: &Node<'_>, file: &str) -> Vec<Problem> {
             let count = occurrences.entry((kind, name.clone())).or_insert(0);
             *count += 1;
             Some(Problem {
-                id: ledger::id(kind, &format!("{file}\n{name}"), *count),
+                id: ledger::finding_id(kind, &format!("{file}\n{name}"), *count),
                 file: file.to_owned(),
                 line: call.start_pos().line() + 1,
                 kind,
@@ -256,7 +257,7 @@ fn scan_problem_findings(
     file: &str,
     absolute: &Path,
     text: &str,
-) -> Vec<(Finding<Kind>, String)> {
+) -> Vec<(LedgerFinding<Kind>, String)> {
     let linted = workspace.analyze(
         crate::source::File {
             path: Path::new(file),
@@ -284,15 +285,15 @@ fn scan_problem_findings(
                             .map(|part| part.text().into_owned())
                             .collect::<Vec<_>>()
                             .join(" ");
-                        ledger::python::qualified(&node, &syntax)
+                        ledger::python_ast::scope_qualified_name(&node, &syntax)
                     },
                 );
-            let mut place = Place::file(file);
+            let mut place = FindingPlace::file(file);
             if let Some(position) = issue.position {
                 place.line = Some(position.line);
                 place.column = Some(position.column);
             }
-            let finding = Finding {
+            let finding = LedgerFinding {
                 kind,
                 key: format!("{file}\n{rule}\n{anchor}"),
                 places: vec![place],
@@ -359,7 +360,7 @@ fn survey_problems(
     }
     let facts = adapter
         .map(|adapter| {
-            ledger::adapter::invoke_adapter(adapter, root, SOLVER_FACTS)
+            ledger::adapter_runner::invoke_adapter(adapter, root, SOLVER_FACTS)
                 .and_then(|document| validate_solver_facts(document, &problems, &catalog.checklist))
                 .with_context(|| format!("opt-review adapter `{adapter}` failed"))
         })

@@ -1,4 +1,4 @@
-mod python;
+mod optimize_python;
 mod runtime;
 
 use std::collections::{BTreeMap, BTreeSet};
@@ -12,13 +12,16 @@ use rayon::prelude::*;
 use serde::Serialize;
 
 use crate::ledger::gix_source::Listing;
-use crate::ledger::{self, AdapterPolicy, Ledger, Place, Select, SurveyOutput, Tree};
+use crate::ledger::{
+    self, AdapterPolicy, FindingPlace, Ledger, QuestionCatalog, Select, SurveyOutput, Tree,
+    WorkflowId,
+};
 use crate::output::Format;
 use crate::source;
 use crate::syntax;
 use crate::workspace::Workspace;
 
-type Finding = ledger::Finding<Kind>;
+type Finding = ledger::LedgerFinding<Kind>;
 const PERFORMANCE_RULES: &[&str] = &[
     "arch/fit-output-in-loop",
     "arch/forecast-per-origin",
@@ -139,7 +142,7 @@ pub(crate) enum Kind {
     LinearScanInLoop,
 }
 
-impl ledger::Kind for Kind {
+impl ledger::LedgerKind for Kind {
     type Group = Group;
 
     const GOALS: &'static [ledger::Goal] = &[
@@ -148,7 +151,7 @@ impl ledger::Kind for Kind {
         ledger::Goal::Design,
     ];
 
-    const COMMAND: &'static str = "optimize";
+    const WORKFLOW: WorkflowId = WorkflowId::Optimize;
 
     const GROUPS: &'static [Group] =
         &[Group::Rulekit, Group::DoneAgain, Group::LargerThanTheAnswer];
@@ -210,7 +213,7 @@ pub(crate) struct OptimizeArgs {
 
 impl OptimizeArgs {
     pub(crate) fn run(self, default: Format) -> Result<ExitCode> {
-        let catalog = ledger::Catalog::load(include_str!("../rules/xpd/optimize.yml"))?;
+        let catalog = QuestionCatalog::load(include_str!("../rules/xpd/optimize.yml"))?;
         if self.questions {
             return catalog.print(self.select.format_override().unwrap_or(default));
         }
@@ -263,7 +266,7 @@ struct Surveyed {
     /// commit.
     named: String,
     lines: usize,
-    python: Option<python::Facts>,
+    python: Option<optimize_python::Facts>,
     rules: Vec<(usize, String, String)>,
 }
 
@@ -297,7 +300,7 @@ fn read(
         named: tree.tracked(&absolute).unwrap_or_else(|| shown.clone()),
         shown,
         lines: text.lines().count(),
-        python: (language == SupportLang::Python).then(|| python::facts(path, &root)),
+        python: (language == SupportLang::Python).then(|| optimize_python::facts(path, &root)),
         rules,
     })
 }
@@ -313,7 +316,7 @@ fn python_findings(surveyed: &[Surveyed]) -> Vec<Finding> {
                 kind: local.kind,
                 key: format!("{}\n{}", file.named, local.key),
                 places: (local.lines.iter().collect::<BTreeSet<_>>().into_iter())
-                    .map(|line| Place::line(&file.shown, *line))
+                    .map(|line| FindingPlace::line(&file.shown, *line))
                     .collect(),
                 evidence: local.evidence.clone(),
                 weight: local.weight,
@@ -331,7 +334,7 @@ fn rule_findings(surveyed: &[Surveyed]) -> Vec<Finding> {
             findings.push(Finding {
                 kind: Kind::RuleIssue,
                 key: format!("{}\n{rule}\n{message}", file.named),
-                places: vec![Place::line(&file.shown, *line)],
+                places: vec![FindingPlace::line(&file.shown, *line)],
                 evidence: format!("`{rule}`: {message}"),
                 weight: 1,
             });
@@ -347,7 +350,7 @@ fn survey(
     listing: &Listing,
     workloads: Vec<runtime::Workload>,
     adapter_error: Option<String>,
-    catalog: &ledger::Catalog,
+    catalog: &QuestionCatalog,
 ) -> Result<SurveyOutput<Kind, Read>> {
     let files = &listing.files;
     let workspace = (files

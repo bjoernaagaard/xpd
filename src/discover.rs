@@ -12,7 +12,9 @@ use clap::ValueEnum;
 use serde::Serialize;
 
 use crate::ledger::gix_source::Listing;
-use crate::ledger::{self, Catalog, Ledger, Place, Select, SurveyOutput, Tree};
+use crate::ledger::{
+    self, FindingPlace, Ledger, QuestionCatalog, Select, SurveyOutput, Tree, WorkflowId,
+};
 use crate::output::Format;
 use crate::source;
 
@@ -40,10 +42,10 @@ pub(crate) enum Kind {
     IdWithoutNewtype,
 }
 
-impl ledger::Kind for Kind {
+impl ledger::LedgerKind for Kind {
     type Group = Group;
 
-    const COMMAND: &'static str = "discover";
+    const WORKFLOW: WorkflowId = WorkflowId::Discover;
     const GOALS: &'static [ledger::Goal] = &[ledger::Goal::Design];
     const GROUPS: &'static [Group] = &[Group::Names, Group::Search, Group::Types];
 
@@ -88,7 +90,7 @@ impl Kind {
         Self::value_variants()
             .iter()
             .copied()
-            .find(|kind| ledger::Kind::source_rule(*kind) == Some(rule))
+            .find(|kind| ledger::LedgerKind::source_rule(*kind) == Some(rule))
     }
 }
 
@@ -116,7 +118,7 @@ pub(crate) struct DiscoverArgs {
 
 impl DiscoverArgs {
     pub(crate) fn run(self, default: Format) -> Result<ExitCode> {
-        let catalog = Catalog::load(include_str!("../rules/xpd/discover.yml"))?;
+        let catalog = QuestionCatalog::load(include_str!("../rules/xpd/discover.yml"))?;
         if self.questions {
             return catalog.print(self.select.format_override().unwrap_or(default));
         }
@@ -145,7 +147,7 @@ fn survey(
     paths: &[PathBuf],
     tree: Tree<'_>,
     listing: &Listing,
-    catalog: &Catalog,
+    catalog: &QuestionCatalog,
 ) -> Result<SurveyOutput<Kind, Read>> {
     let workspace = ledger::rules_workspace(paths, tree)?;
     let mut findings = Vec::new();
@@ -172,10 +174,10 @@ fn survey(
             };
             let line = issue.position.map_or(1, |position| position.line);
             let code = text.lines().nth(line - 1).unwrap_or_default().trim();
-            findings.push(ledger::Finding {
+            findings.push(ledger::LedgerFinding {
                 kind,
                 key: format!("{named}\n{rule}\n{code}"),
-                places: vec![Place::line(&shown, line)],
+                places: vec![FindingPlace::line(&shown, line)],
                 evidence: issue.message,
                 weight: 1,
             });

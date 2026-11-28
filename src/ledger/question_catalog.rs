@@ -1,3 +1,5 @@
+//! Loads and prints YAML question and fact catalogs for ledger workflows.
+
 use std::collections::BTreeSet;
 use std::process::ExitCode;
 
@@ -6,33 +8,36 @@ use serde::{Deserialize, Serialize};
 
 use crate::output::Format;
 
-use super::{ChecklistEntry, Finding, Kind, SurveyOutput, named};
+use super::{ChecklistEntry, LedgerFinding, LedgerKind, SurveyOutput, named};
 
+/// Facts and review questions loaded from a `rules/xpd/<workflow>.yml` catalog.
 #[derive(Debug, Deserialize, Serialize)]
-pub(crate) struct Catalog {
-    facts: Vec<Fact>,
-    questions: Vec<Question>,
+pub(crate) struct QuestionCatalog {
+    facts: Vec<CatalogFact>,
+    questions: Vec<CatalogQuestion>,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
-struct Fact {
+struct CatalogFact {
     id: String,
     text: String,
     how: String,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
-struct Question {
+struct CatalogQuestion {
     id: String,
     text: String,
     look: String,
 }
 
-impl Catalog {
+impl QuestionCatalog {
+    /// Parses a YAML question catalog string.
     pub(crate) fn load(source: &str) -> Result<Self> {
         serde_saphyr::from_str(source).context("the ledger question catalog does not parse")
     }
 
+    /// Prints all catalog facts and questions in JSON or plain text.
     pub(crate) fn print(&self, format: Format) -> Result<ExitCode> {
         match format {
             Format::Json => println!("{}", serde_json::to_string(self)?),
@@ -50,10 +55,12 @@ impl Catalog {
         Ok(ExitCode::SUCCESS)
     }
 
+    /// Whether the catalog defines a fact with the identifier `id`.
     pub(crate) fn has_fact(&self, id: &str) -> bool {
         self.facts.iter().any(|fact| fact.id == id)
     }
 
+    /// Expands catalog questions across `(entity, owner_file)` pairs for a checklist.
     pub(crate) fn checklist(
         &self,
         entities: BTreeSet<(String, String)>,
@@ -79,10 +86,11 @@ impl Catalog {
             .collect()
     }
 
-    pub(crate) fn modules<K: Kind, R>(
+    /// Builds a [`SurveyOutput`] attaching module-scoped checklist questions to files with findings.
+    pub(crate) fn modules<K: LedgerKind, R>(
         &self,
         read: R,
-        findings: Vec<Finding<K>>,
+        findings: Vec<LedgerFinding<K>>,
         tracked: impl Fn(&str) -> Option<String>,
     ) -> SurveyOutput<K, R> {
         let entities = findings

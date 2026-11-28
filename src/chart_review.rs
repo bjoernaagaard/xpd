@@ -7,8 +7,8 @@
 //! gate objectively on removal, while remaining per-figure judgment questions form a durable
 //! checklist that must be fixed or answered with a reason before `finish`.
 
+mod chart_python;
 mod inventory;
-mod python;
 pub(crate) mod runtime;
 mod tsx;
 
@@ -35,7 +35,7 @@ use crate::workspace::Workspace;
 
 pub(crate) use inventory::{BOOK, Inventory, load as inventory};
 
-pub(crate) type Finding = ledger::Finding<Kind>;
+pub(crate) type Finding = ledger::LedgerFinding<Kind>;
 
 /// The five Tufte analytical pillars that group `xpd chart-review` findings.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize)]
@@ -132,10 +132,10 @@ pub(crate) enum Kind {
     TableMissingZeroAmbiguity,
 }
 
-impl ledger::Kind for Kind {
+impl ledger::LedgerKind for Kind {
     type Group = Group;
 
-    const COMMAND: &'static str = "chart-review";
+    const WORKFLOW: ledger::WorkflowId = ledger::WorkflowId::ChartReview;
 
     const GROUPS: &'static [Group] = &[
         Group::GraphicalIntegrity,
@@ -455,6 +455,44 @@ struct FileResult {
     findings: Vec<Finding>,
 }
 
+fn survey_one_file(
+    path: &Path,
+    language: SupportLang,
+    tree: Tree<'_>,
+    listing: &Listing,
+    workspace: Option<&Workspace>,
+) -> Option<FileResult> {
+    let is_py = language == SupportLang::Python;
+    let is_ts = is_js_ts(language);
+    if !is_py && !is_ts {
+        return None;
+    }
+    let text = listing.text(path)?;
+    let absolute = listing.absolute(path)?;
+    let shown = tree.shown(path);
+    let tracked = tree.tracked(&absolute).unwrap_or_else(|| shown.clone());
+    let root = syntax::parse_as(&text, language);
+    if is_py {
+        let surveyed = chart_python::survey_file(path, &shown, &tracked, &text, &root, workspace);
+        Some(FileResult {
+            is_python: true,
+            is_js_ts: false,
+            libraries: surveyed.libraries,
+            figures: surveyed.figures,
+            findings: surveyed.findings,
+        })
+    } else {
+        let surveyed = tsx::survey_file(&shown, &tracked, &root);
+        Some(FileResult {
+            is_python: false,
+            is_js_ts: true,
+            libraries: surveyed.libraries,
+            figures: surveyed.figures,
+            findings: surveyed.findings,
+        })
+    }
+}
+
 /// Surveys `paths` for static figures, mechanical findings, optional runtime measurements, and
 /// the per-figure Tufte checklist.
 fn survey(
@@ -474,36 +512,7 @@ fn survey(
 
     let per_file: Vec<FileResult> = (files.par_iter())
         .filter_map(|(path, language)| {
-            let is_py = *language == SupportLang::Python;
-            let is_ts = is_js_ts(*language);
-            if !is_py && !is_ts {
-                return None;
-            }
-            let text = listing.text(path)?;
-            let absolute = listing.absolute(path)?;
-            let shown = tree.shown(path);
-            let tracked = tree.tracked(&absolute).unwrap_or_else(|| shown.clone());
-            let root = syntax::parse_as(&text, *language);
-            if is_py {
-                let surveyed =
-                    python::survey_file(path, &shown, &tracked, &text, &root, workspace.as_ref());
-                Some(FileResult {
-                    is_python: true,
-                    is_js_ts: false,
-                    libraries: surveyed.libraries,
-                    figures: surveyed.figures,
-                    findings: surveyed.findings,
-                })
-            } else {
-                let surveyed = tsx::survey_file(&shown, &tracked, &root);
-                Some(FileResult {
-                    is_python: false,
-                    is_js_ts: true,
-                    libraries: surveyed.libraries,
-                    figures: surveyed.figures,
-                    findings: surveyed.findings,
-                })
-            }
+            survey_one_file(path, *language, tree, listing, workspace.as_ref())
         })
         .collect();
 

@@ -1,4 +1,4 @@
-mod adapter;
+mod column_adapter;
 mod survey;
 
 use std::process::ExitCode;
@@ -7,12 +7,12 @@ use anyhow::Result;
 use clap::ValueEnum;
 use serde::Serialize;
 
-use crate::ledger::{self, Catalog, Kind as _, Select};
+use crate::ledger::{self, LedgerKind as _, QuestionCatalog, Select, WorkflowId};
 use crate::output::Format;
 
 #[cfg(feature = "ledger-distributed")]
-pub(crate) use adapter::adapter_command;
-pub(crate) use adapter::record_target;
+pub(crate) use column_adapter::adapter_command;
+pub(crate) use column_adapter::record_target;
 
 const CATALOG: &str = include_str!("../rules/xpd/data-prep.yml");
 
@@ -60,7 +60,7 @@ enum Kind {
     ScriptSteps,
 }
 
-impl ledger::Kind for Kind {
+impl ledger::LedgerKind for Kind {
     type Group = Group;
 
     const GROUPS: &[Group] = &[
@@ -70,7 +70,7 @@ impl ledger::Kind for Kind {
         Group::Coercion,
         Group::PipelineShape,
     ];
-    const COMMAND: &str = "data-prep";
+    const WORKFLOW: WorkflowId = WorkflowId::DataPrep;
     const GOALS: &[ledger::Goal] = &[ledger::Goal::Design];
 
     fn group(self) -> Group {
@@ -135,14 +135,15 @@ pub(crate) struct DataPrepArgs {
 impl DataPrepArgs {
     pub(crate) fn run(self, default: Format) -> Result<ExitCode> {
         if self.questions {
-            return Catalog::load(CATALOG)?.print(self.select.format_override().unwrap_or(default));
+            return QuestionCatalog::load(CATALOG)?
+                .print(self.select.format_override().unwrap_or(default));
         }
         let adapter = record_target(self.adapter, self.target)?;
         self.select
             .print_with(default, adapter.as_deref(), survey::survey, |ledger| {
                 let mut text = format!(
                     "xpd {}: {} in {} Python files, {} checklist items\n",
-                    Kind::COMMAND,
+                    Kind::WORKFLOW.as_str(),
                     ledger.count(),
                     ledger.read.files,
                     ledger.checklist.len()

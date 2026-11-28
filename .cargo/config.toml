@@ -3,3 +3,6 @@
 # CMake so that a build can switch such a backend off.
 [env]
 GGML_METAL = "OFF"
+
+[alias]
+xtask = "run --quiet --example xtask --"

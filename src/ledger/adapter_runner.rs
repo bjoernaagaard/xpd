@@ -1,3 +1,5 @@
+//! Runs external Python or shell runtime adapters and parses their JSON output.
+
 use std::path::Path;
 use std::process::{Command, Stdio};
 
@@ -6,6 +8,7 @@ use serde_json::Value;
 
 use crate::venv;
 
+/// Executes `adapter` in `work_dir`, wrapping `.py` files with `runner`, and returns its JSON.
 pub(crate) fn invoke_adapter(adapter: &str, work_dir: &Path, runner: &str) -> Result<Value> {
     let candidate = work_dir.join(adapter);
     let is_python_file = candidate.is_file()

@@ -7,7 +7,7 @@ use anyhow::Result;
 use clap::ValueEnum;
 use serde::Serialize;
 
-use crate::ledger::{self, Catalog, Select};
+use crate::ledger::{self, QuestionCatalog, Select, WorkflowId};
 use crate::output::Format;
 
 const CATALOG: &str = include_str!("../rules/xpd/ts-review.yml");
@@ -57,10 +57,10 @@ enum Kind {
     IncoherentGroup,
 }
 
-impl ledger::Kind for Kind {
+impl ledger::LedgerKind for Kind {
     type Group = Group;
     const GROUPS: &[Group] = &[Group::Evaluation, Group::Lags, Group::Identity];
-    const COMMAND: &str = "ts-review";
+    const WORKFLOW: WorkflowId = WorkflowId::TsReview;
     const GOALS: &[ledger::Goal] = &[ledger::Goal::Design];
 
     fn group(self) -> Group {
@@ -124,7 +124,8 @@ pub(crate) struct TsReviewArgs {
 impl TsReviewArgs {
     pub(crate) fn run(self, default: Format) -> Result<ExitCode> {
         if self.questions {
-            return Catalog::load(CATALOG)?.print(self.select.format_override().unwrap_or(default));
+            return QuestionCatalog::load(CATALOG)?
+                .print(self.select.format_override().unwrap_or(default));
         }
         self.select
             .print_with(default, self.adapter.as_deref(), survey::survey, |ledger| {

@@ -9,7 +9,7 @@ use clap::ValueEnum;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-use crate::ledger::{self, Catalog, Select};
+use crate::ledger::{self, QuestionCatalog, Select, WorkflowId};
 use crate::output::Format;
 
 const CATALOG: &str = include_str!("../rules/xpd/feature-review.yml");
@@ -144,10 +144,10 @@ impl Kind {
     }
 }
 
-impl ledger::Kind for Kind {
+impl ledger::LedgerKind for Kind {
     type Group = Group;
     const GROUPS: &[Group] = &[Group::CutoffAndFolds, Group::Computation, Group::Pipeline];
-    const COMMAND: &str = "feature-review";
+    const WORKFLOW: WorkflowId = WorkflowId::FeatureReview;
     const GOALS: &[ledger::Goal] = &[ledger::Goal::Design];
 
     fn source_rule(self) -> Option<&'static str> {
@@ -237,7 +237,8 @@ pub(crate) struct FeatureReviewArgs {
 impl FeatureReviewArgs {
     pub(crate) fn run(self, default: Format) -> Result<ExitCode> {
         if self.questions {
-            return Catalog::load(CATALOG)?.print(self.select.format_override().unwrap_or(default));
+            return QuestionCatalog::load(CATALOG)?
+                .print(self.select.format_override().unwrap_or(default));
         }
         self.select.print_with(
             default,

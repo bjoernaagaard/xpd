@@ -1,10 +1,11 @@
 use std::collections::BTreeMap;
 
-use crate::ledger::python::{
-    args, assignments, called, identifier, local_nodes, owner, qualified, receiver, resolved_call,
-    scope,
+use crate::ledger::python_ast::{
+    assignments, call_receiver as receiver, called_method_name as called, enclosing_scope as owner,
+    identifier, is_python_scope as scope, local_nodes, positional_call_args as args, resolved_call,
+    scope_qualified_name as qualified,
 };
-use crate::ledger::{Finding, Place};
+use crate::ledger::{FindingPlace, LedgerFinding};
 use crate::names::{is_bound, is_parameter_name};
 use crate::syntax::{Node, keyword_arg, string_literal};
 
@@ -293,12 +294,12 @@ fn fitted_on(call: &Node<'_>, nodes: &[Node<'_>], model: &str, train: &Pair) -> 
 struct LocalReview<'a, 't> {
     file: &'a str,
     nodes: Vec<Node<'t>>,
-    findings: Vec<(Finding<Kind>, Option<String>)>,
+    findings: Vec<(LedgerFinding<Kind>, Option<String>)>,
 }
 
 impl<'t> LocalReview<'_, 't> {
     fn record(&mut self, node: &Node<'_>, kind: Kind, binding: Option<String>, evidence: String) {
-        let mut place = Place::line(self.file, node.start_pos().line() + 1);
+        let mut place = FindingPlace::line(self.file, node.start_pos().line() + 1);
         place.column = Some(node.start_pos().column(node) + 1);
         let key = format!(
             "{}\n{}\n{evidence}",
@@ -306,7 +307,7 @@ impl<'t> LocalReview<'_, 't> {
             binding.as_deref().unwrap_or("")
         );
         self.findings.push((
-            Finding {
+            LedgerFinding {
                 kind,
                 key,
                 places: vec![place],
@@ -390,7 +391,7 @@ impl<'t> LocalReview<'_, 't> {
 
 pub(super) struct ModelStaticReview {
     pub(super) bindings: BTreeMap<String, Vec<usize>>,
-    pub(super) findings: Vec<(Finding<Kind>, Option<String>)>,
+    pub(super) findings: Vec<(LedgerFinding<Kind>, Option<String>)>,
 }
 
 pub(super) fn inspect_models(root: &Node<'_>, file: &str) -> ModelStaticReview {

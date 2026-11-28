@@ -7,9 +7,11 @@ use serde::Serialize;
 use serde_json::{Value, json};
 
 use crate::catalog::Filters;
-use crate::ledger::adapter::invoke_adapter;
+use crate::ledger::adapter_runner::invoke_adapter;
 use crate::ledger::gix_source::Listing;
-use crate::ledger::{self, AdapterPolicy, Entry, Finding, Place, SurveyOutput, Tree};
+use crate::ledger::{
+    self, AdapterPolicy, FindingPlace, LedgerEntry, LedgerFinding, SurveyOutput, Tree,
+};
 use crate::source;
 use crate::syntax;
 use crate::workspace::Workspace;
@@ -37,11 +39,11 @@ pub(super) struct ModelRead {
 }
 
 fn model_id(file: &str, binding: &str) -> String {
-    ledger::id("model", &format!("{file}\n{binding}"), 1)
+    ledger::finding_id("model", &format!("{file}\n{binding}"), 1)
 }
 
 type ModelKey = (String, String);
-type Candidate = (Finding<Kind>, Option<String>, Option<String>);
+type Candidate = (LedgerFinding<Kind>, Option<String>, Option<String>);
 
 #[derive(Default)]
 struct StaticInventory {
@@ -151,7 +153,7 @@ pub(super) fn survey_models(
 fn name_model_findings(
     candidates: Vec<Candidate>,
     bindings: &BTreeMap<ModelKey, Vec<usize>>,
-) -> Vec<Entry<Kind>> {
+) -> Vec<LedgerEntry<Kind>> {
     let by_key: BTreeMap<_, _> = candidates
         .iter()
         .map(|(finding, rule, binding)| {
@@ -233,7 +235,7 @@ fn scan_model_files(
             let Some(&kind) = rules.get(&rule) else {
                 continue;
             };
-            let mut place = Place::file(&owner);
+            let mut place = FindingPlace::file(&owner);
             let mut binding = None;
             if let Some(at) = issue.position {
                 place.line = Some(at.line);
@@ -243,7 +245,7 @@ fn scan_model_files(
             let key = format!("{owner}\n{rule}\n{}", issue.message);
             if pack_sites.insert((kind, place.clone(), key.clone())) {
                 inventory.candidates.push((
-                    Finding {
+                    LedgerFinding {
                         kind,
                         key,
                         places: vec![place],

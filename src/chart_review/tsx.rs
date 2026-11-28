@@ -3,7 +3,7 @@
 
 use std::collections::{BTreeSet, HashMap};
 
-use crate::ledger::{self, Place};
+use crate::ledger::{self, FindingPlace};
 use crate::syntax::{Node, Root};
 
 use super::{
@@ -259,7 +259,7 @@ fn push_figure(
         .and_modify(|count| *count += 1)
         .or_insert(1);
     let fig_key = format!("{tracked}\n{symbol}\n{kind}");
-    let id = ledger::id("figure", &fig_key, *nth);
+    let id = ledger::finding_id("figure", &fig_key, *nth);
     figures.push(Figure {
         id,
         file: shown.to_owned(),
@@ -564,7 +564,7 @@ fn inspect_plotly_trace_fields(
         findings.push(Finding {
             kind: Kind::PieChart,
             key: format!("{tracked}\nts-plotly-pie\n{trace_type}"),
-            places: vec![Place::line(shown, trace_line)],
+            places: vec![FindingPlace::line(shown, trace_line)],
             evidence: format!(
                 "Plotly trace `type: '{trace_type}'` compares angles instead of a common scale (VDQI p. 178). Use a sorted bar chart or a table."
             ),
@@ -575,7 +575,7 @@ fn inspect_plotly_trace_fields(
         findings.push(Finding {
             kind: Kind::DecorativeGauge,
             key: format!("{tracked}\nts-plotly-gauge"),
-            places: vec![Place::line(shown, trace_line)],
+            places: vec![FindingPlace::line(shown, trace_line)],
             evidence: "Plotly gauge indicator uses heavy non-data chrome for a single value (VDQI p. 116). Show a number, text-table, or sparkline.".to_owned(),
             weight: 3,
         });
@@ -584,7 +584,7 @@ fn inspect_plotly_trace_fields(
         findings.push(Finding {
             kind: Kind::ExtraDimensions,
             key: format!("{tracked}\nts-plotly-3d\n{trace_type}"),
-            places: vec![Place::line(shown, trace_line)],
+            places: vec![FindingPlace::line(shown, trace_line)],
             evidence: format!(
                 "Plotly trace `type: '{trace_type}'` depicts extra 3D dimensions (VDQI p. 71). Use a 2D plot or small multiples."
             ),
@@ -598,7 +598,7 @@ fn inspect_plotly_trace_fields(
         findings.push(Finding {
             kind: Kind::DualAxis,
             key: format!("{tracked}\nts-plotly-dual-y"),
-            places: vec![Place::line(shown, trace_line)],
+            places: vec![FindingPlace::line(shown, trace_line)],
             evidence: "Plotly trace assigns `yaxis: 'y2'` creating a dual y-axis (VDQI p. 61). Use small multiples with aligned x-axes.".to_owned(),
             weight: 3,
         });
@@ -609,7 +609,7 @@ fn inspect_plotly_trace_fields(
         findings.push(Finding {
             kind: Kind::RainbowColorscale,
             key: format!("{tracked}\nts-plotly-rainbow\n{scale}"),
-            places: vec![Place::line(shown, trace_line)],
+            places: vec![FindingPlace::line(shown, trace_line)],
             evidence: format!(
                 "Plotly `colorscale: '{scale}'` has no natural lightness order (VDQI p. 154). Use an ordered sequential scale."
             ),
@@ -639,7 +639,7 @@ fn inspect_plotly_trace_style(
             findings.push(Finding {
                 kind: Kind::SmoothedData,
                 key: format!("{tracked}\nts-plotly-spline"),
-                places: vec![Place::line(shown, trace_line)],
+                places: vec![FindingPlace::line(shown, trace_line)],
                 evidence: "Plotly `line.shape: 'spline'` invents curvature between observations (VDQI p. 13). Connect points linearly.".to_owned(),
                 weight: 2,
             });
@@ -650,7 +650,7 @@ fn inspect_plotly_trace_style(
             findings.push(Finding {
                 kind: Kind::ThickLine,
                 key: format!("{tracked}\nts-plotly-thick-line"),
-                places: vec![Place::line(shown, trace_line)],
+                places: vec![FindingPlace::line(shown, trace_line)],
                 evidence: format!(
                     "Plotly `line.width: {width}` draws a heavy stroke (VDQI p. 185). Keep data lines thin (1 to 2 px)."
                 ),
@@ -667,7 +667,7 @@ fn inspect_plotly_trace_style(
             findings.push(Finding {
                 kind: Kind::DistortedSize,
                 key: format!("{tracked}\nts-plotly-diameter"),
-                places: vec![Place::line(shown, trace_line)],
+                places: vec![FindingPlace::line(shown, trace_line)],
                 evidence: "Plotly `marker.sizemode: 'diameter'` squares area relative to value (VDQI p. 57). Use `sizemode: 'area'`.".to_owned(),
                 weight: 3,
             });
@@ -676,7 +676,7 @@ fn inspect_plotly_trace_style(
             findings.push(Finding {
                 kind: Kind::PatternFill,
                 key: format!("{tracked}\nts-plotly-pattern"),
-                places: vec![Place::line(shown, trace_line)],
+                places: vec![FindingPlace::line(shown, trace_line)],
                 evidence: "Plotly `marker.pattern` introduces moire vibration (VDQI p. 108). Use flat muted colors or direct labels.".to_owned(),
                 weight: 2,
             });
@@ -702,7 +702,7 @@ fn inspect_plotly_layout(
         findings.push(Finding {
             kind: Kind::DualAxis,
             key: format!("{tracked}\nts-plotly-layout-yaxis2"),
-            places: vec![Place::line(shown, line)],
+            places: vec![FindingPlace::line(shown, line)],
             evidence: "Plotly layout defines `yaxis2` creating a second vertical scale (VDQI p. 61). Prefer small multiples.".to_owned(),
             weight: 3,
         });
@@ -716,7 +716,7 @@ fn inspect_plotly_layout(
             findings.push(Finding {
                 kind: Kind::AllCapsText,
                 key: format!("{tracked}\nts-plotly-caps\n{title}"),
-                places: vec![Place::line(shown, line)],
+                places: vec![FindingPlace::line(shown, line)],
                 evidence: format!(
                     "Plotly title `{title}` is written in all capitals (VDQI p. 183). Use sentence case."
                 ),
@@ -737,7 +737,7 @@ fn inspect_plotly_layout(
         findings.push(Finding {
             kind: Kind::VerticalAspectRatio,
             key: format!("{tracked}\nts-plotly-aspect"),
-            places: vec![Place::line(shown, line)],
+            places: vec![FindingPlace::line(shown, line)],
             evidence: format!(
                 "Plotly layout `{w}x{h}` is taller than wide (VDQI p. 186). Prefer a horizontal aspect ratio."
             ),
@@ -751,7 +751,7 @@ fn inspect_plotly_layout(
         findings.push(Finding {
             kind: Kind::LegendInsteadOfLabels,
             key: format!("{tracked}\nts-plotly-legend"),
-            places: vec![Place::line(shown, line)],
+            places: vec![FindingPlace::line(shown, line)],
             evidence: "Multi-series Plotly chart relies on a legend with no direct labels (VDQI p. 183). Label series directly and set `showlegend: false`.".to_owned(),
             weight: 2,
         });
@@ -774,7 +774,7 @@ fn inspect_plotly_axis(
         findings.push(Finding {
             kind: Kind::RotatedTicks,
             key: format!("{tracked}\nts-plotly-tickangle\n{axis_key}"),
-            places: vec![Place::line(shown, line)],
+            places: vec![FindingPlace::line(shown, line)],
             evidence: format!(
                 "Plotly `{axis_key}.tickangle: {angle}` rotates labels (VDQI p. 183). Keep words horizontal."
             ),
@@ -785,7 +785,7 @@ fn inspect_plotly_axis(
         findings.push(Finding {
             kind: Kind::HeavyGrid,
             key: format!("{tracked}\nts-plotly-grid\n{axis_key}"),
-            places: vec![Place::line(shown, line)],
+            places: vec![FindingPlace::line(shown, line)],
             evidence: format!(
                 "Plotly `{axis_key}.showgrid: true` draws an explicit grid (VDQI p. 112). Erase the grid or mute it faintly."
             ),
@@ -800,7 +800,7 @@ fn inspect_plotly_axis(
         findings.push(Finding {
             kind: Kind::BoxedFrame,
             key: format!("{tracked}\nts-plotly-mirror\n{axis_key}"),
-            places: vec![Place::line(shown, line)],
+            places: vec![FindingPlace::line(shown, line)],
             evidence: format!(
                 "Plotly `{axis_key}.mirror` encloses the chart in a non-data box frame (VDQI p. 96)."
             ),
@@ -825,7 +825,7 @@ fn inspect_js_plotly_table(
                 findings.push(Finding {
                     kind: Kind::TableRawHeader,
                     key: format!("{tracked}\nts-table-header\n{raw}"),
-                    places: vec![Place::line(shown, line)],
+                    places: vec![FindingPlace::line(shown, line)],
                     evidence: format!(
                         "Plotly table header `{raw}` is a raw identifier or all-caps label (VDQI p. 183)."
                     ),
@@ -848,7 +848,7 @@ fn inspect_js_plotly_table(
                 findings.push(Finding {
                     kind: Kind::TableZebraStriping,
                     key: format!("{tracked}\nts-table-zebra"),
-                    places: vec![Place::line(shown, line)],
+                    places: vec![FindingPlace::line(shown, line)],
                     evidence: "Plotly table applies alternating row fill colors (VDQI p. 179). Remove zebra striping.".to_owned(),
                     weight: 2,
                 });
@@ -861,7 +861,7 @@ fn inspect_js_plotly_table(
             findings.push(Finding {
                 kind: Kind::TableVerticalRules,
                 key: format!("{tracked}\nts-table-borders"),
-                places: vec![Place::line(shown, line)],
+                places: vec![FindingPlace::line(shown, line)],
                 evidence: format!(
                     "Plotly table sets heavy cell borders (`line.width: {width}`, VDQI p. 179)."
                 ),
@@ -916,7 +916,7 @@ fn inspect_ag_grid_cols(array: &Node<'_>, shown: &str, tracked: &str, findings: 
                 findings.push(Finding {
                     kind: Kind::TableRawHeader,
                     key: format!("{tracked}\nts-ag-header\n{hdr}"),
-                    places: vec![Place::line(shown, col_line)],
+                    places: vec![FindingPlace::line(shown, col_line)],
                     evidence: format!(
                         "AG Grid `headerName: '{hdr}'` is a raw identifier or all-caps label (VDQI p. 183). Spell out headers in sentence case with units."
                     ),
@@ -929,7 +929,7 @@ fn inspect_ag_grid_cols(array: &Node<'_>, shown: &str, tracked: &str, findings: 
             findings.push(Finding {
                 kind: Kind::TableRawHeader,
                 key: format!("{tracked}\nts-ag-field-no-header\n{fld}"),
-                places: vec![Place::line(shown, col_line)],
+                places: vec![FindingPlace::line(shown, col_line)],
                 evidence: format!(
                     "AG Grid column `field: '{fld}'` has no `headerName` (VDQI p. 183). Spell out the column header with units."
                 ),
@@ -954,7 +954,7 @@ fn inspect_ag_grid_cols(array: &Node<'_>, shown: &str, tracked: &str, findings: 
                 findings.push(Finding {
                     kind: Kind::TableUnformattedNumbers,
                     key: format!("{tracked}\nts-ag-unformatted\n{label}"),
-                    places: vec![Place::line(shown, col_line)],
+                    places: vec![FindingPlace::line(shown, col_line)],
                     evidence: format!(
                         "AG Grid numeric column `{label}` has no `valueFormatter` (VDQI p. 178). Format numbers to consistent decimal precision."
                     ),
@@ -965,7 +965,7 @@ fn inspect_ag_grid_cols(array: &Node<'_>, shown: &str, tracked: &str, findings: 
                 findings.push(Finding {
                     kind: Kind::TableNumberAlignment,
                     key: format!("{tracked}\nts-ag-align\n{label}"),
-                    places: vec![Place::line(shown, col_line)],
+                    places: vec![FindingPlace::line(shown, col_line)],
                     evidence: format!(
                         "AG Grid numeric column `{label}` is not right-aligned (VDQI p. 178). Set `type: 'numericColumn'` or `type: 'rightAligned'`."
                     ),
@@ -984,7 +984,7 @@ fn inspect_ag_grid_cols(array: &Node<'_>, shown: &str, tracked: &str, findings: 
             findings.push(Finding {
                 kind: Kind::TableAlphabeticalOrder,
                 key: format!("{tracked}\nts-ag-alpha-sort\n{label}"),
-                places: vec![Place::line(shown, col_line)],
+                places: vec![FindingPlace::line(shown, col_line)],
                 evidence: format!(
                     "AG Grid sorts text column `{label}` ascending while numeric columns are unsorted (VDQI p. 178). Order rows by content or value."
                 ),
@@ -1007,7 +1007,7 @@ fn inspect_ag_grid_theme_params(
         findings.push(Finding {
             kind: Kind::TableVerticalRules,
             key: format!("{tracked}\nts-ag-col-border"),
-            places: vec![Place::line(shown, line)],
+            places: vec![FindingPlace::line(shown, line)],
             evidence: "AG Grid enables vertical `columnBorder` lines (VDQI p. 179). Remove vertical gridlines and rely on alignment and horizontal topical dividers.".to_owned(),
             weight: 2,
         });
@@ -1016,7 +1016,7 @@ fn inspect_ag_grid_theme_params(
         findings.push(Finding {
             kind: Kind::TableZebraStriping,
             key: format!("{tracked}\nts-ag-zebra"),
-            places: vec![Place::line(shown, line)],
+            places: vec![FindingPlace::line(shown, line)],
             evidence: "AG Grid sets `oddRowBackgroundColor` zebra striping (VDQI p. 179). Use plain backgrounds with subtle horizontal dividers.".to_owned(),
             weight: 2,
         });

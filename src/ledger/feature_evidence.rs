@@ -1,4 +1,5 @@
 use std::collections::{BTreeMap, BTreeSet};
+use std::path::{Path, PathBuf};
 use std::sync::LazyLock;
 
 use anyhow::{Result, ensure};
@@ -6,7 +7,11 @@ use regex::Regex;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 
-use super::run::{AnswerRecord, Answered, Verdict};
+use super::ChecklistEntry;
+use super::durable_store::feature_journal;
+use super::run_journal::{AnswerRecord, Answered, ChecklistVerdict};
+use super::run_probes::{RunWorkspace, resolve_git_path};
+use super::workflow_registry::WorkflowId;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub(super) struct FeatureEvidence {
@@ -136,7 +141,7 @@ impl FeatureEvidence {
             answer.item
         );
         let hypothesis = candidate["kind"] == "hypothesis";
-        if answer.verdict == Verdict::NotApplicable {
+        if answer.verdict == ChecklistVerdict::NotApplicable {
             ensure!(
                 hypothesis && matches!(question, "lineage" | "value"),
                 "na does not apply to {}",
@@ -146,14 +151,14 @@ impl FeatureEvidence {
         }
         if question == "mechanism" {
             ensure!(
-                answer.verdict == Verdict::Pass && SOURCE_LOCATOR.is_match(reason),
+                answer.verdict == ChecklistVerdict::Pass && SOURCE_LOCATOR.is_match(reason),
                 "{} needs pass and a library key with a page or a primary source locator",
                 answer.item
             );
         }
         if question == "availability" {
             ensure!(
-                answer.verdict == Verdict::Pass,
+                answer.verdict == ChecklistVerdict::Pass,
                 "{} needs an availability justification with pass",
                 answer.item
             );
@@ -225,4 +230,61 @@ pub(super) fn invalidate_answers(
     stale: &BTreeSet<String>,
 ) {
     answers.retain(|item, _| !stale.contains(item));
+}
+
+/// Recorded feature-review paths, adapter, and settled answers used to annotate ad-hoc scans.
+pub(super) struct RecordedFeatureList {
+    pub(super) paths: Vec<PathBuf>,
+    pub(super) adapter: Option<String>,
+    feature_evidence: Option<FeatureEvidence>,
+    answered: BTreeMap<String, AnswerRecord>,
+}
+
+impl RecordedFeatureList {
+    /// Opens the latest recorded `feature-review` run for the repository at `top`, if any.
+    pub(super) fn open(top: &Path) -> Result<Option<Self>> {
+        let workspace = RunWorkspace {
+            top: top.to_path_buf(),
+            journal: resolve_git_path(
+                top,
+                &format!("xpd-{}.json", WorkflowId::FeatureReview.as_str()),
+            )?,
+        };
+        let journal = feature_journal(&workspace)?;
+        Ok(journal.map(|journal| Self {
+            paths: journal
+                .paths
+                .into_iter()
+                .map(|path| top.join(path))
+                .collect(),
+            adapter: journal.adapter,
+            feature_evidence: journal.feature_evidence,
+            answered: journal.answered,
+        }))
+    }
+
+    /// Annotates fresh checklist entries with still-valid answers from the recorded run.
+    pub(super) fn annotate(
+        &self,
+        read: Option<&impl Serialize>,
+        checklist: &mut [ChecklistEntry],
+    ) -> Result<()> {
+        let stale = if let Some(read) = read {
+            let evidence = FeatureEvidence::from_read(&serde_json::to_value(read)?)?;
+            plan_invalidation(self.feature_evidence.as_ref(), Some(&evidence), &[])?
+        } else {
+            BTreeSet::new()
+        };
+        for item in checklist
+            .iter_mut()
+            .filter(|item| !stale.contains(&item.id))
+        {
+            item.answer = self
+                .answered
+                .get(&item.id)
+                .map(serde_json::to_value)
+                .transpose()?;
+        }
+        Ok(())
+    }
 }

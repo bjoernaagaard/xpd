@@ -29,6 +29,7 @@ use super::orchestration::{
     COMMAND_QUEUE, CommandEnvelope, ORCHESTRATION_NAME, Receipt, RunStartInput, Snapshot,
     ledger_run, receipt_key,
 };
+use super::workflow_registry::WorkflowId;
 
 /// The variable that names the PostgreSQL store of horizontal mode.
 #[cfg(feature = "ledger-distributed")]
@@ -122,7 +123,7 @@ pub(crate) fn sqlite_url(db_path: &Path) -> String {
 /// The instance of one run. A generation keeps a restarted run apart from the
 /// run it replaced, and a namespace keeps one worktree's runs apart from
 /// another's in the shared store.
-pub(crate) fn instance_id(namespace: &str, command: &str, generation: u64) -> String {
+pub(crate) fn instance_id(namespace: &str, workflow: WorkflowId, generation: u64) -> String {
     let clean = |part: &str| {
         part.chars()
             .map(|ch| {
@@ -134,7 +135,12 @@ pub(crate) fn instance_id(namespace: &str, command: &str, generation: u64) -> St
             })
             .collect::<String>()
     };
-    format!("{}::{}::{}", clean(namespace), clean(command), generation)
+    format!(
+        "{}::{}::{}",
+        clean(namespace),
+        clean(workflow.as_str()),
+        generation
+    )
 }
 
 /// A Tokio runtime that does not exist until it is asked for.

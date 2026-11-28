@@ -14,7 +14,7 @@ const LINES: usize = 5;
 
 /// A stretch of one file that is long enough to be a copy.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub(crate) struct Block {
+pub(crate) struct TokenBlock {
     /// The same for two stretches with the same tokens.
     pub(super) hash: u64,
     /// The hash of the nearest stretch around this one.
@@ -25,7 +25,7 @@ pub(crate) struct Block {
 }
 
 /// The stretches of the tree below `root` that are long enough to be a copy.
-pub(crate) fn blocks(root: &Node<'_>) -> Vec<Block> {
+pub(crate) fn blocks(root: &Node<'_>) -> Vec<TokenBlock> {
     let mut blocks = Vec::new();
     visit(root, &mut blocks);
     blocks
@@ -33,7 +33,7 @@ pub(crate) fn blocks(root: &Node<'_>) -> Vec<Block> {
 
 /// The token count and the hash of `node`. Adds each stretch below it to `blocks`, and returns
 /// the indexes of the nearest ones so that the caller can name itself as their parent.
-fn visit(node: &Node<'_>, blocks: &mut Vec<Block>) -> (usize, u64, Vec<usize>) {
+fn visit(node: &Node<'_>, blocks: &mut Vec<TokenBlock>) -> (usize, u64, Vec<usize>) {
     let mut hasher = DefaultHasher::new();
     let children = node.children();
     if children.len() == 0 {
@@ -63,7 +63,7 @@ fn visit(node: &Node<'_>, blocks: &mut Vec<Block>) -> (usize, u64, Vec<usize>) {
     for inner in nearest {
         blocks[inner].parent = Some(hash);
     }
-    blocks.push(Block {
+    blocks.push(TokenBlock {
         hash,
         parent: None,
         tokens,
@@ -74,13 +74,15 @@ fn visit(node: &Node<'_>, blocks: &mut Vec<Block>) -> (usize, u64, Vec<usize>) {
 
 /// The groups of equal stretches among `blocks`, each stretch with the file it is in. A stretch
 /// inside a larger copy is left out, so each copy is named once, at its full size.
-pub(super) fn groups<'f>(blocks: &'f [(&'f str, Block)]) -> Vec<Vec<(&'f str, &'f Block)>> {
-    let mut by_hash: HashMap<u64, Vec<(&str, &Block)>> = HashMap::new();
+pub(super) fn exact_copy_groups<'f>(
+    blocks: &'f [(&'f str, TokenBlock)],
+) -> Vec<Vec<(&'f str, &'f TokenBlock)>> {
+    let mut by_hash: HashMap<u64, Vec<(&str, &TokenBlock)>> = HashMap::new();
     for (file, block) in blocks {
         by_hash.entry(block.hash).or_default().push((file, block));
     }
     let copied = |hash: u64| by_hash.get(&hash).is_some_and(|group| group.len() > 1);
-    let mut groups: Vec<Vec<(&str, &Block)>> = (by_hash.values())
+    let mut groups: Vec<Vec<(&str, &TokenBlock)>> = (by_hash.values())
         .filter(|group| group.len() > 1)
         .filter(|group| (group.iter()).any(|(_, block)| !block.parent.is_some_and(copied)))
         .cloned()
@@ -105,7 +107,7 @@ use crate::ledger::salsa_db::SourceText;
 
 /// How many per-file facts stay in memory at once.
 #[expect(dead_code, reason = "the surveys that call it come in the next slice")]
-pub(crate) const FILE_FACTS_LRU: usize = 2048;
+pub(crate) const UNTANGLE_FACTS_LRU: usize = 2048;
 
 /// The per-file facts of `xpd untangle` for one file: its lines and its copied stretches.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -113,7 +115,7 @@ pub(crate) struct UntangleFileSummary {
     /// The lines of the file.
     pub(crate) lines: usize,
     /// The stretches of the file that are long enough to be a copy.
-    pub(crate) blocks: Vec<Block>,
+    pub(crate) blocks: Vec<TokenBlock>,
 }
 
 /// The facts of one file for `xpd untangle`, as a tracked query with a memory cap. Only the

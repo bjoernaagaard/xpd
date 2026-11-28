@@ -24,9 +24,9 @@ use crate::syntax;
 /// How many file texts stay in memory at once.
 #[expect(dead_code, reason = "the surveys that call it come in the next slice")]
 pub(crate) const FILE_TEXT_LRU: usize = 4096;
-/// How many per-file facts of each command stay in memory at once.
+/// How many per-file facts of `xpd optimize` stay in memory at once.
 #[expect(dead_code, reason = "the surveys that call it come in the next slice")]
-pub(crate) const FILE_FACTS_LRU: usize = 2048;
+pub(crate) const OPTIMIZE_FACTS_LRU: usize = 2048;
 /// How many commit diffs stay in memory at once. The history window reads 2000 commits.
 #[expect(dead_code, reason = "the surveys that call it come in the next slice")]
 pub(crate) const COMMIT_DIFF_LRU: usize = 2048;
@@ -44,7 +44,7 @@ pub(crate) struct FileEntry {
 
 /// The files of one commit or working tree, and the fingerprint of the rules that read them.
 ///
-/// Created through [`snapshot`], which gives every field `Durability::LOW`.
+/// Created through [`new_snapshot_input`], which gives every field `Durability::LOW`.
 #[salsa::input]
 pub(crate) struct SnapshotInput {
     /// The full id of the commit, or the empty text for the working tree.
@@ -59,7 +59,7 @@ pub(crate) struct SnapshotInput {
 
 /// The rules and the library index that the surveys read, which change seldom.
 ///
-/// Created through [`rules`], which gives every field `Durability::HIGH`, so that a change of
+/// Created through [`new_rules_input`], which gives every field `Durability::HIGH`, so that a change of
 /// code files never revises the rule catalog or the index.
 #[salsa::input]
 pub(crate) struct RulesInput {
@@ -189,7 +189,7 @@ pub(crate) fn commit_changed_files(
 pub(crate) fn database() -> salsa::DatabaseImpl {
     let mut db = salsa::DatabaseImpl::new();
     file_text::set_lru_capacity(&mut db, FILE_TEXT_LRU);
-    optimize_file_facts::set_lru_capacity(&mut db, FILE_FACTS_LRU);
+    optimize_file_facts::set_lru_capacity(&mut db, OPTIMIZE_FACTS_LRU);
     commit_changed_files::set_lru_capacity(&mut db, COMMIT_DIFF_LRU);
     db
 }
@@ -197,7 +197,7 @@ pub(crate) fn database() -> salsa::DatabaseImpl {
 /// The snapshot of `files` at `commit_oid` under rules of `rules_fingerprint`, with
 /// `Durability::LOW` on every field, so that it never revises the rules or the index.
 #[expect(dead_code, reason = "the surveys that call it come in the next slice")]
-pub(crate) fn snapshot(
+pub(crate) fn new_snapshot_input(
     db: &dyn salsa::Database,
     commit_oid: String,
     files: Vec<FileEntry>,
@@ -213,7 +213,7 @@ pub(crate) fn snapshot(
 /// The rules and index input with `Durability::HIGH` on every field, so that a change of code
 /// files never revises the rule catalog or the library index.
 #[expect(dead_code, reason = "the surveys that call it come in the next slice")]
-pub(crate) fn rules(
+pub(crate) fn new_rules_input(
     db: &dyn salsa::Database,
     fingerprint: String,
     index_fingerprint: String,

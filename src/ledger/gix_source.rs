@@ -56,7 +56,7 @@ impl Listing {
             return Self::at_commit(paths, copy, top, commit);
         }
         Ok(Self {
-            files: ledger::files(paths),
+            files: ledger::walk_code_files(paths),
             origin: Origin::Disk {
                 top: top.map(Path::to_path_buf),
             },
