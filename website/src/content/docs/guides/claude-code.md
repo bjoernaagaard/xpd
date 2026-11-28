@@ -28,10 +28,10 @@ sequenceDiagram
 
 | Setup option | What the agent gets | Requires |
 | --- | --- | --- |
-| [Agent plugin](#agent-plugin) | Hook, MCP server, and all bundled skills | Claude Code or Codex, `xpd` on `PATH`, and [uv](https://docs.astral.sh/uv/) |
+| [Agent plugin](#agent-plugin) | Hook, 14-tool MCP server, and all 14 bundled skills | Claude Code or Codex, `xpd` on `PATH`, and [uv](https://docs.astral.sh/uv/) |
 | [Edit hook only](#lint-each-edit-with-the-hook) | Issues after every edit | `xpd` on `PATH` |
-| [MCP server](../mcp/) | Visual tables, model gates, and animation tools | `uv` |
-| [Agent skill](#agent-skill) | Instructions for when to run each xpd command | Nothing |
+| [MCP server](../mcp/) | Visual tables, coupling maps, ledger views, model gates, and animation tools | `uv` |
+| [Agent skill](#agent-skill) | Lean instructions for `xpd audit`, `xpd library`, all 10 ledgers, and Python style | Nothing |
 
 ## Agent plugin
 

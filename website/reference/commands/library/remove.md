@@ -1,10 +1,19 @@
 Remove a library from `[tool.xpd.libraries]` in `pyproject.toml` and delete its managed `.xpd/indexes/<package>.json` file unless `--keep-index` is given.
 
-## Examples
+## Example
 
-```sh
-xpd library remove pydantic
-xpd library remove skpower --keep-index
+```toml title="pyproject.toml"
+[project]
+name = "demo"
+version = "0.1.0"
+
+[tool.xpd.libraries]
+mypkg = ".xpd/indexes/mypkg.json"
+```
+
+```console
+$ xpd library remove mypkg --keep-index --format json | jq -c '{package}'
+{"package":"mypkg"}
 ```
 
 ## Exit status

@@ -33,29 +33,47 @@ export default defineConfig({
   integrations: [
     starlight({
       title: 'xpd',
-      description: 'A fast linter for Python library habits.',
+      description: 'Static linter, library index, and recorded review workbench for Python.',
       customCss: ['./src/styles/pele.css'],
       social: [{ icon: 'github', label: 'GitHub', href: REPO_URL }],
       editLink: { baseUrl: editUrl('website/') },
       sidebar: [
         { label: 'Get started', link: '/' },
         {
-          label: 'Guides',
+          label: 'Core guides',
           items: [
-            ...['claude-code', 'mcp', 'gates', 'editors', 'write-a-rule'].map((id) => ({ slug: `guides/${id}` })),
+            ...['audit', 'libraries', 'claude-code', 'mcp', 'editors', 'write-a-rule'].map((id) => ({
+              slug: `guides/${id}`,
+            })),
           ],
         },
         {
-          label: 'Workflows',
+          label: 'Code quality ledgers',
           collapsed: true,
           items: [
-            ...['chart-review', 'data-prep', 'feature-review', 'harden', 'model-review', 'opt-review', 'ts-review', 'animate'].map((id) => ({ slug: `guides/${id}` })),
+            ...['untangle', 'optimize', 'harden', 'discover'].map((id) => ({ slug: `guides/${id}` })),
           ],
         },
         {
-          label: 'Gallery',
+          label: 'Data and ML ledgers',
           collapsed: true,
-          items: [{ autogenerate: { directory: 'guides/tufte-examples' } }],
+          items: [
+            ...['data-prep', 'ts-review', 'feature-review', 'model-review', 'opt-review', 'chart-review', 'gates'].map(
+              (id) => ({ slug: `guides/${id}` }),
+            ),
+          ],
+        },
+        {
+          label: 'Media and gallery',
+          collapsed: true,
+          items: [
+            { slug: 'guides/animate' },
+            {
+              label: 'Tufte gallery',
+              collapsed: true,
+              items: [{ autogenerate: { directory: 'guides/tufte-examples' } }],
+            },
+          ],
         },
         {
           label: 'Rules',

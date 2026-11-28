@@ -1,17 +1,19 @@
 # xpd
 
-Run `uvx xpd check .` to catch slow or wrong Python library code without running Python, and add `--fix` to rewrite what can be fixed automatically. `xpd` ships rule packs for pandas, Polars, NumPy, SciPy, scikit-learn, scikit-lego, MAPIE, Category Encoders, LightGBM, XGBoost, statsmodels, linearmodels, arch, CVXPY, skfolio, pymoo, Nixtla forecasting libraries, plotly, Apache Hamilton, and core Python.
+`xpd` is a fast static analyzer, API search engine, and recorded review workbench for Python codebases, data pipelines, and coding agents. Run `uvx xpd check .` to catch slow or wrong library calls without running Python, or run `uvx xpd audit .` for a unified read-only health report across linter rules, static review workflows, `--since` regression deltas, and recorded ledger debt.
 
 Read the full documentation at <https://bjoernaagaard.github.io/xpd/>.
 
 ```mermaid
 flowchart LR
-    Code["Python and TSX files"] --> Check["Lint and fix (xpd check, hook, lsp)"]
-    Code --> Search["Search APIs and playbooks (xpd find, api)"]
-    Code --> Ledgers["Recorded ledgers (chart-review, data-prep, ts-review, feature-review, model-review, opt-review, untangle, optimize, harden, discover)"]
-    Code --> Verify["Dataflow and proof (xpd graph, profile, equiv, refit)"]
-    Code --> Agent["Connect agents (xpd mcp, plugin, animate)"]
+    Code["Python, TSX, and Rust files"] --> Lint["Lint and audit (xpd check, audit, hook, lsp)"]
+    Code --> Search["Search bundled and project APIs (xpd find, api, library)"]
+    Code --> Ledgers["10 recorded review ledgers (code quality, data, ML, charts)"]
+    Code --> Proof["Dataflow and proof (xpd graph, profile, equiv, refit, gates)"]
+    Code --> Agent["Agent and media tools (xpd mcp, plugin, animate)"]
 ```
+
+`xpd` ships rule packs for pandas, Polars, NumPy, SciPy, scikit-learn, scikit-lego, MAPIE, Category Encoders, LightGBM, XGBoost, statsmodels, linearmodels, arch, CVXPY, skfolio, pymoo, Nixtla forecasting libraries, plotly, Apache Hamilton, and core Python.
 
 ## Install
 
@@ -75,23 +77,31 @@ xpd: fixed 2, 3 issues
 
 Set `style = "strict"` in `[tool.xpd]` of `pyproject.toml` or in `~/.config/xpd/config.toml` to promote house style `info` rules to warnings. See [`xpd check`](https://bjoernaagaard.github.io/xpd/commands/check/#house-style) for details.
 
+## Audit a repository in one command
+
+Run `xpd audit` for a read-only rollup of `xpd check`, static ledger workflows (`untangle`, `harden`, `optimize`, `discover`, or `--workflows all`), `--since` regression counts, and recorded ledger debt. Add `--fail-on-regression` in CI or local gates to exit `1` when new issues appear.
+
+```sh
+xpd audit src/ --since HEAD~1 --fail-on-regression
+```
+
 ## Commands at a glance
 
 Run `xpd <command> -h` or read the [command reference](https://bjoernaagaard.github.io/xpd/commands/) for every option and exit status.
 
 | Area | Commands | What they do |
 | --- | --- | --- |
-| Lint and guard | `check`, `rules`, `hook`, `lsp` | Lint files, list rules, guard agent edits, and serve editor diagnostics |
-| Code ledgers | `untangle`, `optimize`, `harden`, `discover` | Audit structural coupling, measured CPU or memory waste, reliability or flaky tests, and names a text search does not find |
-| Domain ledgers | `chart-review`, `data-prep`, `ts-review`, `feature-review`, `model-review`, `opt-review` | Audit charts and tables, data prep, time series, features, model validation, and numerical optimization |
-| Library lookup | `find`, `api`, `index` | Search indexed library symbols, rules, and playbooks for a task |
-| Dataflow and proof | `graph`, `graph map`, `graph impact`, `profile`, `equiv`, `refit` | Trace dataflow, plan pandas to Polars migrations, profile files, and prove refactors or model refits |
-| Authoring and media | `rules new`, `rules test`, `rules run`, `rules outline`, `animate` | Author custom ast-grep rules, map modules, and render editable Manim animations |
-| Integrations | `mcp`, `doctor`, `skill`, `completions` | Run the MCP server, Ruff and ty profile doctor, bundled skills, and shell completions |
+| Lint, audit, and editors | `check`, `audit`, `rules`, `hook`, `lsp` | Lint files, aggregate read-only audits with `--since` regression gating, guard agent edits, and serve editor diagnostics plus workspace structural hints |
+| Code quality ledgers | `untangle`, `optimize`, `harden`, `discover` | Audit coupling (`--map` for Python and Rust, `--move`, `--inline-facade`), measured CPU or memory waste, silent failures or flaky tests, and search-unfriendly names |
+| Data and ML ledgers | `data-prep`, `ts-review`, `feature-review`, `model-review`, `opt-review`, `chart-review` | Audit ingestion and scaling, time series diagnostics, feature lift, model validation, numerical solvers, and Tufte charts or tables |
+| Library lookup | `find`, `api`, `library`, `index` | Search bundled and project-local `[tool.xpd.libraries]` symbols, rules, and playbooks with semantic and keyword ranking |
+| Dataflow and proof | `graph`, `graph map`, `graph impact`, `profile`, `equiv`, `refit`, `gates` | Trace dataflow, plan pandas to Polars migrations, profile files, and prove refactors or model refits |
+| Authoring and media | `rules new`, `rules test`, `rules run`, `rules outline`, `animate` | Author custom ast-grep rules, map modules, and render editable Manim animations with `animate catalog` and `--profile draft` |
+| Integrations | `mcp`, `doctor`, `skill`, `completions` | Run the 14-tool MCP server, Ruff and ty profile doctor, bundled agent skills, and shell completions |
 
 ## Connect agents and editors
 
-Install the xpd plugin in Claude Code to enable edit hooks, MCP tools, and skills in one step.
+Install the xpd plugin in Claude Code or Codex to enable edit hooks, 14 MCP tools, and all 14 bundled skills in one step.
 
 ```sh
 claude plugin marketplace add bjoernaagaard/xpd
@@ -100,13 +110,13 @@ claude plugin install xpd@xpd
 
 | Goal | Setup | Guide |
 | --- | --- | --- |
-| Guard every agent edit with hooks, MCP, and skills | Install the Claude Code or Codex plugin | [Agent plugin](https://bjoernaagaard.github.io/xpd/guides/claude-code/#agent-plugin) |
-| Install only the agent skills | `npx skills add bjoernaagaard/xpd` | [Agent skill](https://bjoernaagaard.github.io/xpd/guides/claude-code/#agent-skill) |
-| Add visual MCP tools and model gates | `claude mcp add xpd -- uvx xpd mcp` | [Connect an agent with MCP](https://bjoernaagaard.github.io/xpd/guides/mcp/) |
-| Verify a scikit-learn pipeline with 15 gates | Call `discovery_gate` and `gates` over MCP | [Train a model with gates](https://bjoernaagaard.github.io/xpd/guides/gates/) |
-| Lint and quick-fix while typing in an editor | Configure `xpd lsp` | [Use xpd in an editor](https://bjoernaagaard.github.io/xpd/guides/editors/) |
-| Add custom project rules or a library pack | `xpd rules new rule` | [Write a rule](https://bjoernaagaard.github.io/xpd/guides/write-a-rule/) |
-| Review charts or render Manim animations | `xpd chart-review` or `xpd animate` | [Chart review](https://bjoernaagaard.github.io/xpd/guides/chart-review/) and [Animate](https://bjoernaagaard.github.io/xpd/guides/animate/) |
+| Guard every agent edit with hooks, MCP, and skills | Install the Claude Code or Codex plugin | [Claude Code and other agents](https://bjoernaagaard.github.io/xpd/guides/claude-code/) |
+| Install only the agent skills | `npx skills add bjoernaagaard/xpd` | [Agent skills](https://bjoernaagaard.github.io/xpd/guides/claude-code/#agent-skill) |
+| Add visual MCP Apps, ledger views, and model gates | `claude mcp add xpd -- uvx xpd mcp` | [Connect an agent with MCP](https://bjoernaagaard.github.io/xpd/guides/mcp/) |
+| Index internal or third-party project libraries | `xpd library add <package>` | [Index project libraries](https://bjoernaagaard.github.io/xpd/guides/libraries/) |
+| Run a unified read-only repository audit | `xpd audit src/ --since main` | [Audit a repository](https://bjoernaagaard.github.io/xpd/guides/audit/) |
+| Lint, quick-fix, and view workspace hints in an editor | Configure `xpd lsp` | [Use xpd in an editor](https://bjoernaagaard.github.io/xpd/guides/editors/) |
+| Refactor coupling or render Manim animations | `xpd untangle` or `xpd animate` | [Untangle](https://bjoernaagaard.github.io/xpd/guides/untangle/) and [Animate](https://bjoernaagaard.github.io/xpd/guides/animate/) |
 
 ## License
 

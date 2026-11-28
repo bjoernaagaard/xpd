@@ -1,7 +1,8 @@
 Use `xpd api` to read how to call a library symbol without importing the library. It prints one
-symbol, method, rule or recipe in full, with each parameter as the source writes it, the first
-paragraph of the docstring, the public methods and the rules that may apply to it. The name is
-one that [`xpd find`](../find/) returns, or a method or property of a class.
+symbol, method, rule or recipe in full from xpd's bundled indexes or project libraries registered
+in `[tool.xpd.libraries]` via [`xpd library`](../library/), with each parameter as the source
+writes it, the first paragraph of the docstring, the public methods and the rules that may apply
+to it. The name is one that [`xpd find`](../find/) returns, or a method or property of a class.
 
 ## Examples
 

@@ -213,7 +213,8 @@ def register_local_tools(mcp: FastMCP, xpd: Xpd, project: Project) -> None:
             source: Existing scene path inside the project, or inline source with an entry
                 path and a map of bundle-relative paths to UTF-8 source. To revise, set
                 from_job to a saved render ID and include only changed files in the map.
-            profile: Preview for iteration, final for delivery, or still for the last frame.
+            profile: Draft for fast layout checks, preview for iteration, final for delivery,
+                or still for the last frame.
             assets: Existing helper or asset paths relative to the project root.
         """
         root = await project.required_root(ctx)

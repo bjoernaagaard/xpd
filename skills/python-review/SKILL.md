@@ -10,211 +10,56 @@ description: >-
 
 # Python review
 
-Review Python code against the rules in the `python-best-practices` skill and report what
-to change. The output is a review, not a rewrite. Change code only when the user asks.
+Review Python code against `python-best-practices` and report what to change. Produce a review, not a rewrite; edit files only when asked.
 
 ## 1. Set the scope
 
-- **What to read.** Review exactly what the user named: a file, a package, a project, or
-  a diff. For a diff, read each changed function in full and anything the change can
-  break, such as callers of a changed signature.
-- **Library or application.** A package that other projects import is a library, and its
-  `__all__`, signatures and exceptions are held to the rules strictly because a change
-  breaks callers. An application or a script gets the simplicity rules instead: concrete
-  classes, plain functions, configuration read in `main()`.
-- **Python version.** Read `requires-python` in `pyproject.toml`. Don't recommend a
-  feature the project can't use. When raising the minimum would remove a whole class of
-  findings, say so once under Consider.
-- **Project conventions.** Read the linter and type checker settings in `pyproject.toml`.
-  A convention the project states on purpose is not a finding.
-- State these assumptions in the report's opening paragraph.
+- Review exactly what the user named (file, package, project, or diff). For a diff, read each changed function in full plus callers affected by signature changes.
+- Distinguish a **library** (strict `__all__`, signatures, and exceptions) from an **application or script** (concrete classes, plain functions, config read in `main()`).
+- Read `requires-python` and tool settings in `pyproject.toml`. Never suggest features unavailable for that version or flag deliberate project conventions.
+- State these assumptions in the opening paragraph.
 
 ## 2. Run the tools first
 
-From the project root, run the commands in section 1 of `python-best-practices` without
-their writing forms (`ruff format --check .`, `ruff check .`, the type checker, and
-`xpd check <paths> --format json`), and fold the results into the report. When xpd is not
-installed, run it once with `uvx xpd check <paths>`, or review by reading.
+From the project root, run read-only checks without writing edits:
 
-Don't paste raw tool output. Group repeated warnings into one finding, and skip findings
-that don't matter for this code. If a tool can't run (no network, no config, an import
-error), say which and why, and review by reading.
+```bash
+ruff format --check .
+ruff check .
+ty check                # or pyright / mypy
+xpd check <paths> --format json
+xpd audit <paths> --format json   # optional multi-workflow rollup
+```
 
-## 3. What to look for, in priority order
+If `xpd` is not installed, run `uvx xpd check <paths>` once or review by reading. Do not paste raw tool output; group repeated warnings into one finding, skip irrelevant noise, and note any tool that could not run.
 
-The first two groups are where real bugs live.
+## 3. Audit in priority order
 
-**Correctness**
+Inspect the code in this order so real bugs always sit above style:
 
-- A mutable default argument, or a class attribute that is a list or dict shared by
-  every instance.
-- Work at import time: I/O, reading the environment, configuring a library, or starting a
-  thread at module level, so that importing the module changes the program.
-- A closure in a loop that captures the loop variable, or a generator read twice.
-- A resource that is not closed, or is closed only on the main path: a file, a
-  connection, a lock, a process or a temp directory opened without `with`.
-- A naive `datetime` compared with an aware one, or local time stored as if it were UTC.
-- `==` on floats, `is` on strings or numbers, or truth tests where `0` and `""` are
-  valid values and only `None` means absent.
-- An iteration that changes the collection it loops over, or output whose order depends
-  on a set.
-- Unsafe input: `pickle`, `eval`, `yaml.load` or `shell=True` on outside data, a path
-  from a user joined without a check, or `random` used for a token.
-- Async code that calls a blocking function, drops a task without keeping a reference,
-  or swallows `CancelledError`.
+1. **Correctness**: mutable defaults, import-time side effects, loop-closure or exhausted-generator bugs, unclosed resources, naive vs aware datetimes, float equality, unsafe deserialization or shell calls, async blocking or swallowed cancellation.
+2. **Errors**: bare or swallowing `except`, double-logged exceptions, missing `from err`, sentinel error returns, runtime `assert` guards, messages missing the offending value.
+3. **Types and boundaries**: missing annotations, `Any`, `typing.cast`, `dict[str, Any]`, redundant conversions on typed values, single-impl `Protocol`/`ABC`, missing stdlib idioms (`NamedTuple`, `defaultdict`, `Counter`, `tomllib`, `perf_counter`, `fromisoformat`).
+4. **Module design**: underscore module names without `__all__`, vague module names, generic verb functions, duplicate public names, interpolated keys (`xpd discover`), class-as-namespace wrappers.
+5. **Readability and library habits**: complex comprehensions, pass-through functions, multi-line nested calls, vectorized pandas/NumPy loops, `xpd check` / `xpd profile` / `xpd equiv` findings.
+6. **Proof**: missing runnable verification, mocked tests, skipped/retried/sleeping tests, or weakened checks.
 
-**Errors**
-
-- A bare `except`, `except Exception` that hides the cause, or `except ...: pass`.
-- An error both logged and re-raised, or re-raised without `from` so the cause is lost.
-- `None`, `-1` or `""` returned to mean "failed", and callers that don't check for it.
-- `assert` that guards input or state at run time.
-- A message that doesn't name the value that was wrong.
-
-**Types and boundaries**
-
-- A public function without annotations, or one that takes or returns `Any`.
-- `typing.cast` or `# type: ignore` in place of fixing the type where the value is made.
-- A `dict[str, Any]` passed between functions where a `NamedTuple` would name the
-  fields (`python/dict-str-any`), a `typing.cast` (`python/typing-cast`), a function
-  that returns `json.loads` in place of a typed value (`python/json-without-type`), or two
-  IDs typed as plain `str` or `int` that a caller can swap (`python/id-without-newtype`).
-- A frozen dataclass that can be a `NamedTuple` (`python/record-without-namedtuple`), a record that
-  no function takes and that only carries two or three results to one caller, or a
-  record with one field.
-- A typed value that is checked or converted again: `float()`, `int()`, `str()` or
-  `bool()` around a value of that type (`python/same-type-conversion`,
-  `python/float-around-number`), `isinstance` on a declared type, a test for an empty
-  frame around a pandas reduction (`pandas/empty-guard`), or an `if` for a case the types
-  rule out. Count them, and show the line without the conversion or the guard.
-- A `Protocol` or `ABC` with one implementation, or an interface added only for a test.
-- Bare strings compared in several places where a `StrEnum` or `Literal` would do.
-- `setdefault(key, [])` on a dict that the function starts empty, where a
-  `collections.defaultdict(list)` would do (`python/setdefault-without-defaultdict`).
-- A loop that only counts its items where `collections.Counter(items)` would do
-  (`python/counting-loop-without-counter`).
-- `strptime` with an ISO 8601 format in place of `date.fromisoformat`
-  (`python/strptime-without-fromisoformat`).
-- A duration measured with `time.time()` in place of `time.perf_counter()`
-  (`python/elapsed-without-perf-counter`).
-- `tomli` or `toml.load` in place of `tomllib` (`python/toml-without-tomllib`).
-- `insert(0, item)` in a loop, where `append` and one `reverse()` or a `deque` would do
-  (`python/front-insert-in-loop`).
-- `orjson.loads(raw.decode())`, where `orjson.loads(raw)` reads the bytes
-  (`python/orjson-loads-decoded`).
-- A subclass of a class with `__slots__` that leaves out `__slots__`, so its instances get a
-  `__dict__` again (`python/slotted-base-without-slots`).
-
-**Module design**
-
-- Module level names that start with an underscore, and a module without `__all__`
-  whose callers have to guess what is public (`python/module-private-name`).
-- Mutable module level state, a `utils`, `helpers` or `config` module
-  (`python/vague-module-name`), or a wildcard import.
-- An error message that starts with a value, so a log line does not search back to the raise
-  (`python/error-message-prefix`), and a deprecation that only warns at run time in place of
-  `@deprecated` (`python/deprecated-without-decorator`).
-- A public function named only with a verb, such as `load` or `clean`
-  (`python/generic-verb-name`), a public name that another module also defines, and an event
-  name, settings key or module path built with an f-string (`python/interpolated-key`). Each
-  makes a search land on the wrong definition or on none. `xpd discover` lists them together.
-- A module that configures a library, sets up logging or reads the environment when it is
-  imported (`python/import-side-effect`).
-- An import inside a function without a stated reason.
-- A class with `__init__` and one method, or a class that only groups functions.
-- A dependency used for something the standard library or an existing dependency does.
-
-**Readability**
-
-- A comprehension with two `for` clauses (`python/comprehension-two-fors`), with several
-  conditions, or that merges dicts with `**` for every item
-  (`python/comprehension-merges-dicts`, `python/unpacked-comprehension`), that runs over
-  several lines (`python/comprehension-multi-line`) or that sits among other arguments of
-  a call (`python/comprehension-among-arguments`). Show the loop or the named value.
-- A function that only passes its parameters to one call
-  (`python/pass-through-function`), or that is one line and called from one place.
-- A call that runs over several lines inside the arguments of another call
-  (`python/multi-line-call-argument`), or a frame rebuilt from the columns of another
-  frame in a dict (`pandas/frame-rebuilt-from-columns`). Show the named value or the
-  `rename`.
-- A function that moves between pandas and NumPy and back: three or more `reset_index`
-  calls (`pandas/repeated-reset-index`), three or more `to_numpy` calls with a write back
-  into a frame (`pandas/numpy-round-trip`), or rows repeated through the index
-  (`pandas/repeat-rows-by-index`). Show the function written in pandas alone.
-- A loop over `groupby` that appends a summary per group
-  (`pandas/groupby-loop-collects`). Show the `agg` call.
-- A loop that one call on whole arrays or columns replaces: `x[t]` from `x[t - 1]`
-  (`numpy/recurrence-loop`), a mask per label (`numpy/mask-per-label`), a random draw
-  per pass (`numpy/random-draw-loop`), a reduction per column (`pandas/column-loop`), a
-  lambda in named `agg` (`pandas/named-agg-lambda`), or records filtered in Python
-  before the frame is built (`pandas/filter-before-frame`). Read every loop and every
-  comprehension for this, run the loop and the whole array form on the same input, and
-  show where they differ.
-- A function that works at several levels at once, or needs comments to separate its
-  parts.
-- A Boolean positional parameter, deep nesting where an early return would do, or a
-  `lambda` bound to a name.
-- A comment that repeats the code, commented-out code, or a docstring that restates the
-  signature.
-- Code a newer Python replaces, for the version the project declares: `Optional[X]`,
-  `TypeVar` where `def f[T]` works, `os.path` where `pathlib` is clearer, quoted forward
-  references on 3.14.
-
-**Library habits**
-
-- For pandas, Polars, NumPy, SciPy, scikit-learn, scikit-lego, MAPIE, Category Encoders,
-  linearmodels, arch, skfolio, pymoo, plotly and Hamilton code, report what `xpd check` finds, and
-  use `xpd profile` and `xpd equiv` when a finding depends on the data or a rewrite has to give the
-  same result.
-
-**Proof**
-
-- A change with no command a reader can run to see that it works.
-- Tests that mock the thing under test (`python/mock-import`), or assert on private
-  details, so they pass while the program fails.
-- A test that is skipped or marked `xfail(strict=False)` (`python/test-skip`), rerun
-  until it passes (`python/test-rerun`), waits with a sleep (`python/test-sleep`) or
-  turns off a Hypothesis correctness check (`python/test-suppressed-health-check`), so
-  a failure stays unseen.
-- A diff that changes a test, a snapshot or a tool setting together with the code it
-  judges, where the change to the check is what makes the code pass.
-- A round trip, an invariant or a rewrite with only hand-picked cases, where a property
-  test with Hypothesis or `xpd equiv` would try the inputs nobody thought of. Report it
-  only when the project has tests.
-
-The `python-best-practices` skill holds the full rules. Read the section a finding cites
-before you write the finding.
+Read [references/checklist.md](references/checklist.md) for the complete item-by-item checklist and matching `xpd` rule IDs before writing findings.
 
 ## 4. Write the report
 
-Use the structure in `assets/review-template.md`.
+Use the structure in [assets/review-template.md](assets/review-template.md).
 
-- **Must fix:** a bug, a leak, a swallowed error, a security hole, work at import time
-  that breaks callers, or an API mistake that becomes a breaking change once published.
-- **Should fix:** code that works but has a real cost, such as untyped boundaries, errors
-  callers can't handle, or a module nobody can tell the public part of.
-- **Consider:** naming, modernization, and local polish.
+- **Must fix:** bugs, leaks, swallowed errors, security holes, import-time side effects, or breaking public API mistakes.
+- **Should fix:** untyped boundaries, unhandleable errors, or unclear module exports.
+- **Consider:** naming, version modernization, and local polish.
 
-Rules for each finding:
-
-- Cite a location as `file:line`, or `whole file` when there is no single line.
-- Cite the rule and its source so a reader can look it up: a `python-best-practices`
-  section, a PEP 8 heading, a Google Python Style Guide section number, a ruff rule code
-  such as `B006`, a type checker error code, or an xpd rule such as
-  `python/module-private-name`.
-- Show the fix as Python code, limited to the lines that change.
-- Group repeats into one finding that lists every location.
-- Respect intent. A deliberate, documented choice goes under Consider with the trade-off,
-  never under Must fix.
-- Separate defects from preferences. A style finding never sits above a bug.
-- Don't report an unused dependency or a missing test as a finding unless the user asked
-  about dependencies or tests.
-- Keep it proportionate. Five to ten findings is enough for a short file.
-- The "What is already good" section is required, with two to four specific points.
+Report rules:
+- Cite `file:line` (or `whole file`) and the exact rule source (`python-best-practices` section, PEP 8, Google style guide, Ruff code, type checker code, or `xpd` rule ID).
+- Show minimal Python fix diffs, group repeated instances into one finding, and keep deliberate documented choices under **Consider**.
+- Do not flag unused dependencies or missing tests unless asked. Five to ten findings suffice for a short file.
+- Always include **What is already good** with two to four specific points.
 
 ## 5. Offer the lint
 
-If the project does not run xpd, end the report by suggesting `xpd check` after each edit
-(`uv tool install xpd`, and `xpd hook` for Claude Code), and name two or three findings
-from the review that it would have caught, with the rule that catches each. Do the same
-for ruff or a type checker when the project runs neither.
+If the project does not use `xpd`, close by recommending `uv tool install xpd` (`xpd check`, `xpd audit`, and `xpd hook` for coding agents) and cite two or three findings from the review with the exact `xpd` rules that catch them. Do the same for Ruff or a type checker when missing.

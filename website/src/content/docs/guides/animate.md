@@ -7,12 +7,22 @@ Run `xpd animate` to render and revise an editable Manim video from a built-in s
 
 ```mermaid
 flowchart LR
-    A["xpd animate doctor and setup"] --> B["xpd animate guide <recipe> > scene.py"]
-    B --> C["xpd animate start"]
+    A["xpd animate doctor and setup"] --> B["xpd animate catalog <family> and guide"]
+    B --> C["Iterate with --profile draft then xpd animate start"]
     C --> D["Inspect video and contact sheet"]
     D -->|Edit and run xpd animate revise| P["Render the next preview"]
     P --> D
-    D -->|Approved| E["xpd animate approve"]
+    D -->|Approved| E["xpd animate approve (4K60)"]
+```
+
+## Browse sibling Manim primitives offline
+
+Before writing scene code, inspect the bundled Manim Community 0.22.1 module catalog to compare sibling primitives deliberately instead of reaching for the first familiar class.
+
+```sh
+xpd animate catalog
+xpd animate catalog indication --json
+xpd animate catalog transform
 ```
 
 ## Set up the renderer once
@@ -53,14 +63,15 @@ Approval renders the saved revision even if the working files have changed. Use
 
 | Profile | Manim preset | Output | Resolution |
 | --- | --- | --- | --- |
+| `draft` | `-ql` | Fast layout MP4 and contact sheet | 854 by 480 at 15 fps |
 | `preview` | `-qh` | MP4 and contact sheet | 1920 by 1080 at 60 fps |
 | `final` | `-qk` | MP4 and contact sheet | 3840 by 2160 at 60 fps |
 | `still` | `-qm` | PNG of the last frame | 1280 by 720 |
 
-Pass `--asset <path>` (relative to the project root) for any helper module, data file, or `manim.cfg`, and resolve assets inside Python via `Path(__file__).parent`.
+Unchanged partial movie segments are cached per scene and profile so single-line edits reuse untouched beats. Default to installed `Noto Sans`, `Noto Serif`, or `Noto Mono` fonts to keep render logs clean. Pass `--asset <path>` (relative to the project root) for any helper module, data file, or `manim.cfg`, and resolve assets inside Python via `Path(__file__).parent`.
 
 ```sh
-xpd animate render scenes/chart.py SalesChart --profile preview \
+xpd animate render scenes/chart.py SalesChart --profile draft \
   --asset scenes/data/monthly.csv --asset manim.cfg --json
 ```
 
@@ -68,13 +79,14 @@ For scenes you trust and run without Podman, install [Manim Community](https://d
 
 ## Render from local MCP
 
-Start `xpd mcp --root .` and call the five `animate_` tools over stdio.
+Start `xpd mcp --root .` and call the six `animate_` tools over stdio.
 
 | MCP tool | Purpose |
 | --- | --- |
 | `animate_status` | Check Podman and image readiness |
 | `animate_guide` | Return the animation guide or one of the six starter recipes |
-| `animate_render` | Render a file path, inline `source.files` map, or `from_job` revision |
+| `animate_catalog` | Browse sibling Manim 0.22.1 primitives by module family offline |
+| `animate_render` | Render a file path, inline `source.files` map, or `from_job` revision with `draft`, `preview`, `final`, or `still` |
 | `animate_artifact` | Retrieve `contact_sheet` (default), `video`, `source`, `manifest`, or `log` by `job_id` |
 | `animate_source` | Read saved scene files from a completed `job_id` before editing |
 

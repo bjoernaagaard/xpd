@@ -10,9 +10,7 @@ description: >-
 
 # Python best practices
 
-Follow PEP 8, the Google Python Style Guide and the typing documentation. This file holds
-the rules where they leave a choice open, where models drift, and what changed through
-Python 3.15. Where a project already has a convention, the project wins.
+Follow PEP 8, the Google Python Style Guide, and the typing documentation. This file holds the rules where they leave a choice open, where models drift, and what changed through Python 3.15. Where a project already has a convention, the project wins.
 
 ## 1. Before you hand back code
 
@@ -22,306 +20,75 @@ From the project root, run what the project has configured:
 ruff format .           # or the project's formatter
 ruff check .
 ty check                # or the project's type checker: pyright, mypy
-xpd check .             # when xpd is installed: the lint for sections 3 and 4
+xpd check .             # when xpd is installed
+xpd audit . --since HEAD  # optional read-only multi-workflow check
 ```
 
-- Fix a finding rather than silencing it. To suppress one line, name the rule and the
-  reason: `# noqa: S603  the arguments are a fixed list`.
-- Then run the real command or app on real input and read its output. A clean lint run
-  shows the code is tidy, not that it works.
+- Fix a finding rather than silencing it. To suppress one line, name the rule and reason: `# noqa: S603  fixed argument list`.
+- Run the real command or app on real input and read its output. A clean lint run shows the code is tidy, not that it works.
 
-## 2. Versions
+## 2. Versions and dependencies
 
-Read `requires-python` in `pyproject.toml` before you use a feature below. A new project
-declares the current release (`>=3.15`). A library declares the oldest release it tests.
-Never take the minimum from `.python-version` or from the interpreter that happens to run.
-
-| Since | Use | Instead of |
-|---|---|---|
-| 3.10 | `X \| None`, `match`, `zip(strict=True)`, `kw_only=True` and `slots=True` on dataclasses | `Optional[X]`, `Union`, long `isinstance` chains |
-| 3.11 | `Self`, `tomllib`, `StrEnum`, `asyncio.TaskGroup`, `except*`, `err.add_note()` | a `TypeVar` bound to the class, `tomli`, `asyncio.gather` |
-| 3.12 | `def first[T](xs: list[T]) -> T`, `type Pair = tuple[int, int]`, `@override`, `itertools.batched`, `Path.walk` | `TypeVar`, `TypeAlias`, `os.walk` |
-| 3.13 | type parameter defaults, `@warnings.deprecated`, `copy.replace`, `ReadOnly`, `TypeIs` | `dataclasses.replace` for other types, `TypeGuard` for narrowing |
-| 3.14 | annotations evaluated on demand, template strings (`t"..."`), `compression.zstd`, `concurrent.interpreters` | quoted forward references, `from __future__ import annotations` |
-| 3.15 | `lazy import`, `frozendict`, the `sentinel` type, `{**d for d in dicts}` and `[*xs for xs in lists]` | imports inside functions to save startup time, `object()` sentinels, `ChainMap` or a loop to merge dicts |
-
-Check the dependencies and the type checker separately. A language feature the interpreter
-accepts can still be one the checker or a library does not support.
+Read `requires-python` in `pyproject.toml` before using modern syntax. A new project declares the current release (`>=3.15`); a library declares the oldest release it tests. Check dependencies and the type checker separately before adopting new syntax. See [references/versions-and-tools.md](references/versions-and-tools.md) for the Python 3.10 to 3.15 feature table and tool-to-rule mapping.
 
 ## 3. Names and modules
 
-- **Module level names are public.** Don't start a module level function, class or
-  variable with an underscore. List the names callers may import in `__all__`, at the top
-  of the module, and leave the rest out of it:
-
-```python
-__all__ = ["total"]
-
-LIMIT = 100
-
-
-def prices(rows: list[Row]) -> list[float]:
-    return [row.price for row in rows][:LIMIT]
-
-
-def total(rows: list[Row]) -> float:
-    return sum(prices(rows))
-```
-
-- **A method or attribute of a class may be private.** `def _load(self)` is fine, and so
-  is a name inside a function.
-- A project that uses a framework where the underscore has a meaning keeps it. Hamilton
-  reads `_helper` as "not a node".
-- **Importing a module does nothing.** No I/O, no configuration of a library, no reading
-  of the environment and no logging setup at module level. Put it in a function that
-  `main()` or the caller runs.
-- No mutable module level state. A cache belongs to an object, or behind
-  `functools.cache` on a function.
-- Name a module after what it holds. No `utils`, `helpers`, `common` or `misc`.
-- **A public name is a search query.** Give it two to four words, one of them a word of
-  the domain, so that one search finds its definition: `load_orders`, not `load`, and
-  `clean_title`, not `clean`. Stop at the shortest name that no other module defines.
-- **One definition per name, and one spelling per concept.** Move shared code to one
-  module named after it and import it. Pick `org_id` or `organization_id` and use it
-  everywhere. Rename a function in the commit that changes what it does.
-- **Write each name out whole.** No event name, settings key or module path built with an
-  f-string, such as `f"github.{entity}.{action}"`, and no `getattr` or `import_module`
-  with a built name. A dict from each value to its full name keeps every name searchable.
-- Imports sit at the top of the file, absolute, one module per line. No wildcard
-  imports. An import inside a function needs a comment with its reason, and on 3.15
-  `lazy import` replaces most of them.
-- Constants are `UPPER_CASE`, classes `CapWords`, everything else `lower_case`. No type
-  in the name (`user_list`, `name_str`), and no single letters outside a short loop or
-  comprehension.
+- **Module-level names are public.** Do not prefix module-level functions, classes, or variables with `_` unless a framework requires it (such as Hamilton `_helper`). Export public names in `__all__` at the top of the module.
+- **Class internals and locals may use `_`.** `def _load(self)` and local names inside functions are fine.
+- **Importing a module does nothing.** Keep I/O, environment reads, library setup, and logging configuration out of module scope; run them inside `main()` or caller-invoked functions. No mutable module-level state; attach caches to objects or `@functools.cache`.
+- **Name modules after what they hold.** Avoid `utils`, `helpers`, `common`, or `misc`.
+- **A public name is a search query.** Use two to four words including a domain term (`load_orders`, not `load`). Keep one definition per name, one spelling per concept, and rename functions in the commit that changes what they do.
+- **Write each name out whole.** Avoid building event names, settings keys, or module paths with f-strings, `getattr`, or `import_module`; use an explicit dict mapping.
+- **Imports sit at the top**, absolute, one module per line, no wildcards. Justify any in-function import with a comment (or `lazy import` on Python 3.15+).
+- **Casing:** `UPPER_CASE` constants, `CapWords` classes, `lower_case` everything else, no type suffixes (`user_list`), and no single-letter names outside tiny loops or comprehensions.
 
 ## 4. Functions and control flow
 
-- **Return early.** Keep the main path at the left margin, with no `else` after `return`
-  or `raise`.
-- **Booleans and options are keyword-only.** `def load(path, *, strict=False)`.
-- **No mutable default.** Use `None` and build the value inside, or a tuple.
-- **A comprehension maps or filters one value per item.** One `for`, at most one `if`,
-  and the whole comprehension on one line. Anything more is a loop.
-- **A comprehension gets a name before it is passed with other arguments.** Write
-  `frames = [read(path) for path in paths]` and then `pd.concat(frames, ignore_index=True)`.
-  As the only argument it stays in the call, as in `sum(x.cost for x in items)`.
-- **Build a row or a record in a loop.** Don't merge dicts with `**` inside a
-  comprehension, and don't unpack a comprehension inside a dict literal:
+- **Return early** with no `else` after `return` or `raise`.
+- **Booleans and options are keyword-only:** `def load(path, *, strict=False)`. Never use mutable defaults (`None` or tuple instead).
+- **Keep comprehensions simple:** one `for`, at most one `if`, one line. Name a comprehension before passing it alongside other arguments (`frames = [...]`; `pd.concat(frames, ...)`). Build dicts or merged rows in an explicit loop instead of `{**a, **b}` inside comprehensions.
+- **Build lists with `append`.** Use `reverse()` once after the loop or `collections.deque.appendleft` instead of `insert(0, item)`.
+- **Use generator expressions** directly in consuming calls (`sum`, `any`, `"".join`), and generator functions for large or early-stopping streams.
+- **One multi-line call per statement.** Name inner multi-line expressions on the line above instead of nesting them as call arguments.
+- **No `lambda` bound to a name** (write `def`), and **no pass-through wrappers** that only forward arguments to one call. Split functions that work at multiple levels.
 
-```python
-def table(models: list[Model], catalog: Catalog) -> list[dict[str, object]]:
-    rows = []
-    for model in models:
-        row: dict[str, object] = {"id": model.id}
-        row.update(owner(model))
-        row.update(limits(catalog, model))
-        rows.append(row)
-    return rows
-```
+## 5. Types and records
 
-- **Build a list in a loop with `append`.** For the reverse order, call `reverse()` once
-  after the loop, or start a `collections.deque()` and call `appendleft`. Each
-  `insert(0, item)` moves every item already in the list.
-- A generator expression goes straight into the call that consumes it, such as `sum`,
-  `any` or `"".join`. When the caller may stop early or the data is large, write a
-  generator function.
-- **One call per statement when the call needs several lines.** Don't nest a call that
-  runs over several lines inside the arguments of another, as in
-  `frames.append(pd.DataFrame({...}))`. Name the inner result on the line above.
-- No `lambda` bound to a name. Write `def`.
-- **No function that only passes its parameters to one call,** such as
-  `def reference(curve, at_price): return float(curve(at_price))`. Call the other
-  function. A function earns its name when it computes something, or when three places
-  would otherwise repeat the same lines.
-- A function does one thing at one level. When it needs a comment to separate its parts,
-  split it into functions named after the parts.
-
-## 5. Types
-
-- **Annotate every parameter and return value.** Inside a function, annotate only what
-  the checker cannot infer, such as an empty list.
-- **Data that crosses a boundary gets a named model.** A file, a request, a response, a
-  database row or a config file is read once into a `NamedTuple`, with
-  `Order(**json.loads(body))` or `Order._make(row)`, and the rest of the code takes the
-  `NamedTuple`. No function returns `json.loads`, and no `dict[str, Any]` is passed
-  between functions.
-- **Trust a typed value.** After that read, don't check or convert it again: no
-  `isinstance` on a value whose type is declared, no `float()`, `int()`, `str()` or
-  `bool()` around a value of that type, and no `if` for a case the types rule out.
-- **A NumPy number is a number.** `np.float64` is a subclass of `float`, so an element of
-  a float64 array, arithmetic on it, and `mean`, `median`, `std` and `var` need no
-  `float()`. `np.int64` is not an `int`, but it indexes and adds like one. Convert it
-  once, where the value is written out or returned as an `int`, not at every step.
-- **pandas handles the empty case.** `mean`, `median`, `min` and `max` of an empty Series
-  are `nan` with no warning, so don't write `x.mean() if len(x) else float("nan")`. Pass
-  a dtype to `to_numpy(dtype=float)` instead of `astype(float).to_numpy()`.
-- **No `typing.cast`.** Fix the type where the value is made, or narrow it with
-  `isinstance`, `match` or a `TypeIs` function.
-- **No `Any`** except at the edge of an untyped library, and then in one function that
-  returns a typed value.
-- `# type: ignore` names the error code and the reason, on that line only.
-- **A concrete class or a plain function until a second implementation exists.** No
-  `Protocol` or `ABC` for one implementation, and none added only for a test.
-- Parameters take the widest type that works (`Iterable[str]`, `Mapping[str, int]` from
-  `collections.abc`). Return values are concrete (`list[str]`).
-- **A record is `class Order(NamedTuple)`,** from the standard library, in place of a
-  frozen dataclass and a frozen attrs class. Copy it with `order._replace(price=3.0)`. Keep
-  a dataclass for a record that changes, that inherits, or that needs `field()` or
-  `__post_init__`, and a `TypedDict` for a value that has to stay a dict. Reach for the
-  standard library before a package: `tomllib` for a config file, `functools.cache` for a result
-  to keep, `itertools.pairwise` and `batched` for windows, `collections.defaultdict(list)`
-  for a dict of lists in place of `setdefault(key, [])`. `collections.Counter(items)` counts,
-  `date.fromisoformat` reads an ISO date in place of `strptime`, and `time.perf_counter()`
-  measures a duration in place of `time.time()`. A subclass of a class with `__slots__`
-  assigns its own `__slots__`, `()` when it adds no field. A closed set of names is a
-  `StrEnum` or `Literal`, never bare strings compared in several places.
-- **Add a record only for a value that several functions take.** Two or three results of
-  one function are a tuple that the caller unpacks into names. One summary per group is
-  a table: `df.groupby(key).agg(rows=("price", "size"), median=("price", "median"))`, not
-  a loop that appends a record for each group. A record that holds one field is that
-  field.
-- A class that only has `__init__` and one method is a function.
+- **Annotate every parameter and return value.** Inside functions, annotate only what the checker cannot infer (such as empty collections).
+- **Data crossing a boundary gets a named model.** Parse files, requests, rows, or configs once into a `NamedTuple` (immutable default, copied with `_replace`), a `dataclass` (when mutable, inheriting, or needing `__post_init__`), or a `TypedDict` (when it must stay a dict). Never pass `dict[str, Any]` or raw `json.loads` across functions.
+- **Trust typed values.** Skip redundant `isinstance`, `float()`, `int()`, `str()`, or `bool()` conversions on already-typed values. NumPy `np.float64` subclasses `float`, and pandas reductions (`mean`, `median`, `min`, `max`) return `nan` on empty Series without an empty guard. Use `to_numpy(dtype=float)` instead of `astype(float).to_numpy()`.
+- **No `typing.cast` or `Any`** except at one narrow untyped library boundary returning a typed value. Every `# type: ignore` names its error code and reason.
+- **Concrete types until a second implementation exists.** No `Protocol` or `ABC` for one implementation. Accept abstract collection inputs (`Iterable[str]`, `Mapping[str, int]`) and return concrete types (`list[str]`).
+- **Prefer the standard library:** `tomllib`, `functools.cache`, `itertools.pairwise` and `batched`, `collections.defaultdict(list)`, `collections.Counter`, `date.fromisoformat`, `time.perf_counter()`, `StrEnum` or `Literal` for closed sets. Subclasses of slotted classes declare `__slots__`.
+- **Keep records purposeful:** return a tuple for two or three local values, use `groupby().agg(...)` for group summaries, drop single-field wrappers, and turn `__init__` plus one-method classes into functions.
 
 ## 6. Errors
 
-- **Check with `if` and `raise`** the most specific built-in exception, or one class the
-  project defines for callers to catch. The message says what was wrong and names the
-  value: `raise ValueError(f"unknown region: {region!r}")`.
-- **Catch only what you can handle,** as narrowly as the call allows. No bare `except`,
-  and no `except Exception` outside the top of a program or a worker loop.
-- **Handle an error once.** Re-raise it with context, or log it and stop, never both.
-  `raise ConfigError(f"cannot read {path}") from err` keeps the cause.
-- No `None`, `-1` or `""` returned to mean "failed". Raise, or return `X | None` only when
-  absence is a normal answer.
-- No `assert` for input or state that can be wrong at run time. `python -O` removes it.
-- No `try` around an import to make a dependency optional, unless the project declares
-  it as an extra.
+- **Check with `if` and `raise`** the most specific built-in or project exception with a message naming what failed and the offending value.
+- **Catch narrowly.** No bare `except`; keep `except Exception` only at program or worker boundaries.
+- **Handle once:** either re-raise with `from err` or log and stop, never both. Never return `None`, `-1`, or `""` to signal failure (`X | None` is only for normal absence).
+- **No `assert` for runtime input or state checks**, and no `try` around imports unless declared as an optional extra.
 
-## 7. Data, I/O and boundaries
+## 7. Data, I/O, and boundaries
 
-- `pathlib.Path` for paths. Open every file, socket and connection with `with`.
-- Pass `encoding="utf-8"` when a project supports a release below 3.15.
-- `subprocess.run([...], check=True)` with a list, a timeout when the child can hang, and
-  never `shell=True` with a value from outside.
-- Instants are timezone-aware `datetime` values (`datetime.now(UTC)`), and spans are
-  `timedelta`. A bare number carries its unit in the name (`timeout_s`).
-- Pass bytes straight to `orjson.loads`, which reads UTF-8 itself, and not `raw.decode()`.
-- Read configuration and the environment once, in `main()`, and pass values down.
-- `secrets` for tokens, `random` for the rest. Never `pickle`, `eval` or `yaml.load` on
-  data from outside.
-- Log with `logging.getLogger(__name__)` and lazy arguments
-  (`log.info("loaded %d rows", n)`). A library never configures logging and never prints.
+- Use `pathlib.Path`, `with` for every resource, and `encoding="utf-8"` below Python 3.15.
+- Call `subprocess.run([...], check=True)` with a list and timeout; never `shell=True` with external input.
+- Use timezone-aware `datetime.now(UTC)`, `timedelta` spans, unit-suffixed bare numbers (`timeout_s`), and `orjson.loads(raw)` directly on bytes.
+- Read configuration and environment once in `main()` and pass values down. Use `secrets` for tokens; never run `pickle`, `eval`, or `yaml.load` on untrusted data.
+- Log with `logging.getLogger(__name__)` and lazy `%` formatting; libraries never configure logging or print.
 
 ## 8. Comments and docstrings
 
-- **A comment gives a reason the code cannot show**: why this order, why this constant,
-  which bug in a dependency it avoids. Delete a comment that says what the next line
-  does, and rename until it isn't needed.
-- No commented-out code, no banners, no change history, no TODO without an owner.
-- **A docstring is one line** that says what the caller gets, in the imperative
-  (`"""Return the rows that changed since the last sync."""`). Add more only for what the
-  signature cannot say: the exceptions callers should catch, units, side effects.
-  Don't repeat the parameter names and types.
-- **The docstring holds the words a search uses**, spelled out with spaces. A search for
-  "session expired" does not find `SessionExpiryChecker`, and it finds
-  `"""Return whether the user session has expired."""`.
+- Comments explain why (order, constants, dependency bugs), never what the next line does. No commented-out code, banners, history logs, or ownerless TODOs.
+- Write one-line imperative docstrings (`"""Return rows changed since the last sync."""`) using plain searchable words. Add detail only for exceptions, units, or side effects not visible in the signature.
 
-## 9. Proof that it works
+## 9. Projects and proof
 
-- **Run the change.** Run the real command or app with real data and show the output.
-  For a bug, run the same case before and after the fix. Run it again after the last
-  edit, because proof counts only for the version it ran on.
-- **Write a test file only when the project or the user asks for one,** and never one
-  that replaces the code under test with a mock. These three kinds are hard to pass with
-  broken code:
+- Use `pyproject.toml` with `[project]`, `src/<package>/`, a lockfile, `uv add` (ask before adding dependencies), and `main()` behind `[project.scripts]`. Never weaken linter or type checker settings to pass.
+- Prove every change by running the real app or command on real data after the final edit. For projects with tests, read [references/testing.md](references/testing.md) for E2E, Hypothesis property, differential (`xpd equiv`), and pytest 9 rules.
 
-| Kind | What it proves | Write it for |
-|---|---|---|
-| End to end | A whole flow works in the running program | A flow a user would notice was broken. End it with an artifact someone can check and rerun |
-| Property, with Hypothesis | A statement holds for thousands of generated inputs | A round trip (`decode(encode(x)) == x`), a value that must stay in range, an action that is safe to repeat, fast code that must match slow code |
-| Differential | New code gives the same result as old code | A rewrite or a migration. `xpd equiv old.py new.py` compares two scripts that assign `result` |
+## References
 
-- Watch a new test fail once on broken code. A test that can't fail proves nothing.
-- **A project with tests runs them with pytest** from `tests/` beside `src/`, with
-  `--import-mode=importlib`, `-ra` and, on pytest 9, `strict = true` in the pytest
-  settings. `-ra` lists each skipped test in the summary, and `strict` turns a mistyped
-  marker and an `xfail` test that passes into errors.
-  Add `pytest-randomly`, so a test that depends on the order of the run fails, and
-  `pytest-timeout` with a `timeout` setting, so a test that hangs fails. The plugin
-  stops no test until `timeout` is set.
-- **Never add `pytest-rerunfailures`, `flaky`, `pytest-mock` or `pytest-socket`,** and
-  never write `--reruns` or `xfail(strict=False)`. They rerun a failure, replace the
-  code under test, block the real network or let a failing test stay.
-- **A slow property or differential test gets a Hypothesis profile with
-  `deadline=None`,** because the default deadline of 200 ms fails it on timing. Don't
-  suppress `HealthCheck.function_scoped_fixture` or `HealthCheck.differing_executors`,
-  because the test can then pass while it checks the wrong thing.
-- `pytest-cov` and `pytest-benchmark` prove nothing that an end to end test needs.
-  Coverage counts no lines of a command the test starts as a process, and a benchmark
-  reports a slowdown only against a saved run.
-- **A test that fails some of the time has a cause.** Find it. Don't skip the test,
-  rerun it or add a sleep. When the cause can't be found, delete the test and write
-  down why.
-- Don't change a test, a snapshot or a tool setting so that your own change passes.
-- When a check still fails after three rounds of fixes, stop and show the user.
-- Never add an interface, a parameter or a module level hook only so that a test can
-  replace it.
-
-## 10. Projects
-
-- `pyproject.toml` with a `[project]` table, a `src/<package>/` layout and a lockfile.
-  Use the project's workflow to add a dependency (`uv add`), and ask before you add one.
-- Check the standard library and the dependencies already there before you write a
-  helper.
-- A command is a `main()` function behind `[project.scripts]`. A script that is run
-  directly ends with `if __name__ == "__main__": main()`.
-- Tool settings live in `pyproject.toml`. Don't loosen the linter or the type checker
-  to make a change pass.
-
-## What a tool checks
-
-| Rule | Tool |
-|---|---|
-| Layout, quotes, import order, unused names, mutable defaults (`B006`), bare `except`, a `lambda` bound to a name (`E731`), an import inside a function (`PLC0415`), access to another object's private member (`SLF001`) | `ruff format`, `ruff check` |
-| Types, `None` handling, missing annotations in strict mode | the project's type checker |
-| Module level names with an underscore, a `utils` or `config` module | `xpd check`: `python/module-private-name`, `python/vague-module-name` |
-| A public function named only with a verb, a name built with an f-string | `xpd check`: `python/generic-verb-name`, `python/interpolated-key` |
-| A public name that two modules define, and the rest of the rules about search | `xpd discover` |
-| An error message that starts with a value, a `warnings.warn` deprecation in place of `@deprecated` | `xpd check`: `python/error-message-prefix`, `python/deprecated-without-decorator` |
-| Calls and environment reads at import | `xpd check`: `python/import-side-effect` |
-| `**` merges, unpacked comprehensions, two `for` clauses | `xpd check`: `python/comprehension-merges-dicts`, `python/unpacked-comprehension`, `python/comprehension-two-fors` |
-| A comprehension over several lines, or among other arguments | `xpd check`: `python/comprehension-multi-line`, `python/comprehension-among-arguments` |
-| A function that only passes its parameters on, a call over several lines inside another call | `xpd check`: `python/pass-through-function`, `python/multi-line-call-argument` |
-| A frame rebuilt from the columns of another frame | `xpd check`: `pandas/frame-rebuilt-from-columns` |
-| Three or more `reset_index` or `to_numpy` calls in one function, rows repeated through the index | `xpd check`: `pandas/repeated-reset-index`, `pandas/numpy-round-trip`, `pandas/repeat-rows-by-index` |
-| `typing.cast`, `dict[str, Any]` in a signature, two IDs typed as plain `str` or `int` | `xpd check`: `python/typing-cast`, `python/dict-str-any`, `python/id-without-newtype` |
-| A frozen dataclass or attrs class, a function that returns `json.loads` | `xpd check`: `python/record-without-namedtuple`, `python/json-without-type` |
-| `float()`, `int()`, `str()` or `bool()` around a value of that type | `xpd check`: `python/same-type-conversion`, `python/float-around-number` |
-| `setdefault(key, [])` on a dict the function starts as `{}` | `xpd check`: `python/setdefault-without-defaultdict` |
-| A loop that only counts its items | `xpd check`: `python/counting-loop-without-counter` |
-| `strptime` with an ISO 8601 format | `xpd check`: `python/strptime-without-fromisoformat` |
-| `time.time()` minus an earlier `time.time()` | `xpd check`: `python/elapsed-without-perf-counter` |
-| `import tomli`, `toml.load` | `xpd check`: `python/toml-without-tomllib` |
-| `insert(0, item)` in a loop on a list the function starts as `[]` | `xpd check`: `python/front-insert-in-loop` |
-| `orjson.loads(raw.decode())` | `xpd check`: `python/orjson-loads-decoded` |
-| A subclass without `__slots__` of a class with `__slots__` | `xpd check`: `python/slotted-base-without-slots` |
-| A test for an empty frame around a mean, `astype(...).to_numpy()` | `xpd check`: `pandas/empty-guard`, `pandas/astype-then-to-numpy` |
-| A loop over `groupby` that appends a summary per group | `xpd check`: `pandas/groupby-loop-collects` |
-| A loop where one call on whole arrays or columns does the work: a recurrence, a mask per label, a draw per pass, a column per pass, a lambda in named `agg`, a filter before the frame | `xpd check`: `numpy/recurrence-loop`, `numpy/slice-fill-loop`, `numpy/mask-per-label`, `numpy/random-draw-loop`, `pandas/column-loop`, `pandas/named-agg-lambda`, `pandas/filter-before-frame` |
-| Mock imports | `xpd check`: `python/mock-import` |
-| A skipped test, `xfail(strict=False)`, a test that is rerun, a sleep in a test, a suppressed Hypothesis correctness check | `xpd check`: `python/test-skip`, `python/test-rerun`, `python/test-sleep`, `python/test-suppressed-health-check` |
-| Slow or wrong pandas, Polars, NumPy, SciPy, scikit-learn, scikit-lego, MAPIE, Category Encoders, linearmodels, arch, skfolio, pymoo, plotly and Hamilton code | `xpd check`, in files that import them |
-
-The rest of this file needs a reader. The `python-review` skill is that reader.
-
-## Look up the rest
-
-- Layout, naming and whitespace: [PEP 8](https://peps.python.org/pep-0008/)
-- Comprehensions (2.7), exceptions (2.4), global state (2.5), default arguments (2.12),
-  docstrings (3.8), naming (3.16), type annotations (3.19):
-  [Google Python Style Guide](https://google.github.io/styleguide/pyguide.html)
-- Annotations, generics, narrowing, protocols:
-  [typing documentation](https://typing.python.org/en/latest/)
-- What each release added: [What's New in Python](https://docs.python.org/3/whatsnew/)
-- Every xpd rule with before and after code:
-  [xpd rules](https://bjoernaagaard.github.io/xpd/rules/)
+- Python 3.10 to 3.15 syntax table and full tool-to-rule mapping (`ruff`, type checker, `xpd check`, `xpd discover`) -> [references/versions-and-tools.md](references/versions-and-tools.md)
+- Proof, pytest 9, Hypothesis profiles, and banned test plugins -> [references/testing.md](references/testing.md)
+- External specs: [PEP 8](https://peps.python.org/pep-0008/), [Google Python Style Guide](https://google.github.io/styleguide/pyguide.html), [typing docs](https://typing.python.org/en/latest/), and [xpd rules](https://bjoernaagaard.github.io/xpd/rules/)

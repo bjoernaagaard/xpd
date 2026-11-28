@@ -1,16 +1,16 @@
 ---
 title: Get started
-description: Install xpd, check a small pandas file, and choose which fixes to apply.
+description: Install xpd, lint a pandas file, run a unified repository audit, and explore guides for ledgers, libraries, editors, and coding agents.
 ---
 
-Run `uvx xpd check .` in any Python project to find slow or broken library calls without importing or running your code. `xpd` parses each file once, detects imported libraries, and runs only the matching rule packs plus the Python pack.
+Run `uvx xpd check .` in any Python project to find slow or broken library calls without importing or running your code, or run `uvx xpd audit .` for a read-only summary across linter rules, static review workflows, `--since` regression deltas, and recorded ledger debt.
 
 ```mermaid
 flowchart LR
-    A["xpd check ."] --> B["Parse each .py file once"]
-    B --> C["Detect imported libraries"]
-    C --> D["Run matching library packs and Python pack"]
-    D --> E["Report issues and apply optional fixes"]
+    A["xpd check . or xpd audit ."] --> B["Parse source files statically"]
+    B --> C["Detect imported libraries and structure"]
+    C --> D["Run matching packs and static workflows"]
+    D --> E["Report issues, deltas, and optional fixes"]
 ```
 
 ## Install
@@ -81,20 +81,12 @@ Line 6 now mutates `df` in place under pandas copy-on-write, and line 7 returns 
 
 ## Where to go next
 
-| Goal | Page |
+| Area | Start with |
 | --- | --- |
-| Browse every rule pack and fix level | [Rules](rules/) |
-| Wire xpd into Claude Code or Codex | [Claude Code and other agents](guides/claude-code/) |
-| Expose visual tools, gates, and animations over MCP | [Connect an agent with MCP](guides/mcp/) |
-| Validate a scikit-learn pipeline end to end | [Train a model with gates](guides/gates/) |
-| Get live diagnostics and quick fixes in your editor | [Use xpd in an editor](guides/editors/) |
-| Audit charts and tables against Tufte's principles | [Review charts and tables against Tufte's book](guides/chart-review/) |
-| Prepare features and targets | [Prepare features and targets](guides/data-prep/) |
-| Harden error handling and tests | [Harden Python code](guides/harden/) |
-| Diagnose time series before forecasting | [Review time series before forecasting](guides/ts-review/) |
-| Audit feature mechanisms and fold lift | [Review model features](guides/feature-review/) |
-| Audit model validation and calibration | [Review model validation](guides/model-review/) |
-| Audit CVXPY, pymoo, and skfolio solves | [Review numerical optimization](guides/opt-review/) |
-| Render editable Manim concept animations | [Animate a concept with Manim](guides/animate/) |
-| Author custom project rules or a library pack | [Write a rule](guides/write-a-rule/) |
-| Look up flags and exit codes for any command | [Commands](commands/) |
+| Unified repository health and CI gating | [Audit a repository](guides/audit/) |
+| Search bundled and project-local library APIs | [Index project libraries](guides/libraries/) |
+| Claude Code, Codex, MCP Apps, and editors | [Claude Code and other agents](guides/claude-code/), [MCP](guides/mcp/), and [Editors](guides/editors/) |
+| Code quality ledgers | [Untangle](guides/untangle/), [Optimize](guides/optimize/), [Harden](guides/harden/), and [Discover](guides/discover/) |
+| Data, ML, and visualization ledgers | [Data prep](guides/data-prep/), [Time series](guides/ts-review/), [Features](guides/feature-review/), [Models](guides/model-review/), [Optimization](guides/opt-review/), [Charts](guides/chart-review/), and [Model gates](guides/gates/) |
+| Concept animations and custom rules | [Animate with Manim](guides/animate/) and [Write a rule](guides/write-a-rule/) |
+| Complete reference | [Rules](rules/), [Commands](commands/), and [MCP server](mcp/) |

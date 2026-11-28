@@ -181,7 +181,7 @@ Install the [Generic LSP Client](https://marketplace.visualstudio.com/items?item
 
 ## Code actions, hover, and cell files
 
-`xpd lsp` runs the same rules as [`xpd check`](../../commands/check/), respects `# ast-grep-ignore: <pack>/<rule>`, and links every diagnostic `codeDescription` to its rule page. Hover over any diagnostic to read the rule documentation inline.
+`xpd lsp` runs the same rules as [`xpd check`](../../commands/check/), respects `# ast-grep-ignore: <pack>/<rule>`, and links every diagnostic `codeDescription` to its rule page. Hover over any diagnostic to read the rule documentation inline. On file open and save, `xpd lsp` also publishes workspace-level structural `HINT` diagnostics from `xpd untangle` (`untangle/import-cycle`, `untangle/orphaned-module`, `untangle/facade-module`, `untangle/single-use-module`, `untangle/mixed-responsibilities`, and `untangle/shared-state`).
 
 | Code action | Kind | Offered when |
 | --- | --- | --- |

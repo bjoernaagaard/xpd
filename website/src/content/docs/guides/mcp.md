@@ -5,7 +5,7 @@ sidebar:
   order: 2
 ---
 
-Run `claude mcp add xpd -- uvx xpd mcp` to expose xpd's 11 MCP tools for visual tables and charts, model training gates, and Manim animations. Standard lint and search commands stay in the agent's shell, and the server delegates every tool call to the matching `xpd` binary.
+Run `claude mcp add xpd -- uvx xpd mcp` to expose xpd's 14 MCP tools for visual tables, module maps, ledger views, model training gates, and Manim animations. Standard lint and search commands stay in the agent's shell, and the server delegates every tool call to the matching `xpd` binary.
 
 ```mermaid
 sequenceDiagram
@@ -48,9 +48,9 @@ Browse schemas and live examples in the [MCP reference](../../mcp/).
 
 | Tool group | Tools | Built on |
 | --- | --- | --- |
-| Visual views | [`show_issues`](../../mcp/tools/show_issues/), [`show_dataflow`](../../mcp/tools/show_dataflow/), [`show_columns`](../../mcp/tools/show_columns/) | `xpd check`, `xpd graph`, `xpd profile` |
+| Visual views | [`show_issues`](../../mcp/tools/show_issues/), [`show_dataflow`](../../mcp/tools/show_dataflow/), [`show_columns`](../../mcp/tools/show_columns/), [`show_map`](../../mcp/tools/show_map/), [`show_ledger`](../../mcp/tools/show_ledger/) | `xpd check`, `xpd graph`, `xpd profile`, `xpd untangle --map`, and all 10 ledgers |
 | Model gates | [`discovery_gate`](../../mcp/tools/discovery_gate/), [`contract`](../../mcp/tools/contract/), [`gates`](../../mcp/tools/gates/) | `xpd api`, `profile`, `check`, `graph`, `equiv`, `refit` |
-| Animations | `animate_status`, `animate_guide`, `animate_render`, `animate_artifact`, `animate_source` | `xpd animate` |
+| Animations | [`animate_status`](../../mcp/tools/animate_status/), [`animate_guide`](../../mcp/tools/animate_guide/), [`animate_catalog`](../../mcp/tools/animate_catalog/), [`animate_render`](../../mcp/tools/animate_render/), [`animate_artifact`](../../mcp/tools/animate_artifact/), [`animate_source`](../../mcp/tools/animate_source/) | `xpd animate` |
 
 The server also serves five workflow [prompts](../../mcp/prompts/) and rule and skill [resources](../../mcp/resources/).
 

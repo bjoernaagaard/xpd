@@ -1,7 +1,7 @@
 {
   "name": "xpd",
   "version": "0.65.0",
-  "description": "Lints Python that uses pandas, NumPy, SciPy, scikit-learn, scikit-lego, MAPIE, Category Encoders, linearmodels, arch, pymoo, plotly or Apache Hamilton for slow operations and wrong results, after each edit and through MCP tools.",
+  "description": "Static linter, project library index, unified repo audit, 10 recorded review ledgers, and Manim animation tools for Python (pandas, Polars, NumPy, SciPy, scikit-learn, LightGBM, XGBoost, statsmodels, CVXPY, skfolio, pymoo, Nixtla, plotly, Hamilton) over hooks, LSP, and 14 MCP tools.",
   "author": {
     "name": "Bjørn Aagaard",
     "url": "https://github.com/bjoernaagaard"
@@ -13,17 +13,26 @@
   "keywords": [
     "python",
     "linter",
+    "audit",
     "pandas",
+    "polars",
     "numpy",
     "scipy",
     "scikit-learn",
     "scikit-lego",
     "mapie",
     "category-encoders",
+    "lightgbm",
+    "xgboost",
+    "statsmodels",
     "linearmodels",
     "arch",
+    "cvxpy",
+    "skfolio",
     "pymoo",
+    "nixtla",
     "plotly",
-    "hamilton"
+    "hamilton",
+    "manim"
   ]
 }

@@ -1,4 +1,4 @@
-Run `xpd find "<task>"` before choosing a library function to search xpd's bundled library symbols, rules, worked recipes, and playbooks without installing those libraries. Read any chosen entry in full with [`xpd api`](../api/).
+Run `xpd find "<task>"` before choosing a library function to search xpd's bundled library symbols, project-local libraries configured in `[tool.xpd.libraries]` via [`xpd library`](../library/), rules, worked recipes, and playbooks without installing those libraries. Read any chosen entry in full with [`xpd api`](../api/).
 
 ## Examples
 
