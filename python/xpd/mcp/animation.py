@@ -2,12 +2,13 @@
 
 import asyncio
 import base64
+import json
 import os
 import re
 import stat
 from contextlib import ExitStack
 from pathlib import Path
-from typing import Literal
+from typing import Any, Literal
 
 from fastmcp import Context, FastMCP
 from fastmcp.exceptions import ToolError
@@ -22,7 +23,7 @@ from xpd.mcp.models import Output
 from xpd.mcp.names import ToolName
 from xpd.mcp.root import Project, Root, RootsRequiredError
 
-Profile = Literal["preview", "final", "still"]
+Profile = Literal["draft", "preview", "final", "still"]
 Artifact = Literal["video", "still", "contact_sheet", "source", "manifest", "log"]
 
 MIB = 1024 * 1024
@@ -88,6 +89,7 @@ class InlineScene(BaseModel):
 
 
 GUIDE = Command(("animate", "guide"), bytes.decode, SUCCESS)
+CATALOG = Command(("animate", "catalog", "--json"), json.loads, SUCCESS)
 STATUS = Command(
     ("animate", "doctor", "--json"), TypeAdapter(AnimationStatus).validate_json, SUCCESS
 )
@@ -169,6 +171,17 @@ def register(mcp: FastMCP, xpd: Xpd, project: Project, *, local: bool) -> None:
             recipe: Recipe name from the guide. Omit it to see the workflow and recipe names.
         """
         return await xpd.run(GUIDE, Path.cwd(), (recipe,) if recipe else ())
+
+    @mcp.tool(name=ToolName.ANIMATE_CATALOG, tags={"animation"}, annotations=READS)
+    async def animate_catalog(family: str | None = None) -> dict[str, Any]:
+        """List Manim Module Index families or compare every sibling primitive in one family side
+        by side before writing scene code.
+
+        Args:
+            family: Module name or suffix such as `indication`, `creation`, `transform`,
+                `graphing`, or `rate_functions`. Omit to list all families.
+        """
+        return await xpd.run(CATALOG, Path.cwd(), (family,) if family else ())
 
     @mcp.tool(name=ToolName.ANIMATE_STATUS, tags={"animation"}, annotations=READS)
     async def animate_status() -> AnimationStatus:

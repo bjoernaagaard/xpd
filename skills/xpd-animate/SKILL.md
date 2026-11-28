@@ -12,18 +12,25 @@ that runs in the app itself.
 1. Read the conversation and the relevant code or data. Identify the behavior to illustrate and
    sketch the opening, the key change, and the outcome. Ask which concept the user means when
    several materially different concepts fit the prompt.
-2. Check the local runtime with `xpd animate doctor --json` or the MCP tool `animate_status`.
+2. Check sibling Manim primitives before writing scene code. Run `xpd animate catalog <family>`
+   (for example `indication`, `creation`, `transform`, `movement`, `composition`, `changing`,
+   `graphing`, `rate_functions`, or `scene`) or call `animate_catalog` in MCP. Write a compact
+   beat sheet for each beat naming the visual intent, the catalog family checked, the chosen
+   primitive, and one line explaining why it beat its siblings.
+3. Check the local runtime with `xpd animate doctor --json` or the MCP tool `animate_status`.
    The runtime uses a pinned Manim Community image and Cairo on rootless Podman. If the report
-   says the image is missing, provision it once with `xpd animate setup`. Guides and starter
-   scenes are available offline.
-3. Use a recipe or write a normal Manim `Scene` subclass. Keep the main scene and its inputs
-   in the project. Pass every local asset or imported helper needed at render time. Make
-   settings for the scene's important timing and data easy to edit.
-4. Start a workflow from the project root. Inspect the preview video for timing and the contact
-   sheet for layout. If a change is needed, edit the scene or its assets and submit a revision
-   with a short note. Inspect each new preview.
-5. Approve the revision you inspected. Approval renders that saved scene and its assets at final
-   quality. Return the video and source bundle or render manifest.
+   says the image is missing, provision it once with `xpd animate setup`. Guides, the module
+   catalog, and starter scenes are available offline.
+4. Use a recipe or write a normal Manim `Scene` subclass. Keep the main scene and its inputs
+   in the project. Pass every local asset or imported helper needed at render time. Default to
+   installed `Noto Sans`, `Noto Serif`, or `Noto Mono` fonts so missing-font warnings never
+   fill the render log. Make settings for the scene's important timing and data easy to edit.
+5. Iterate rapidly with `--profile draft` (`-ql`, 480p15) to verify layout and pacing, then run
+   a workflow or `--profile preview` (1080p60) and inspect the contact sheet. If a change is
+   needed, edit the scene or its assets and submit a revision with a short note. Inspect each
+   new preview.
+6. Approve the revision you inspected. Approval renders that saved scene and its assets at
+   final quality (4K60). Return the video, beat sheet, and source bundle or render manifest.
 
 ## CLI
 
@@ -46,8 +53,10 @@ xpd animate approve RUN --revision 2 --json
 Use `xpd animate resume RUN` after an interruption. For a standalone preview, final,
 or still, use `xpd animate render cache_miss.py CacheMiss --profile still`.
 
-The `preview` profile uses Manim's `-qh` (1080p60), and `final` uses `-qk`
-(4K60). The `still` profile uses `-qm -s` for the last frame at 720p.
+The `draft` profile uses Manim's `-ql` (480p15) for fast layout checks, `preview` uses `-qh`
+(1080p60), and `final` uses `-qk` (4K60). The `still` profile uses `-qm -s` for the last frame
+at 720p. Unchanged partial movie segments are cached per scene and profile so single-line edits
+skip re-rendering untouched beats.
 Bundle a `manim.cfg` with `--asset` to set scene defaults. xpd reads the
 bundled config beside the scene, falling back to the bundled project-root
 config, and sets the managed output paths and preset.

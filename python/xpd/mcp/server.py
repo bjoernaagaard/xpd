@@ -20,9 +20,10 @@ HTTP_RESTRICTED_TOOLS = frozenset({ToolName.GATES})
 
 def instructions(skill_uris: dict[str, str], *, local: bool) -> str:
     animate = (
-        f"- When asked to animate a concept as a video, call `{ToolName.ANIMATE_GUIDE}`. "
+        f"- When asked to animate a concept as a video, call `{ToolName.ANIMATE_GUIDE}` and "
+        f"`{ToolName.ANIMATE_CATALOG}` to compare sibling Manim primitives before coding. "
         f"Use `{ToolName.ANIMATE_STATUS}` to check the renderer, "
-        f"`{ToolName.ANIMATE_RENDER}` to preview the scene, and "
+        f"`{ToolName.ANIMATE_RENDER}` with `draft` or `preview` to iterate, and "
         f"`{ToolName.ANIMATE_ARTIFACT}` to inspect the contact sheet before the final render.\n"
         if local
         else ""

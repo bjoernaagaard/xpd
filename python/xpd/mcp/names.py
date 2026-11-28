@@ -8,6 +8,7 @@ class ToolName(StrEnum):
     GATES = auto()
     CONTRACT = auto()
     ANIMATE_GUIDE = auto()
+    ANIMATE_CATALOG = auto()
     ANIMATE_STATUS = auto()
     ANIMATE_RENDER = auto()
     ANIMATE_ARTIFACT = auto()

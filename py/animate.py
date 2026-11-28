@@ -41,8 +41,7 @@ LOG_LIMIT = 128 * 1024
 MAX_FILES = 128
 SEGMENT = re.compile(r"[0-9a-f]{64}\.mp4")
 JOB_ID = re.compile(r"[0-9a-f]{32}")
-CACHE_SCHEMA = "3"
-SEQUENCE_HOLD = re.compile(rb"(?m)^CACHE_MISS_HOLD_SECONDS = [0-9]+(?:\.[0-9]+)?$")
+CACHE_SCHEMA = "4"
 CONFIG = """[CLI]
 input_file =
 media_dir = /tmp/media
@@ -53,6 +52,7 @@ sections_dir = /tmp/output/{scene_name}/sections
 tex_dir = /tmp/media/Tex
 text_dir = /tmp/media/texts
 log_dir = /tmp/media/logs
+max_inflight_encoders = 2
 write_all = False
 dry_run = False
 preview = False
@@ -61,6 +61,7 @@ show_in_file_browser = False
 save_sections = False
 """
 PROFILES = {
+    "draft": ("-ql", "mp4"),
     "preview": ("-qh", "mp4"),
     "final": ("-qk", "mp4"),
     "still": ("-qm", "png"),
@@ -117,16 +118,10 @@ class Scene(NamedTuple):
         return digest.hexdigest()
 
     def segment_key(self, profile: str) -> str:
-        if self.name == "CacheMiss":
-            template = SEQUENCE_HOLD.sub(
-                b"CACHE_MISS_HOLD_SECONDS = <duration>", sys.argv[3].encode()
-            )
-            entry = SEQUENCE_HOLD.sub(
-                b"CACHE_MISS_HOLD_SECONDS = <duration>", self.files[self.entry]
-            )
-            if entry == template:
-                return self.fingerprint(profile, normalized_entry=entry)
-        return self.fingerprint(profile)
+        digest = hashlib.sha256()
+        for metadata in (CACHE_SCHEMA, IMAGE, CONFIG, profile, self.entry.as_posix(), self.name):
+            digest.update(metadata.encode() + b"\0")
+        return digest.hexdigest()
 
 
 class Render(NamedTuple):
@@ -328,7 +323,34 @@ def doctor() -> dict[str, str | bool | None]:
     return {"ready": reason is None, "version": VERSION, "image": IMAGE, "reason": reason}
 
 
-def worker(name: str, *mounts: tuple[Path, str, str]) -> list[str]:
+def host_memory_gib() -> int:
+    try:
+        for line in Path("/proc/meminfo").read_text(encoding="ascii").splitlines():
+            if line.startswith("MemTotal:"):
+                kib = int(line.split()[1])
+                return max(2, kib // (1024 * 1024))
+    except (OSError, ValueError, IndexError):
+        pass
+    return 8
+
+
+def worker_limits(profile: str | None) -> tuple[int, str, int]:
+    cpus = min(max(2, (os.cpu_count() or 4) // 4), 8)
+    half_ram = max(2, host_memory_gib() // 2)
+    if profile == "final":
+        memory_gib = min(7, half_ram)
+        timeout = 300
+    elif profile in {"draft", "preview", "still"}:
+        memory_gib = min(4, half_ram)
+        timeout = 300
+    else:
+        memory_gib = min(2, half_ram)
+        timeout = 120
+    return cpus, f"{memory_gib}g", timeout
+
+
+def worker(name: str, *mounts: tuple[Path, str, str], profile: str | None = None) -> list[str]:
+    cpus, memory, timeout = worker_limits(profile)
     command = [
         *PODMAN,
         "run",
@@ -343,13 +365,13 @@ def worker(name: str, *mounts: tuple[Path, str, str]) -> list[str]:
         "--user=1000:1000",
         "--read-only",
         "--read-only-tmpfs=false",
-        "--tmpfs=/tmp:rw,noexec,nosuid,nodev,size=256m,mode=1777,notmpcopyup",
+        "--tmpfs=/tmp:rw,noexec,nosuid,nodev,size=1024m,mode=1777,notmpcopyup",
         "--cap-drop=all",
         "--security-opt=no-new-privileges",
-        "--pids-limit=128",
-        "--memory=2g",
-        "--cpus=2",
-        "--timeout=120",
+        "--pids-limit=256",
+        f"--memory={memory}",
+        f"--cpus={cpus}",
+        f"--timeout={timeout}",
         "--ulimit=nofile=256:256",
         f"--ulimit=fsize={VIDEO_LIMIT}:{VIDEO_LIMIT}",
         "--env=HOME=/tmp",
@@ -641,6 +663,7 @@ def run_scene(
             (configuration, "/xpd-manim.cfg", "ro"),
             (seed, "/seed", "ro"),
             (shim, "/xpd-animation-worker.py", "ro"),
+            profile=profile,
         ),
         "python",
         "-I",
