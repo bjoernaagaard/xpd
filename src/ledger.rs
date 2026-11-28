@@ -9,7 +9,6 @@ use std::fs;
 use std::hash::{Hash, Hasher as _};
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
-#[cfg(feature = "ledger-incremental")]
 use std::sync::Arc;
 
 use anyhow::{Context, Result};
@@ -26,17 +25,14 @@ use crate::workspace::Workspace;
 
 pub(crate) mod adapter;
 mod catalog;
-#[cfg(feature = "ledger-durable")]
 mod durable;
 mod feature_evidence;
 pub(crate) mod gix_source;
-#[cfg(feature = "ledger-durable")]
 mod orchestration;
 pub(crate) mod python;
 mod run;
 pub(crate) use catalog::Catalog;
 pub(crate) use run::Goal;
-#[cfg(feature = "ledger-incremental")]
 pub(crate) mod salsa_db;
 pub(crate) mod twins;
 #[cfg(feature = "ledger-distributed")]
@@ -153,10 +149,6 @@ pub(crate) struct Entry<K> {
     /// The id that xpd 0.55.0 and older gave this finding, from [`legacy_id`]. A run that one
     /// of them recorded cites these ids, and its import rewrites each one to `id`.
     #[serde(skip)]
-    #[cfg_attr(
-        not(feature = "ledger-durable"),
-        expect(dead_code, reason = "only the import of a JSON journal reads it")
-    )]
     pub(crate) legacy_id: String,
     /// With `--since`: whether the commit had no finding of this id.
     #[serde(rename = "new", skip_serializing_if = "Option::is_none")]
@@ -311,7 +303,6 @@ fn legacy_id(kind: &str, key: &str, nth: usize) -> String {
 /// `GixSource` implements it over the git object database, and `FsSource` over the files on
 /// disk. Paths are relative to the top of the repository, and object ids are full hex ids in
 /// the object format of the repository.
-#[cfg(feature = "ledger-incremental")]
 pub(crate) trait ContentSource: std::fmt::Debug + Send + Sync {
     /// The full id of the commit that `rev`, such as `HEAD`, `main` or a hash, names.
     #[expect(dead_code, reason = "the surveys that call it come in the next slice")]

@@ -99,19 +99,15 @@ pub(super) fn groups<'f>(blocks: &'f [(&'f str, Block)]) -> Vec<Vec<(&'f str, &'
     groups
 }
 
-#[cfg(feature = "ledger-incremental")]
 use std::sync::Arc;
 
-#[cfg(feature = "ledger-incremental")]
 use crate::ledger::salsa_db::SourceText;
 
 /// How many per-file facts stay in memory at once.
-#[cfg(feature = "ledger-incremental")]
 #[expect(dead_code, reason = "the surveys that call it come in the next slice")]
 pub(crate) const FILE_FACTS_LRU: usize = 2048;
 
 /// The per-file facts of `xpd untangle` for one file: its lines and its copied stretches.
-#[cfg(feature = "ledger-incremental")]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct UntangleFileSummary {
     /// The lines of the file.
@@ -122,7 +118,6 @@ pub(crate) struct UntangleFileSummary {
 
 /// The facts of one file for `xpd untangle`, as a tracked query with a memory cap. Only the
 /// compact stretches are kept, never a syntax tree.
-#[cfg(feature = "ledger-incremental")]
 #[salsa::tracked(lru = 2048, returns(ref))]
 pub(crate) fn untangle_file_facts(
     db: &dyn salsa::Database,

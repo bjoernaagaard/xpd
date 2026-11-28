@@ -6,7 +6,6 @@
 //! without what `.ignore` files leave out, sorted and without repeats. A path that names a file
 //! is kept as it is, as the walk keeps a file it is given.
 
-#[cfg(feature = "ledger-incremental")]
 use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -31,7 +30,6 @@ enum Origin {
     Disk,
     /// The files of a commit, each with its path below the top of the repository and the id of
     /// its blob.
-    #[cfg(feature = "ledger-incremental")]
     Commit {
         source: GixSource,
         blobs: HashMap<PathBuf, (String, String)>,
@@ -42,27 +40,17 @@ impl Listing {
     /// The files under `paths`, which are in the folders of `tree`. `top` is the top of the
     /// repository and `commit` the commit the files are from, which is `HEAD` for the files of
     /// today. The files of another commit are read from the object database of `top`.
-    #[cfg_attr(
-        not(feature = "ledger-incremental"),
-        expect(
-            clippy::unnecessary_wraps,
-            reason = "reading a commit, which only the ledger-incremental build does, can fail"
-        )
-    )]
     pub(crate) fn of(
         paths: &[PathBuf],
         tree: Tree<'_>,
         top: Option<&Path>,
         commit: &str,
     ) -> Result<Self> {
-        #[cfg(feature = "ledger-incremental")]
         if commit != "HEAD"
             && let (Some(top), Some(copy)) = (top, tree.top)
         {
             return Self::at_commit(paths, copy, top, commit);
         }
-        #[cfg(not(feature = "ledger-incremental"))]
-        let _ = (tree, top, commit);
         Ok(Self {
             files: ledger::files(paths),
             origin: Origin::Disk,
@@ -71,7 +59,6 @@ impl Listing {
 
     /// The files of `commit` under `paths`, which are in `copy`, the folder that stands for the
     /// top of the repository at `top`.
-    #[cfg(feature = "ledger-incremental")]
     fn at_commit(paths: &[PathBuf], copy: &Path, top: &Path, commit: &str) -> Result<Self> {
         use crate::ledger::ContentSource as _;
 
@@ -98,7 +85,6 @@ impl Listing {
     pub(crate) fn text(&self, path: &Path) -> Option<Arc<str>> {
         match &self.origin {
             Origin::Disk => fs::read_to_string(path).ok().map(Arc::from),
-            #[cfg(feature = "ledger-incremental")]
             Origin::Commit { source, blobs } => {
                 use crate::ledger::ContentSource as _;
 
@@ -113,16 +99,13 @@ impl Listing {
     pub(crate) fn absolute(&self, path: &Path) -> Option<PathBuf> {
         match &self.origin {
             Origin::Disk => fs::canonicalize(path).ok(),
-            #[cfg(feature = "ledger-incremental")]
             Origin::Commit { blobs, .. } => blobs.contains_key(path).then(|| path.to_path_buf()),
         }
     }
 }
 
-#[cfg(feature = "ledger-incremental")]
 pub(crate) use commit::GixSource;
 
-#[cfg(feature = "ledger-incremental")]
 mod commit {
     use std::cell::RefCell;
     use std::collections::{BTreeMap, HashMap};

@@ -4,9 +4,6 @@
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::path::Path;
 
-#[cfg(not(feature = "ledger-incremental"))]
-use crate::git;
-
 /// How many commits are read, newest first. Older commits say little about how the code
 /// changes today.
 const COMMITS_READ: usize = 2000;
@@ -36,34 +33,14 @@ pub(super) struct Pair {
 impl History {
     /// The non-merge history for `revision` in the repository at `top`. Empty when it cannot
     /// be read.
-    #[cfg(feature = "ledger-incremental")]
     pub(super) fn read(top: &Path, revision: &str) -> Self {
         Self::read_gix(top, revision)
     }
 
-    /// The non-merge history from `git log`. Empty when Git cannot read it.
-    #[cfg(not(feature = "ledger-incremental"))]
-    pub(super) fn read(top: &Path, revision: &str) -> Self {
-        let limit = COMMITS_READ.to_string();
-        let args = [
-            "log",
-            "--no-merges",
-            "--name-only",
-            "--format=%x00",
-            "-n",
-            &limit,
-            revision,
-            "--",
-        ];
-        git::output(top, &args).map_or_else(|_| Self::default(), |log| Self::parse(&log))
-    }
-
-    #[cfg(feature = "ledger-incremental")]
     pub(super) fn read_gix(top: &Path, revision: &str) -> Self {
         Self::try_read_gix(top, revision).unwrap_or_default()
     }
 
-    #[cfg(feature = "ledger-incremental")]
     fn try_read_gix(top: &Path, revision: &str) -> gix::Result<Self> {
         use gix::bstr::ByteSlice;
         use gix::revision::walk::{CommitTimeOrder, Sorting};
@@ -118,23 +95,6 @@ impl History {
             }
         }
         Ok(Self { commits })
-    }
-
-    /// The commits of a log printed with `--name-only --format=%x00`: a NUL starts each commit,
-    /// and each line after it names one file.
-    #[cfg(not(feature = "ledger-incremental"))]
-    pub(super) fn parse(log: &str) -> Self {
-        let commits = log
-            .split('\0')
-            .map(|commit| {
-                (commit.lines().map(str::trim))
-                    .filter(|line| !line.is_empty())
-                    .map(str::to_owned)
-                    .collect::<Vec<_>>()
-            })
-            .filter(|files| !files.is_empty())
-            .collect();
-        Self { commits }
     }
 
     pub(super) fn len(&self) -> usize {

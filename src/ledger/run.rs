@@ -5,16 +5,13 @@
 //! was decided, says which stage comes next, and gates each fix itself: it runs the checks of
 //! the project and compares the findings by their ids, so no stage grades its own work.
 //!
-//! Without the `ledger-durable` feature the journal is the JSON file `xpd-<command>.json` in the
-//! git folder of the worktree. With it, the run is a `duroxide` orchestration in
-//! `<git-common-dir>/xpd-ledger.sqlite`, and the CLI measures as before and hands each
-//! measurement to the orchestration as an activity result. A JSON journal that an older xpd left
-//! is imported once, by the worktree that owns it, and renamed with the `.migrated` suffix.
+//! Each run is a `duroxide` orchestration in `<git-common-dir>/xpd-ledger.sqlite`, and the CLI
+//! measures as before and hands each measurement to the orchestration as an activity result. A
+//! legacy JSON journal (`xpd-<command>.json`) left by an older xpd is imported once, by the
+//! worktree that owns it, and renamed with the `.migrated` suffix.
 
 use super::ChecklistOwners;
 use super::feature_evidence::{FeatureEvidence, plan_invalidation};
-#[cfg(not(feature = "ledger-durable"))]
-use super::feature_evidence::{gate_invalidation, invalidate_answers};
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt::Write as _;
@@ -809,27 +806,8 @@ impl Place {
     }
 
     /// The path of `name` in the git folder of the worktree.
-    #[cfg(feature = "ledger-durable")]
     fn git_path(&self, name: &str) -> Result<PathBuf> {
         git_path(&self.top, name)
-    }
-
-    #[cfg(not(feature = "ledger-durable"))]
-    fn read(&self, command: &str) -> Result<Journal> {
-        ensure!(
-            self.journal.is_file(),
-            "no run is open. Start one with `xpd {command} start`"
-        );
-        let text = fs::read_to_string(&self.journal)
-            .with_context(|| format!("cannot read {}", self.journal.display()))?;
-        serde_json::from_str(&text)
-            .with_context(|| format!("cannot read {}", self.journal.display()))
-    }
-
-    #[cfg(not(feature = "ledger-durable"))]
-    fn write(&self, journal: &Journal) -> Result<()> {
-        fs::write(&self.journal, serde_json::to_string_pretty(journal)?)
-            .with_context(|| format!("cannot write {}", self.journal.display()))
     }
 
     fn head(&self) -> Result<String> {
@@ -898,7 +876,6 @@ pub(super) type SurveyedFindings = (BTreeSet<String>, ChecklistOwners, Option<Fe
 
 /// The findings at a commit, or in the working tree for `None`, as a map from the id that
 /// xpd 0.55.0 gave each one to its id of today.
-#[cfg(feature = "ledger-durable")]
 type Renamed<'r> = &'r dyn Fn(&Journal, Option<&str>) -> Result<BTreeMap<String, String>>;
 
 /// Normalizes an adapter argument: when it names an existing file under `here`, stores its
@@ -1074,81 +1051,6 @@ fn read_plan<K: Kind>(journal: &Journal, text: &str, command: &str) -> Result<Pl
     Ok(plan)
 }
 
-/// Adds `plan` to the journal, after checking it against `known` and `checklist` of today.
-#[cfg(not(feature = "ledger-durable"))]
-fn plan(
-    journal: &mut Journal,
-    plan: Plan,
-    known: &BTreeSet<String>,
-    checklist: &ChecklistOwners,
-) -> Result<()> {
-    let mut named: BTreeSet<&str> = journal.fixes().map(|fix| fix.id.as_str()).collect();
-    for fix in &plan.fixes {
-        ensure!(named.insert(&fix.id), "two fixes are named {}", fix.id);
-        ensure!(
-            !fix.findings.is_empty() || !fix.questions.is_empty() || fix.goal.is_some(),
-            "the fix {} names no finding, names no checklist question and sets no goal",
-            fix.id
-        );
-        if fix.goal == Some(Goal::Design) {
-            ensure!(
-                !fix.questions.is_empty(),
-                "the fix {} has a design goal, which must name at least one checklist question",
-                fix.id
-            );
-        }
-        if matches!(fix.goal, Some(Goal::Faster | Goal::Both)) {
-            ensure!(
-                journal.bench.is_some(),
-                "the fix {} has a speed goal, which needs `--bench` on `start`",
-                fix.id
-            );
-        }
-        ensure!(
-            fix.outcome.is_none() && fix.attempts.is_empty() && !fix.approved,
-            "the fix {} holds fields that only xpd writes",
-            fix.id
-        );
-    }
-    let cited = (plan.fixes.iter().flat_map(|fix| &fix.findings))
-        .chain(plan.accepted.iter().map(|accepted| &accepted.finding));
-    for id in cited {
-        ensure!(
-            known.contains(id),
-            "the ledger of today has no finding {id}"
-        );
-    }
-    let cited_questions = (plan.fixes.iter().flat_map(|fix| &fix.questions))
-        .chain(plan.answered.iter().map(|answered| &answered.item));
-    for item in cited_questions {
-        ensure!(
-            checklist.contains_key(item),
-            "the checklist of today has no item {item}"
-        );
-    }
-    for accepted in plan.accepted {
-        ensure!(
-            !accepted.reason.trim().is_empty(),
-            "the accepted finding {} has no reason",
-            accepted.finding
-        );
-        journal.accepted.insert(accepted.finding, accepted.reason);
-    }
-    for answered in plan.answered {
-        ensure!(
-            !answered.reason.trim().is_empty(),
-            "the answered item {} has no reason",
-            answered.item
-        );
-        let (item, record) = answered.into_pair();
-        journal.answered.insert(item, record);
-    }
-    if !plan.fixes.is_empty() {
-        journal.rounds.push(plan.fixes);
-    }
-    Ok(())
-}
-
 /// Fails unless `id` is the open fix, and the user said yes to it when it changes an interface.
 fn check_gate(journal: &Journal, id: &str) -> Result<()> {
     let open = journal.open().map(|open| open.id.clone());
@@ -1260,84 +1162,6 @@ pub(super) fn gate_checklist_files(
     files
 }
 
-/// Gates the fix `id` at the commit that is checked out. Returns whether the fix is kept.
-#[cfg(not(feature = "ledger-durable"))]
-fn gate(
-    journal: &mut Journal,
-    place: &Place,
-    id: &str,
-    found: Found<'_>,
-    command: &str,
-) -> Result<bool> {
-    check_gate(journal, id)?;
-    let measured = measure_gate(journal, place, found, command)?;
-    let stale = gate_invalidation(
-        journal.feature_evidence.as_ref(),
-        measured.feature_before.as_ref(),
-        measured.feature_after.as_ref(),
-        &measured.changed_files,
-    )?;
-    let (judged, questions) = {
-        let fix = journal.fix_mut(id)?;
-        let judged = judge_fix(&GateEvidence {
-            command,
-            findings: &fix.findings,
-            questions: &fix.questions,
-            goal: fix.goal,
-            before: &measured.before,
-            after: &measured.after,
-            broken: &measured.broken,
-            lines: (measured.lines_before, measured.lines_after),
-            timing: measured.timing,
-            changed_files: &measured.changed_files,
-            checklist_before: &measured.checklist_before,
-        });
-        (judged, fix.questions.clone())
-    };
-    let fix = journal.fix_mut(id)?;
-    match judged {
-        Ok(Compared { fixed, added }) => {
-            fix.outcome = Some(Outcome::Kept {
-                commit: measured.commit.clone(),
-                fixed,
-                added,
-                lines_before: measured.lines_before,
-                lines_after: measured.lines_after,
-                timing_before: measured.timing.map(|(before, _)| before),
-                timing_after: measured.timing.map(|(_, after)| after),
-            });
-            let commit = measured.commit;
-            journal.current.clone_from(&commit);
-            journal.current_lines = measured.lines_after;
-            if measured.feature_after.is_some() {
-                invalidate_answers(&mut journal.answered, &stale);
-                journal.feature_evidence = measured.feature_after;
-            }
-            for item in questions
-                .into_iter()
-                .filter(|_| command != "feature-review")
-            {
-                journal.answered.insert(
-                    item,
-                    AnswerRecord::Fixed {
-                        fix: id.to_owned(),
-                        commit: commit.clone(),
-                    },
-                );
-            }
-            if let (Some(bench), Some((_, after_timing))) = (&mut journal.bench, measured.timing) {
-                bench.current = after_timing;
-            }
-            Ok(true)
-        }
-        Err(reason) => {
-            eprintln!("xpd: the gate did not keep {id}. {reason}");
-            fix.attempts.push(reason);
-            Ok(false)
-        }
-    }
-}
-
 /// What `finish` measures. The fields have the names of the finish output of the
 /// orchestration.
 #[derive(Debug)]
@@ -1444,132 +1268,12 @@ fn report_finish(journal: &Journal, surveyed: &Surveyed) {
     );
 }
 
-/// Ends the run when no fix is open and each finding that is new since the start has a
-/// reason. Returns whether the run ended.
-#[cfg(not(feature = "ledger-durable"))]
-fn finish(journal: &mut Journal, place: &Place, found: Found<'_>) -> Result<bool> {
-    let surveyed = measure_finish(journal, place, found)?;
-    let unexplained = unexplained(journal, &surveyed);
-    if !unexplained.is_empty() {
-        report_unexplained(&unexplained);
-        return Ok(false);
-    }
-    let unanswered = unanswered(journal, &surveyed);
-    if !unanswered.is_empty() {
-        report_unanswered(&unanswered);
-        return Ok(false);
-    }
-    journal.current_lines = surveyed.current_lines;
-    journal
-        .feature_evidence
-        .clone_from(&surveyed.feature_evidence);
-    report_finish(journal, &surveyed);
-    journal.finished = true;
-    Ok(true)
-}
-
-/// Runs one stage on the JSON journal of the worktree. Returns the run and whether the stage
-/// kept what it measured.
-#[cfg(not(feature = "ledger-durable"))]
-fn act_journal<K: Kind>(
-    action: Action,
-    place: &Place,
-    here: &Path,
-    command: &str,
-    found: Found<'_>,
-) -> Result<(Journal, bool)> {
-    let mut kept = true;
-    let journal = match action {
-        Action::Start {
-            paths,
-            checks,
-            bench,
-            bench_runs,
-            adapter,
-            target,
-            restart,
-        } => {
-            if let Ok(old) = place.read(command) {
-                ensure!(
-                    old.finished || restart,
-                    "a run is open. Go on with `xpd {command} status`, or replace it with --restart"
-                );
-            }
-            start(
-                place,
-                here,
-                &paths,
-                checks,
-                bench.map(|cmd| (cmd, bench_runs)),
-                (adapter, target),
-                found,
-            )?
-        }
-        Action::Plan { file } => {
-            let mut journal = place.read(command)?;
-            let text = plan_text(here, &file)?;
-            let read = read_plan::<K>(&journal, &text, command)?;
-            require_feature_head(&journal, place)?;
-            let (known, checklist, evidence) = found(&journal, None)?;
-            let stale = plan_invalidation(
-                journal.feature_evidence.as_ref(),
-                evidence.as_ref(),
-                &read.answered,
-            )?;
-            invalidate_answers(&mut journal.answered, &stale);
-            journal.feature_evidence = evidence;
-            plan(&mut journal, read, &known, &checklist)?;
-            journal
-        }
-        Action::Approve { fix } => {
-            let mut journal = place.read(command)?;
-            journal.fix_mut(&fix)?.approved = true;
-            journal
-        }
-        Action::Drop { fix, reason } => {
-            let mut journal = place.read(command)?;
-            ensure!(
-                place.head()? == journal.current,
-                "the commit is not {}, where the run stands. Restore it with `git reset --hard {}`",
-                journal.current,
-                journal.current
-            );
-            journal.fix_mut(&fix)?.outcome = Some(Outcome::Dropped { reason });
-            journal
-        }
-        Action::Gate { fix } => {
-            let mut journal = place.read(command)?;
-            kept = gate(&mut journal, place, &fix, found, command)?;
-            journal
-        }
-        Action::Status => place.read(command)?,
-        Action::Finish => {
-            let mut journal = place.read(command)?;
-            kept = if matches!(
-                command,
-                "data-prep" | "ts-review" | "feature-review" | "model-review" | "opt-review"
-            ) && let Some(open) = journal.open()
-            {
-                eprintln!("xpd: the fix {} is still open", open.id);
-                false
-            } else {
-                require_feature_head(&journal, place)?;
-                finish(&mut journal, place, found)?
-            };
-            journal
-        }
-    };
-    place.write(&journal)?;
-    Ok((journal, kept))
-}
-
 /// A run as a `duroxide` orchestration in the ledger store of the repository.
 ///
 /// Each worktree has its own namespace in the shared store, and each start of a run takes the
 /// next generation of that namespace, so the instance of a run is
 /// `wt-<worktree>::<command>::<generation>` and the run that counts is the highest generation.
 /// A lock file in the git folder of the worktree makes one process at a time its writer.
-#[cfg(feature = "ledger-durable")]
 mod durable_run {
     use std::collections::{BTreeMap, BTreeSet};
     use std::fs::{self, File, TryLockError};
@@ -2410,13 +2114,6 @@ impl RecordedFeatureList {
             top: top.to_path_buf(),
             journal: git_path(top, "xpd-feature-review.json")?,
         };
-        #[cfg(not(feature = "ledger-durable"))]
-        let journal = place
-            .journal
-            .is_file()
-            .then(|| place.read("feature-review"))
-            .transpose()?;
-        #[cfg(feature = "ledger-durable")]
         let journal = durable_run::feature_journal(&place)?;
         Ok(journal.map(|journal| Self {
             paths: journal
@@ -2539,15 +2236,11 @@ pub(super) fn act<K: Kind, R: Serialize>(
             .transpose()?;
         Ok((ids, checklist, feature_evidence))
     };
-    #[cfg(not(feature = "ledger-durable"))]
-    let (journal, kept) = act_journal::<K>(action, &place, &here, command, &found)?;
-    #[cfg(feature = "ledger-durable")]
     let renamed = |journal: &Journal, commit: Option<&str>| -> Result<BTreeMap<String, String>> {
         Ok((surveyed(journal, commit)?.findings.into_iter())
             .map(|entry| (entry.legacy_id, entry.id))
             .collect())
     };
-    #[cfg(feature = "ledger-durable")]
     let (journal, kept) = durable_run::act::<K>(action, &place, &here, command, &found, &renamed)?;
     match format {
         Format::Json => println!(
