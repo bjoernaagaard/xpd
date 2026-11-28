@@ -3,7 +3,7 @@
   ".github/dependabot.yml": "1,8",
   ".github/workflows/ci.yml": "1,9,21",
   ".github/workflows/docs.yml": "1-7,50,73",
-  ".github/workflows/release.yml": "189-190,210,220,233,235,244,257,275",
+  ".github/workflows/release.yml": "210,233,235,244,257,275",
   ".gitignore": "3,6,11,14,17,21,23-24",
   "Cargo.toml": "2,14,30,37-39,44,60-63,66,70-74,76-78,80-82,84-89,91-93,95,99-100,104,107-108,110",
   "build.rs": "59,72,126,218,245,458",
