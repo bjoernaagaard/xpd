@@ -17,9 +17,11 @@ from pydantic import TypeAdapter
 
 from xpd.mcp.models import (
     CheckReport,
+    CouplingMapReport,
     DiscoveryEntry,
     GateReport,
     GraphReport,
+    LedgerWorkflowName,
     Profile,
     Rule,
     SkillSource,
@@ -51,6 +53,19 @@ GATES_RETRY = Command(
 RULES = Command(("rules", "--format", "json"), TypeAdapter(list[Rule]).validate_json, SUCCESS)
 BUILTIN_RULES = Command(("rules", "--builtin", "--format", "json"), RULES.decode, SUCCESS)
 SKILLS = Command(("skill", "--json"), TypeAdapter(list[SkillSource]).validate_json, SUCCESS)
+UNTANGLE_MAP = Command(
+    ("untangle", "--map", "--format", "json"),
+    TypeAdapter(CouplingMapReport).validate_json,
+    FINDINGS,
+)
+
+
+def ledger_status_command(workflow: LedgerWorkflowName) -> Command[dict[str, object]]:
+    return Command((workflow, "status", "--format", "json"), json.loads, FINDINGS)
+
+
+def ledger_survey_command(workflow: LedgerWorkflowName) -> Command[dict[str, object]]:
+    return Command((workflow, "--format", "json"), json.loads, FINDINGS)
 
 
 def json_error(stdout: bytes) -> bytes | None:

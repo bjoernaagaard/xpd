@@ -429,3 +429,58 @@ class Scripts(BaseModel):
         description="The script that loads the saved model and leaves the same `result`."
     )
     features: str = Field(description="The file with the feature steps.")
+
+
+class CouplingNode(Output):
+    id: str
+    path: str
+    package: str
+    loc: int
+    role: str
+
+
+class CouplingEdge(Output):
+    model_config = ConfigDict(validate_by_name=True, serialize_by_alias=True)
+
+    source: str = Field(alias="from")
+    to: str
+    eager: bool
+    cycle: bool
+    volatile: bool
+
+
+class CouplingHiddenLink(Output):
+    first: str
+    second: str
+
+
+class CouplingMapReport(Output):
+    """Structured coupling and health map returned by `xpd untangle --map --format json`."""
+
+    focused: bool
+    total_modules: int
+    nodes: list[CouplingNode]
+    edges: list[CouplingEdge]
+    hidden_links: list[CouplingHiddenLink] = Field(default_factory=list)
+
+
+LedgerWorkflowName = Literal[
+    "chart-review",
+    "data-prep",
+    "discover",
+    "feature-review",
+    "harden",
+    "model-review",
+    "opt-review",
+    "optimize",
+    "ts-review",
+    "untangle",
+]
+
+
+class LedgerViewReport(Output):
+    """Status or read-only survey payload for any registered xpd ledger workflow."""
+
+    workflow: LedgerWorkflowName
+    mode: Literal["run", "survey"]
+    payload: dict[str, JsonValue]

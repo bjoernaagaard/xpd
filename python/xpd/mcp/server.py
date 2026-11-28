@@ -49,7 +49,8 @@ columns that exist instead of computing their formulas again.
 - Before you choose methods for a data file, run `xpd profile <file>`.
 - After you refactor data logic, run `xpd equiv <script.py> --since HEAD`. The refactor is done \
 when it prints `"equivalent": true`.
-- Before and after a refactor of a codebase, run `xpd untangle`.
+- Before and after a refactor of a codebase, run `xpd untangle` (or call `show_map` and \
+`show_ledger` for visual coupling and workflow summaries).
 - To build a model from a data file, follow the `build_pipeline` prompt. Call \
 `{ToolName.DISCOVERY_GATE}` on the files once the library is chosen, and the run is done when \
 `{ToolName.GATES}` returns `passed: true`. `{ToolName.GATES}` runs the stages itself.

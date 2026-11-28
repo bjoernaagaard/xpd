@@ -296,10 +296,12 @@ fn read(
             }
         }
     }
+    let summary =
+        crate::ledger::salsa_db::cached_optimize_facts(&shown, &text, language, "optimize");
     Some(Surveyed {
         named: tree.tracked(&absolute).unwrap_or_else(|| shown.clone()),
         shown,
-        lines: text.lines().count(),
+        lines: summary.lines,
         python: (language == SupportLang::Python).then(|| optimize_python::facts(path, &root)),
         rules,
     })

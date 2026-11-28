@@ -1,4 +1,4 @@
-mod copies;
+pub(crate) mod copies;
 mod coupling_map;
 mod history;
 mod module_graph;
@@ -285,11 +285,13 @@ fn read(
         });
         (absolute, facts)
     });
+    let shown = tree.shown(path);
+    let summary = crate::ledger::salsa_db::cached_untangle_facts(&shown, &text, language);
     Some(Surveyed {
-        shown: tree.shown(path),
+        shown,
         tracked,
-        blocks: copies::blocks(&root.root()),
-        shapes: twins::shapes(&root.root()),
+        blocks: summary.blocks.clone(),
+        shapes: summary.shapes.clone(),
         defaults: (language == SupportLang::Python)
             .then(|| redundancy::extract_default_arg_facts(&root)),
         python,
@@ -494,4 +496,130 @@ fn survey(
         ..
     } = collect(tree, listing, history)?;
     Ok(catalog.modules(read, findings, |path| tracked.get(path).cloned()))
+}
+
+/// A workspace-level structural hint surfaced by `xpd lsp` for one Python file.
+#[derive(Debug, Clone)]
+pub(crate) struct WorkspaceHint {
+    pub(crate) kind: String,
+    pub(crate) line: usize,
+    pub(crate) message: String,
+}
+
+/// Maximum Python files scanned during a fast LSP workspace structural hint pass.
+const MAX_LSP_HINT_FILES: usize = 250;
+
+/// Computes lightweight cross-module structural hints (`import-cycle`, `orphaned-module`,
+/// `facade-module`, `single-use-module`, `mixed-responsibilities`, `shared-state`) for the
+/// Python files under `root` without walking git history or executing Python.
+pub(crate) fn workspace_hints(root: &Path) -> HashMap<PathBuf, Vec<WorkspaceHint>> {
+    let mut hints: HashMap<PathBuf, Vec<WorkspaceHint>> = HashMap::new();
+    if !root.is_dir() {
+        return hints;
+    }
+    let files: Vec<PathBuf> = crate::ledger::walk_code_files(&[root.to_path_buf()])
+        .into_iter()
+        .filter(|(_, lang)| *lang == SupportLang::Python)
+        .take(MAX_LSP_HINT_FILES)
+        .map(|(path, _)| path)
+        .collect();
+    if files.is_empty() {
+        return hints;
+    }
+    let mut modules = Vec::with_capacity(files.len());
+    let mut canonical_by_shown: HashMap<String, PathBuf> = HashMap::new();
+    for path in &files {
+        let Ok(text) = std::fs::read_to_string(path) else {
+            continue;
+        };
+        let Ok(absolute) = std::fs::canonicalize(path).or_else(|_| std::path::absolute(path))
+        else {
+            continue;
+        };
+        let shown = absolute
+            .strip_prefix(root)
+            .unwrap_or(&absolute)
+            .to_string_lossy()
+            .replace('\\', "/");
+        let parsed = syntax::parse_as(&text, SupportLang::Python);
+        let facts = python_facts::extract_module_facts(&absolute, &parsed, &text, |candidate| {
+            candidate.is_file()
+        });
+        for (kind, line, message, _) in &facts.local {
+            if matches!(
+                kind,
+                UntangleKind::SharedState | UntangleKind::MixedResponsibilities
+            ) {
+                hints
+                    .entry(absolute.clone())
+                    .or_default()
+                    .push(WorkspaceHint {
+                        kind: kind_slug(*kind).to_owned(),
+                        line: *line,
+                        message: message.clone(),
+                    });
+            }
+        }
+        canonical_by_shown.insert(shown.clone(), absolute.clone());
+        modules.push(python_facts::SurveyedModule {
+            shown: shown.clone(),
+            file: absolute,
+            tracked: Some(shown),
+            facts,
+        });
+    }
+    let entry_points = std::fs::read_to_string(root.join("pyproject.toml"))
+        .ok()
+        .as_deref()
+        .map(zones::EntryPoints::from_pyproject)
+        .unwrap_or_default();
+    let empty_changes = HashMap::new();
+    for finding in python_facts::cross_module_findings(&modules, &empty_changes, &entry_points) {
+        if !matches!(
+            finding.kind,
+            UntangleKind::ImportCycle
+                | UntangleKind::OrphanedModule
+                | UntangleKind::FacadeModule
+                | UntangleKind::SingleUseModule
+        ) {
+            continue;
+        }
+        let slug = kind_slug(finding.kind);
+        for place in &finding.places {
+            if let Some(canonical) = canonical_by_shown.get(&place.path) {
+                hints
+                    .entry(canonical.clone())
+                    .or_default()
+                    .push(WorkspaceHint {
+                        kind: slug.to_owned(),
+                        line: place.line.unwrap_or(1),
+                        message: finding.evidence.clone(),
+                    });
+            }
+        }
+    }
+    hints
+}
+
+fn kind_slug(kind: UntangleKind) -> &'static str {
+    match kind {
+        UntangleKind::Copy => "copy",
+        UntangleKind::ChangesTogether => "changes-together",
+        UntangleKind::SharedState => "shared-state",
+        UntangleKind::VolatileImport => "volatile-import",
+        UntangleKind::ImportCycle => "import-cycle",
+        UntangleKind::PrivateReach => "private-reach",
+        UntangleKind::VagueModule => "vague-module",
+        UntangleKind::PassThrough => "pass-through",
+        UntangleKind::Unreferenced => "unreferenced",
+        UntangleKind::ConstantParameter => "constant-parameter",
+        UntangleKind::OneValueBranch => "one-value-branch",
+        UntangleKind::OneCallerParameter => "one-caller-parameter",
+        UntangleKind::NearCopy => "near-copy",
+        UntangleKind::DefaultArgument => "default-argument",
+        UntangleKind::OrphanedModule => "orphaned-module",
+        UntangleKind::FacadeModule => "facade-module",
+        UntangleKind::SingleUseModule => "single-use-module",
+        UntangleKind::MixedResponsibilities => "mixed-responsibilities",
+    }
 }

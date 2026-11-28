@@ -13,22 +13,23 @@
 //! alone. Each tracked query caps how many of its values stay in memory, and evicted values
 //! leave only their dependency record behind.
 
-use std::sync::Arc;
+use std::collections::HashMap;
+use std::fmt::Write as _;
+use std::sync::{Arc, LazyLock, Mutex};
 
 use ast_grep_language::SupportLang;
 use salsa::Durability;
+use sha2::{Digest as _, Sha256};
 
 use super::twins;
 use crate::syntax;
+use crate::untangle::copies::{self, UNTANGLE_FACTS_LRU, UntangleFileSummary};
 
 /// How many file texts stay in memory at once.
-#[expect(dead_code, reason = "the surveys that call it come in the next slice")]
 pub(crate) const FILE_TEXT_LRU: usize = 4096;
 /// How many per-file facts of `xpd optimize` stay in memory at once.
-#[expect(dead_code, reason = "the surveys that call it come in the next slice")]
 pub(crate) const OPTIMIZE_FACTS_LRU: usize = 2048;
 /// How many commit diffs stay in memory at once. The history window reads 2000 commits.
-#[expect(dead_code, reason = "the surveys that call it come in the next slice")]
 pub(crate) const COMMIT_DIFF_LRU: usize = 2048;
 
 /// One file of a snapshot, as the caller captured it.
@@ -185,18 +186,18 @@ pub(crate) fn commit_changed_files(
 /// A database with the memory caps of this module set on each tracked query. The caps that
 /// the `lru` settings declare already hold at creation, and this sets them again through the
 /// per-query setters so that a caller can lower them at runtime on the same database.
-#[expect(dead_code, reason = "the surveys that call it come in the next slice")]
 pub(crate) fn database() -> salsa::DatabaseImpl {
     let mut db = salsa::DatabaseImpl::new();
     file_text::set_lru_capacity(&mut db, FILE_TEXT_LRU);
     optimize_file_facts::set_lru_capacity(&mut db, OPTIMIZE_FACTS_LRU);
+    copies::set_untangle_lru(&mut db, UNTANGLE_FACTS_LRU);
     commit_changed_files::set_lru_capacity(&mut db, COMMIT_DIFF_LRU);
     db
 }
 
 /// The snapshot of `files` at `commit_oid` under rules of `rules_fingerprint`, with
 /// `Durability::LOW` on every field, so that it never revises the rules or the index.
-#[expect(dead_code, reason = "the surveys that call it come in the next slice")]
+#[expect(dead_code, reason = "reserved for multi-snapshot workspace queries")]
 pub(crate) fn new_snapshot_input(
     db: &dyn salsa::Database,
     commit_oid: String,
@@ -212,7 +213,6 @@ pub(crate) fn new_snapshot_input(
 
 /// The rules and index input with `Durability::HIGH` on every field, so that a change of code
 /// files never revises the rule catalog or the library index.
-#[expect(dead_code, reason = "the surveys that call it come in the next slice")]
 pub(crate) fn new_rules_input(
     db: &dyn salsa::Database,
     fingerprint: String,
@@ -225,7 +225,7 @@ pub(crate) fn new_rules_input(
 }
 
 /// The key of the file that `entry` names in a snapshot.
-#[expect(dead_code, reason = "the surveys that call it come in the next slice")]
+#[expect(dead_code, reason = "reserved for multi-snapshot workspace queries")]
 pub(crate) fn file_key<'db>(db: &'db dyn salsa::Database, entry: &FileEntry) -> FileKey<'db> {
     FileKey::new(
         db,
@@ -236,10 +236,109 @@ pub(crate) fn file_key<'db>(db: &'db dyn salsa::Database, entry: &FileEntry) -> 
 }
 
 /// The key of the rules that `input` names.
-#[expect(dead_code, reason = "the surveys that call it come in the next slice")]
 pub(crate) fn rules_key(db: &dyn salsa::Database, input: RulesInput) -> RulesKey<'_> {
     RulesKey::new(
         db,
         format!("{}\n{}", input.fingerprint(db), input.index_fingerprint(db)),
     )
+}
+
+struct SurveyCache {
+    db: salsa::DatabaseImpl,
+    sources: HashMap<(String, String, SupportLang), SourceText>,
+    rules: HashMap<String, RulesInput>,
+    commits: HashMap<String, CommitDiff>,
+}
+
+impl SurveyCache {
+    fn new() -> Self {
+        Self {
+            db: database(),
+            sources: HashMap::new(),
+            rules: HashMap::new(),
+            commits: HashMap::new(),
+        }
+    }
+
+    fn source(&mut self, rel_path: &str, text: &str, lang: SupportLang) -> SourceText {
+        let hash = content_hash(text);
+        let key = (rel_path.to_owned(), hash.clone(), lang);
+        if let Some(&existing) = self.sources.get(&key) {
+            return existing;
+        }
+        let created = SourceText::new(&self.db, rel_path.to_owned(), hash, lang, text.to_owned());
+        self.sources.insert(key, created);
+        created
+    }
+
+    fn rules(&mut self, fingerprint: &str) -> RulesInput {
+        if let Some(&existing) = self.rules.get(fingerprint) {
+            return existing;
+        }
+        let created = new_rules_input(&self.db, fingerprint.to_owned(), "bundled".to_owned());
+        self.rules.insert(fingerprint.to_owned(), created);
+        created
+    }
+}
+
+static SURVEY_CACHE: LazyLock<Mutex<SurveyCache>> =
+    LazyLock::new(|| Mutex::new(SurveyCache::new()));
+
+fn content_hash(text: &str) -> String {
+    let digest = Sha256::digest(text.as_bytes());
+    let mut hex = String::with_capacity(64);
+    for byte in digest {
+        let _ = write!(hex, "{byte:02x}");
+    }
+    hex
+}
+
+/// Returns memoized `xpd untangle` per-file stretches and shapes via Salsa, keyed by path,
+/// content hash, and language so unchanged files across `--since` and `gate` are parsed once.
+pub(crate) fn cached_untangle_facts(
+    rel_path: &str,
+    text: &str,
+    lang: SupportLang,
+) -> Arc<UntangleFileSummary> {
+    let mut cache = SURVEY_CACHE
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
+    let source = cache.source(rel_path, text, lang);
+    Arc::clone(copies::untangle_file_facts(&cache.db, source))
+}
+
+/// Returns memoized `xpd optimize` per-file line counts and shape stretches via Salsa.
+pub(crate) fn cached_optimize_facts(
+    rel_path: &str,
+    text: &str,
+    lang: SupportLang,
+    rules_fingerprint: &str,
+) -> Arc<OptimizeFileSummary> {
+    let mut cache = SURVEY_CACHE
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
+    let source = cache.source(rel_path, text, lang);
+    let rules_input = cache.rules(rules_fingerprint);
+    let key = rules_key(&cache.db, rules_input);
+    Arc::clone(optimize_file_facts(&cache.db, source, key))
+}
+
+/// Returns memoized changed files for a commit pair key via Salsa's `commit_changed_files`.
+pub(crate) fn cached_commit_diff(
+    commit_key: &str,
+    load: impl FnOnce() -> anyhow::Result<Vec<String>>,
+) -> anyhow::Result<Arc<[String]>> {
+    let mut cache = SURVEY_CACHE
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
+    let diff = if let Some(&existing) = cache.commits.get(commit_key) {
+        existing
+    } else {
+        let changed = load()?;
+        let created = CommitDiff::new(&cache.db, commit_key.to_owned(), changed);
+        cache.commits.insert(commit_key.to_owned(), created);
+        created
+    };
+    let id = CommitId::new(&cache.db, commit_key.to_owned());
+    Ok(Arc::clone(commit_changed_files(&cache.db, id, diff)))
 }

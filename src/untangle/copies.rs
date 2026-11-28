@@ -104,18 +104,20 @@ pub(super) fn exact_copy_groups<'f>(
 use std::sync::Arc;
 
 use crate::ledger::salsa_db::SourceText;
+use crate::ledger::twins;
 
 /// How many per-file facts stay in memory at once.
-#[expect(dead_code, reason = "the surveys that call it come in the next slice")]
 pub(crate) const UNTANGLE_FACTS_LRU: usize = 2048;
 
-/// The per-file facts of `xpd untangle` for one file: its lines and its copied stretches.
+/// The per-file facts of `xpd untangle` for one file: its lines, copied stretches, and shape twins.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct UntangleFileSummary {
     /// The lines of the file.
     pub(crate) lines: usize,
     /// The stretches of the file that are long enough to be a copy.
     pub(crate) blocks: Vec<TokenBlock>,
+    /// The stretches of the file that are long enough to be a near copy.
+    pub(crate) shapes: twins::Shapes,
 }
 
 /// The facts of one file for `xpd untangle`, as a tracked query with a memory cap. Only the
@@ -130,5 +132,11 @@ pub(crate) fn untangle_file_facts(
     Arc::new(UntangleFileSummary {
         lines: text.lines().count(),
         blocks: blocks(&root.root()),
+        shapes: twins::shapes(&root.root()),
     })
+}
+
+/// Applies the configured LRU memory cap to `untangle_file_facts` on `db`.
+pub(crate) fn set_untangle_lru(db: &mut salsa::DatabaseImpl, capacity: usize) {
+    untangle_file_facts::set_lru_capacity(db, capacity);
 }

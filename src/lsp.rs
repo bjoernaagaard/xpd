@@ -539,6 +539,8 @@ struct Server<'c> {
     documents: HashMap<String, Document>,
     /// The file that holds each project's package warnings, by the project's folder.
     package_files: HashMap<PathBuf, Uri>,
+    /// Workspace-level structural hints per project root, keyed by canonical file path.
+    structural_hints: HashMap<PathBuf, HashMap<PathBuf, Vec<crate::untangle::WorkspaceHint>>>,
     /// The open documents whose issues the client does not have yet, when the server pushes
     /// them.
     unpublished: BTreeSet<String>,
@@ -569,6 +571,7 @@ impl<'c> Server<'c> {
             workspace,
             documents: HashMap::new(),
             package_files: HashMap::new(),
+            structural_hints: HashMap::new(),
             unpublished: BTreeSet::new(),
             pending_packages: BTreeSet::new(),
             sent_requests: 0,
@@ -882,6 +885,12 @@ impl<'c> Server<'c> {
     /// Reads the venv of the project in `root` again, and brings what the client shows for the
     /// project up to date.
     fn refresh_project(&mut self, root: &Path, reload: Reload) -> Result<()> {
+        let should_scan_hints =
+            matches!(reload, Reload::WithImports) || !self.structural_hints.contains_key(root);
+        if should_scan_hints {
+            self.structural_hints
+                .insert(root.to_path_buf(), crate::untangle::workspace_hints(root));
+        }
         if self.workspace.refresh(root)? || matches!(reload, Reload::WithImports) {
             self.lint_again(root);
         }
@@ -908,6 +917,7 @@ impl<'c> Server<'c> {
     /// closed or moved to another project.
     fn close_project(&mut self, root: &Path) {
         self.pending_packages.remove(root);
+        self.structural_hints.remove(root);
         if let Some(file) = self.package_files.remove(root) {
             self.notify::<PublishDiagnostics>(PublishDiagnosticsParams::new(
                 file,
@@ -931,12 +941,18 @@ impl<'c> Server<'c> {
             .documents
             .get_mut(key)
             .context("the document is not open")?;
+        let root = document.place.root.clone();
+        let file_path = uri::to_path(&document.uri)
+            .and_then(|path| std::fs::canonicalize(&path).ok().or(Some(path)));
         let (document, linted) = lint(&mut self.workspace, document)?;
-        let params = PublishDiagnosticsParams::new(
-            document.uri.clone(),
-            diagnostics(document, linted, self.client.encoding),
-            document.version,
+        let mut items = diagnostics(document, linted, self.client.encoding);
+        append_structural_hints(
+            &self.structural_hints,
+            &root,
+            file_path.as_deref(),
+            &mut items,
         );
+        let params = PublishDiagnosticsParams::new(document.uri.clone(), items, document.version);
         self.notify::<PublishDiagnostics>(params);
         Ok(())
     }
@@ -1020,8 +1036,22 @@ impl<'c> Server<'c> {
         };
         let items = match document {
             Some(document) => {
+                let root = document.place.root.clone();
+                let file_path = uri::to_path(&document.uri)
+                    .and_then(|path| std::fs::canonicalize(&path).ok().or(Some(path)));
                 let (document, linted) = lint(&mut self.workspace, document)?;
-                diagnostics(document, linted, self.client.encoding)
+                let mut found = diagnostics(document, linted, self.client.encoding);
+                if !self.structural_hints.contains_key(&root) {
+                    self.structural_hints
+                        .insert(root.clone(), crate::untangle::workspace_hints(&root));
+                }
+                append_structural_hints(
+                    &self.structural_hints,
+                    &root,
+                    file_path.as_deref(),
+                    &mut found,
+                );
+                found
             }
             None => Vec::new(),
         };
@@ -1196,5 +1226,34 @@ fn edit(
             changes: Some(HashMap::from([(uri, edits)])),
             ..WorkspaceEdit::default()
         },
+    }
+}
+
+fn append_structural_hints(
+    hints_by_project: &HashMap<PathBuf, HashMap<PathBuf, Vec<crate::untangle::WorkspaceHint>>>,
+    root: &Path,
+    file_path: Option<&Path>,
+    out: &mut Vec<Diagnostic>,
+) {
+    let Some(path) = file_path else {
+        return;
+    };
+    let Some(project_hints) = hints_by_project.get(root) else {
+        return;
+    };
+    let Some(file_hints) = project_hints.get(path) else {
+        return;
+    };
+    for hint in file_hints {
+        let line = u32::try_from(hint.line.saturating_sub(1)).unwrap_or(u32::MAX);
+        let pos = lsp_types::Position::new(line, 0);
+        out.push(Diagnostic {
+            range: lsp_types::Range::new(pos, pos),
+            severity: Some(DiagnosticSeverity::HINT),
+            code: Some(NumberOrString::String(format!("untangle/{}", hint.kind))),
+            source: Some(SOURCE.to_owned()),
+            message: hint.message.clone(),
+            ..Diagnostic::default()
+        });
     }
 }

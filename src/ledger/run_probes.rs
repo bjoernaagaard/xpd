@@ -110,19 +110,23 @@ pub(super) fn measure_bench(command: &str, runs: usize) -> Result<Timing> {
     })
 }
 
-/// Tracked files changed between `current` and `head` in `top`.
+/// Tracked files changed between `current` and `head` in `top`, memoized through Salsa.
 pub(super) fn diff_changed_files(
     top: &Path,
     current: &str,
     head: &str,
 ) -> Result<BTreeSet<String>> {
-    let diff = git::output(top, &["diff", "--name-only", current, head])?;
-    Ok(diff
-        .lines()
-        .map(str::trim)
-        .filter(|line| !line.is_empty())
-        .map(|line| line.replace('\\', "/"))
-        .collect())
+    let key = format!("{}:{current}..{head}", top.display());
+    let changed = super::salsa_db::cached_commit_diff(&key, || {
+        let diff = git::output(top, &["diff", "--name-only", current, head])?;
+        Ok(diff
+            .lines()
+            .map(str::trim)
+            .filter(|line| !line.is_empty())
+            .map(|line| line.replace('\\', "/"))
+            .collect())
+    })?;
+    Ok(changed.iter().cloned().collect())
 }
 
 /// Runs each check that passed at the start and returns the ones that fail now.
