@@ -394,6 +394,23 @@ impl ChartReviewArgs {
     }
 }
 
+/// Runs a static chart-review survey without runtime adapters for `xpd audit`.
+pub(crate) fn audit_survey(
+    paths: &[PathBuf],
+    files: Tree<'_>,
+    top: Option<&Path>,
+    commit: &str,
+) -> Result<ledger::AuditSurvey> {
+    let listing = Listing::of(paths, files, top, commit)?;
+    Ok(ledger::AuditSurvey::from_output(survey(
+        paths,
+        files,
+        &listing,
+        None,
+        AdapterPolicy::BestEffort,
+    )?))
+}
+
 /// Formats `xpd chart-review --questions --format text`.
 fn catalog_text(inv: &Inventory) -> String {
     let mut out = String::new();

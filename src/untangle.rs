@@ -646,6 +646,24 @@ pub(crate) fn workspace_hints(root: &Path) -> HashMap<PathBuf, Vec<WorkspaceHint
     hints
 }
 
+/// Runs a static untangle survey for `xpd audit`.
+pub(crate) fn audit_survey(
+    paths: &[PathBuf],
+    files: Tree<'_>,
+    top: Option<&Path>,
+    commit: &str,
+) -> Result<ledger::AuditSurvey> {
+    let catalog = QuestionCatalog::load(include_str!("../rules/xpd/untangle.yml"))?;
+    let history = top.map_or_else(History::default, |top| History::read(top, commit));
+    let output = survey(
+        files,
+        &Listing::of(paths, files, top, commit)?,
+        &history,
+        &catalog,
+    )?;
+    Ok(ledger::AuditSurvey::from_output(output))
+}
+
 fn kind_slug(kind: UntangleKind) -> &'static str {
     match kind {
         UntangleKind::Copy => "copy",

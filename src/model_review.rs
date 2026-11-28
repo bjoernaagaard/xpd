@@ -95,6 +95,25 @@ pub(crate) struct ModelReviewArgs {
     questions: bool,
 }
 
+/// Runs a static model-review survey without runtime adapters for `xpd audit`.
+pub(crate) fn audit_survey(
+    paths: &[std::path::PathBuf],
+    tree: ledger::Tree<'_>,
+    top: Option<&std::path::Path>,
+    commit: &str,
+) -> Result<ledger::AuditSurvey> {
+    Ok(ledger::AuditSurvey::from_output(
+        model_runtime::survey_models(
+            paths,
+            tree,
+            top,
+            commit,
+            None,
+            ledger::AdapterPolicy::BestEffort,
+        )?,
+    ))
+}
+
 impl ModelReviewArgs {
     pub(crate) fn run(self, default: Format) -> Result<ExitCode> {
         if self.questions {

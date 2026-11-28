@@ -116,6 +116,20 @@ impl HardenArgs {
     }
 }
 
+/// Runs a static harden survey for `xpd audit`.
+pub(crate) fn audit_survey(
+    paths: &[PathBuf],
+    tree: Tree<'_>,
+    top: Option<&std::path::Path>,
+    commit: &str,
+) -> Result<ledger::AuditSurvey> {
+    let catalog = QuestionCatalog::load(include_str!("../rules/xpd/harden.yml"))?;
+    let listing = Listing::of(paths, tree, top, commit)?;
+    Ok(ledger::AuditSurvey::from_output(survey(
+        paths, tree, &listing, &catalog,
+    )?))
+}
+
 fn survey(
     paths: &[PathBuf],
     tree: Tree<'_>,

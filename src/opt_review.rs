@@ -108,6 +108,23 @@ pub(crate) struct OptReviewArgs {
     questions: bool,
 }
 
+/// Runs a static opt-review survey without runtime adapters for `xpd audit`.
+pub(crate) fn audit_survey(
+    paths: &[PathBuf],
+    tree: Tree<'_>,
+    top: Option<&Path>,
+    commit: &str,
+) -> Result<ledger::AuditSurvey> {
+    Ok(ledger::AuditSurvey::from_output(survey_problems(
+        paths,
+        tree,
+        top,
+        commit,
+        None,
+        AdapterPolicy::BestEffort,
+    )?))
+}
+
 impl OptReviewArgs {
     pub(crate) fn run(self, default: Format) -> Result<ExitCode> {
         if self.questions {

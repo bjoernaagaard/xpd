@@ -259,6 +259,25 @@ impl OptimizeArgs {
     }
 }
 
+/// Runs a static optimize survey without executing runtime workloads for `xpd audit`.
+pub(crate) fn audit_survey(
+    paths: &[PathBuf],
+    tree: Tree<'_>,
+    top: Option<&Path>,
+    commit: &str,
+) -> Result<ledger::AuditSurvey> {
+    let catalog = QuestionCatalog::load(include_str!("../rules/xpd/optimize.yml"))?;
+    let listing = Listing::of(paths, tree, top, commit)?;
+    Ok(ledger::AuditSurvey::from_output(survey(
+        paths,
+        tree,
+        &listing,
+        Vec::new(),
+        None,
+        &catalog,
+    )?))
+}
+
 /// What one file gives the ledger.
 struct Surveyed {
     shown: String,

@@ -3,6 +3,7 @@
 
 mod animate;
 mod animate_workflow;
+mod audit;
 mod author;
 mod cases;
 mod catalog;

@@ -28,7 +28,7 @@ use super::orchestration::{
     Command as RunCommand, CommandEnvelope, FinishOutput, FixOutcome, GateOutput, JournalState,
     Receipt, ReceiptOutcome, RunStartInput, Snapshot, ValidatePlanOutput,
 };
-use super::run_journal::RunJournal;
+use super::run_journal::{AnswerRecord, RunJournal};
 use super::run_probes::{Renamed, RunWorkspace};
 use super::workflow_registry::WorkflowId;
 
@@ -507,6 +507,100 @@ pub(super) fn migrate_legacy_journal(
         target.display()
     );
     Ok(())
+}
+
+/// Read-only rollup of recorded ledger debt for one workflow in the current worktree.
+#[derive(Debug, Clone, Serialize)]
+pub(crate) struct RecordedDebt {
+    pub(crate) status: String,
+    pub(crate) accepted_findings: usize,
+    pub(crate) accepted_checklist: usize,
+    pub(crate) open_fixes: usize,
+}
+
+/// Reads recorded debt across `workflows` without creating or modifying the ledger store.
+pub(crate) fn recorded_ledger_debt(
+    top: &Path,
+    workflows: &[WorkflowId],
+) -> Result<BTreeMap<WorkflowId, RecordedDebt>> {
+    let git_dir = git_dir_at(top, "--absolute-git-dir")?;
+    let common = git_dir_at(top, "--git-common-dir")?;
+    let config = ProviderConfig::for_repository(&common);
+    if let ProviderConfig::Sqlite { db_path } = &config
+        && !db_path.is_file()
+    {
+        return Ok(BTreeMap::new());
+    }
+    let namespace = if git_dir == common {
+        "wt-main".to_owned()
+    } else {
+        let below = git_dir.strip_prefix(&common).unwrap_or(&git_dir);
+        format!("wt-{}", below.display())
+    };
+    let requested = workflows.to_vec();
+    LazyTokio::new().block_on(async move {
+        let store = open_store(&config).await?;
+        let mut out = BTreeMap::new();
+        for workflow in requested {
+            let client = |generation| {
+                LedgerOrchestratorClient::new(
+                    Arc::clone(&store),
+                    instance_id(&namespace, workflow, generation),
+                )
+            };
+            let mut highest = None;
+            for generation in 0_u64.. {
+                match client(generation).status().await? {
+                    OrchestrationStatus::NotFound => break,
+                    status => highest = Some((generation, status)),
+                }
+            }
+            let Some((generation, status)) = highest else {
+                continue;
+            };
+            let label = match status {
+                OrchestrationStatus::Completed { .. } => "completed",
+                OrchestrationStatus::Failed { .. } => "failed",
+                _ => "running",
+            };
+            let snapshot = client(generation).snapshot().await?;
+            let Some(snapshot) = snapshot else {
+                out.insert(
+                    workflow,
+                    RecordedDebt {
+                        status: label.to_owned(),
+                        accepted_findings: 0,
+                        accepted_checklist: 0,
+                        open_fixes: 0,
+                    },
+                );
+                continue;
+            };
+            let journal = journal_of(&snapshot.run)?;
+            let accepted_checklist = journal
+                .answered
+                .values()
+                .filter(|record| matches!(record, AnswerRecord::Exception { .. }))
+                .count();
+            let open_fixes = journal.fixes().filter(|fix| fix.outcome.is_none()).count();
+            out.insert(
+                workflow,
+                RecordedDebt {
+                    status: label.to_owned(),
+                    accepted_findings: journal.accepted.len(),
+                    accepted_checklist,
+                    open_fixes,
+                },
+            );
+        }
+        Ok::<_, anyhow::Error>(out)
+    })?
+}
+
+fn git_dir_at(top: &Path, flag: &str) -> Result<PathBuf> {
+    let folder = crate::git::output(top, &["rev-parse", flag])?;
+    let folder = top.join(folder.trim());
+    fs::canonicalize(&folder).with_context(|| format!("cannot read {}", folder.display()))
 }
 
 /// Keeps the log lines of the embedded runtime off stdout, where the run is printed.

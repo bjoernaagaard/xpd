@@ -368,6 +368,7 @@ enum Cmd {
     Optimize(crate::optimize::OptimizeArgs),
     Harden(crate::harden::HardenArgs),
     Discover(crate::discover::DiscoverArgs),
+    Audit(crate::audit::AuditArgs),
     /// Serve ledger runs from a shared PostgreSQL store.
     #[cfg(feature = "ledger-distributed")]
     #[command(subcommand)]
@@ -508,6 +509,7 @@ pub fn run() -> ExitCode {
         Cmd::Harden(args) => command_result(args.run(default_format)),
         Cmd::Discover(args) => command_result(args.run(default_format)),
         Cmd::Optimize(args) => command_result(args.run(default_format)),
+        Cmd::Audit(args) => command_result(args.run(default_format)),
         #[cfg(feature = "ledger-distributed")]
         Cmd::Ledger(LedgerCommand::Worker(args)) => {
             command_result(crate::ledger::worker::run_ledger_worker(args))

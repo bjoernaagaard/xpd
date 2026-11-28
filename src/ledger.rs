@@ -35,6 +35,7 @@ mod question_catalog;
 mod run_journal;
 mod run_probes;
 mod run_stage;
+pub(crate) use durable_store::{RecordedDebt, recorded_ledger_debt};
 pub(crate) use question_catalog::QuestionCatalog;
 pub(crate) use run_journal::Goal;
 pub(crate) mod salsa_db;
@@ -272,6 +273,37 @@ pub(crate) struct ChecklistEntry {
     pub(crate) requires_na: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) answer: Option<serde_json::Value>,
+}
+
+/// One static finding captured by `xpd audit`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct AuditFinding {
+    pub(crate) id: String,
+    pub(crate) kind: String,
+}
+
+/// Compact static survey snapshot consumed by `xpd audit`.
+#[derive(Debug, Default)]
+pub(crate) struct AuditSurvey {
+    pub(crate) findings: Vec<AuditFinding>,
+    pub(crate) checklist_items: usize,
+}
+
+impl AuditSurvey {
+    /// Extracts stable finding IDs, kind names, and checklist count from a workflow survey.
+    pub(crate) fn from_output<K: LedgerKind, R>(output: SurveyOutput<K, R>) -> Self {
+        Self {
+            findings: output
+                .findings
+                .into_iter()
+                .map(|entry| AuditFinding {
+                    id: entry.id,
+                    kind: entry.finding.kind.name(),
+                })
+                .collect(),
+            checklist_items: output.checklist.len(),
+        }
+    }
 }
 
 /// What a ledger survey returns: what it read, its mechanical findings, and any checklist items.
@@ -798,7 +830,7 @@ impl Drop for Scratch {
 /// `None` when the commit holds none of the paths. The files of the commit are written to a
 /// folder of their own through an index of their own, so the working tree and the index of the
 /// repository stay as they are.
-fn at_commit<T>(
+pub(crate) fn at_commit<T>(
     paths: &[PathBuf],
     top: &Path,
     commit: &str,
