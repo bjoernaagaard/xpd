@@ -389,6 +389,18 @@ impl Journal {
         }
     }
 
+    /// Unique finding ids removed by kept fixes in this run.
+    fn fixed_count(&self) -> usize {
+        self.fixes()
+            .filter_map(|fix| match &fix.outcome {
+                Some(Outcome::Kept { fixed, .. }) => Some(fixed.iter().map(String::as_str)),
+                _ => None,
+            })
+            .flatten()
+            .collect::<BTreeSet<_>>()
+            .len()
+    }
+
     fn text(&self, command: &str) -> String {
         let mut text = String::new();
         let _ = writeln!(
@@ -452,11 +464,26 @@ impl Journal {
         }
         let _ = writeln!(
             text,
-            "  {} findings accepted with a reason",
+            "  {} findings fixed, {} accepted with a reason",
+            self.fixed_count(),
             self.accepted.len()
         );
         if !self.answered.is_empty() {
-            let _ = writeln!(text, "  {} checklist items answered", self.answered.len());
+            let fixed_items = self
+                .answered
+                .values()
+                .filter(|record| matches!(record, AnswerRecord::Fixed { .. }))
+                .count();
+            let excepted_items = self
+                .answered
+                .values()
+                .filter(|record| matches!(record, AnswerRecord::Exception { .. }))
+                .count();
+            let _ = writeln!(
+                text,
+                "  {} checklist items answered ({fixed_items} fixed, {excepted_items} accepted)",
+                self.answered.len()
+            );
         }
         let _ = writeln!(text, "Next: {}", self.next(command).text);
         text
@@ -1254,16 +1281,17 @@ fn report_finish(journal: &Journal, surveyed: &Surveyed) {
     let bench_summary = journal.bench.as_ref().map_or_else(String::new, |bench| {
         format!(", bench {}", format_speedup(bench.baseline, bench.current))
     });
+    let fixed = before.difference(after).count();
+    let added = after.difference(before).count();
+    let accepted = after
+        .iter()
+        .filter(|id| journal.accepted.contains_key(*id))
+        .count();
+    let unexplained = after.len().saturating_sub(accepted);
     eprintln!(
-        "xpd: {} findings at the start, {} now: {} fixed, {} added, {} left without a reason; lines {} -> {current_lines}{bench_summary}",
+        "xpd: {} findings at the start, {} now: {fixed} fixed, {added} added, {accepted} accepted, {unexplained} left without a reason; lines {} -> {current_lines}{bench_summary}",
         before.len(),
         after.len(),
-        before.difference(after).count(),
-        after.difference(before).count(),
-        after
-            .iter()
-            .filter(|id| !journal.accepted.contains_key(*id))
-            .count(),
         journal.was_lines,
     );
 }
@@ -2245,7 +2273,14 @@ pub(super) fn act<K: Kind, R: Serialize>(
     match format {
         Format::Json => println!(
             "{}",
-            serde_json::json!({"run": journal, "next": journal.next(command)})
+            serde_json::json!({
+                "run": journal,
+                "summary": {
+                    "fixed": journal.fixed_count(),
+                    "accepted": journal.accepted.len(),
+                },
+                "next": journal.next(command),
+            })
         ),
         Format::Text => print!("{}", journal.text(command)),
     }

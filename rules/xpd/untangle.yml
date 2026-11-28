@@ -8,13 +8,13 @@ facts:
 questions:
   - id: one-purpose
     text: "Can the purpose of this module be said in one sentence that names what it holds?"
-    look: "The definitions in the module and whether one name covers them all."
+    look: "The definitions in the module, whether one name covers them all, and any vague-module or mixed-responsibilities findings."
   - id: changes-together
     text: "Does everything in this module change for the same reason?"
     look: "The git history of the module and the findings that name its files."
   - id: no-dead-weight
     text: "Is every definition in this module used, and does each parameter earn its place?"
-    look: "Unreferenced, constant-parameter, one-caller-parameter and pass-through findings in the module."
+    look: "Unreferenced, orphaned-module, facade-module, single-use-module, constant-parameter, one-caller-parameter and pass-through findings in the module."
   - id: copies-together
     text: "Is any code in this module written again in another module?"
     look: "Copy and near-copy findings that name this module and the other places."

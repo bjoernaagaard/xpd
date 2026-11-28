@@ -104,6 +104,17 @@ fn loaded_by(path: &Path, root: &Root) -> Vec<PathBuf> {
     loaded
 }
 
+/// Where an import statement sits in a module.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub(crate) enum ImportScope {
+    /// Executed when the module itself is imported.
+    TopLevel,
+    /// Executed only when a function or lambda runs.
+    Deferred,
+    /// Guarded by an `if TYPE_CHECKING:` branch.
+    TypeChecking,
+}
+
 /// One name that a module of the project gives to the file that imports it.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct Import {
@@ -116,15 +127,108 @@ pub(crate) struct Import {
     pub(crate) bound: String,
     /// The line of the import statement, counted from 1.
     pub(crate) line: usize,
+    /// Whether the import runs at module load time, inside a function, or only for type checking.
+    pub(crate) scope: ImportScope,
+}
+
+/// The dotted Python module name of `path` relative to its outermost package root.
+pub(crate) fn module_name(path: &Path, is_file: impl Fn(&Path) -> bool) -> Option<String> {
+    let package = path.parent().unwrap_or(Path::new(""));
+    let top = import_root(package, is_file);
+    let relative = path.strip_prefix(top).ok()?;
+    let mut parts: Vec<String> = relative
+        .components()
+        .filter_map(|part| part.as_os_str().to_str().map(str::to_owned))
+        .collect();
+    let last = parts.pop()?;
+    if last == INIT {
+        if parts.is_empty() {
+            return None;
+        }
+    } else {
+        let stem = Path::new(&last).file_stem()?.to_str()?.to_owned();
+        parts.push(stem);
+    }
+    Some(parts.join("."))
+}
+
+/// Whether an `if_statement` condition checks `TYPE_CHECKING`.
+fn is_type_checking_if(node: &Node<'_>) -> bool {
+    node.kind() == "if_statement"
+        && node.field("condition").is_some_and(|condition| {
+            condition
+                .dfs()
+                .any(|item| item.kind() == "identifier" && item.text() == "TYPE_CHECKING")
+        })
+}
+
+/// Where `import` sits in the module AST.
+fn import_scope(import: &Node<'_>) -> ImportScope {
+    let mut deferred = false;
+    let mut child_id = import.node_id();
+    for ancestor in import.ancestors() {
+        let kind = ancestor.kind();
+        if kind == "if_statement"
+            && is_type_checking_if(&ancestor)
+            && ancestor
+                .field("consequence")
+                .is_some_and(|consequence| consequence.node_id() == child_id)
+        {
+            return ImportScope::TypeChecking;
+        }
+        if matches!(kind.as_ref(), "function_definition" | "lambda") {
+            deferred = true;
+        }
+        child_id = ancestor.node_id();
+    }
+    if deferred {
+        ImportScope::Deferred
+    } else {
+        ImportScope::TopLevel
+    }
 }
 
 /// Every import of a module of the same project in the file at `path`, wherever the statement
 /// stands, also in a function or under `if TYPE_CHECKING:`. `from package import module` gives
 /// the module, and no entry for the package. `from . import name` names no module, so it starts
 /// from the package itself.
+#[expect(
+    dead_code,
+    reason = "kept for disk-backed callers alongside imported_with"
+)]
 pub(crate) fn imported(path: &Path, root: &Root) -> Vec<Import> {
     let path = std::path::absolute(path).unwrap_or_else(|_| path.to_path_buf());
     imported_with(&path, root, Path::is_file)
+}
+
+/// Resolves an absolute dotted module path starting from `top`, falling back to enclosing
+/// directories (and `src/` or `python/` roots below them) so PEP 420 namespace packages and
+/// tests importing sibling source roots resolve without an unbroken chain of `__init__.py`.
+fn resolve_absolute_module(
+    package: &Path,
+    top: &Path,
+    parts: &[String],
+    is_file: &impl Fn(&Path) -> bool,
+) -> Option<PathBuf> {
+    if let Some(found) = module_file(top, parts, is_file) {
+        return Some(found);
+    }
+    for ancestor in package.ancestors() {
+        if ancestor != top
+            && let Some(found) = module_file(ancestor, parts, is_file)
+        {
+            return Some(found);
+        }
+        for sub in ["src", "python"] {
+            let root = ancestor.join(sub);
+            if root != top
+                && let Some(found) = module_file(&root, parts, is_file)
+            {
+                return Some(found);
+            }
+        }
+    }
+    None
 }
 
 /// Every import of a module of the same project in the file at `path`, resolving module
@@ -141,9 +245,11 @@ pub(crate) fn imported_with(
         let line = import.start_pos().line() + 1;
         match &*import.kind() {
             "import_statement" => {
+                let scope = import_scope(&import);
                 for name in import.field_children("name") {
                     let dotted = parts(&name);
-                    let Some(module) = module_file(top, &dotted, &is_file) else {
+                    let Some(module) = resolve_absolute_module(package, top, &dotted, &is_file)
+                    else {
                         continue;
                     };
                     imports.push(Import {
@@ -151,17 +257,32 @@ pub(crate) fn imported_with(
                         name: None,
                         bound: bound_name(&name).unwrap_or_else(|| dotted.join(".")),
                         line,
+                        scope,
                     });
                 }
             }
             "import_from_statement" => {
+                let scope = import_scope(&import);
+                let relative = import
+                    .field("module_name")
+                    .is_some_and(|node| node.kind() == "relative_import");
                 let Some((base, mut module)) = from_module(&import, package, top) else {
                     continue;
                 };
-                let package_file = if module.is_empty() {
-                    Some(base.join(INIT)).filter(|init| is_file(init))
+                let (resolved_base, package_file) = if relative {
+                    let file = if module.is_empty() {
+                        Some(base.join(INIT)).filter(|init| is_file(init))
+                    } else {
+                        module_file(base, &module, &is_file)
+                    };
+                    (base.to_path_buf(), file)
                 } else {
-                    module_file(base, &module, &is_file)
+                    let file = resolve_absolute_module(package, top, &module, &is_file);
+                    let root_dir = file
+                        .as_ref()
+                        .and_then(|resolved| base_for_module(resolved, &module))
+                        .unwrap_or_else(|| top.to_path_buf());
+                    (root_dir, file)
                 };
                 let Some(package_file) = package_file else {
                     continue;
@@ -169,7 +290,7 @@ pub(crate) fn imported_with(
                 for name in import.field_children("name") {
                     let taken = parts(&name);
                     module.extend(taken.iter().cloned());
-                    let found = module_file(base, &module, &is_file);
+                    let found = module_file(&resolved_base, &module, &is_file);
                     module.truncate(module.len() - taken.len());
                     let bound = bound_name(&name).unwrap_or_else(|| taken.join("."));
                     imports.push(match found {
@@ -178,12 +299,14 @@ pub(crate) fn imported_with(
                             name: None,
                             bound,
                             line,
+                            scope,
                         },
                         None => Import {
                             module: package_file.clone(),
                             name: Some(taken.join(".")),
                             bound,
                             line,
+                            scope,
                         },
                     });
                 }
@@ -192,6 +315,20 @@ pub(crate) fn imported_with(
         }
     }
     imports
+}
+
+/// Recovers the root directory from which `resolved` was found for `parts`.
+fn base_for_module(resolved: &Path, parts: &[String]) -> Option<PathBuf> {
+    let mut dir = resolved.parent()?;
+    let depth = if resolved.file_name().is_some_and(|name| name == INIT) {
+        parts.len()
+    } else {
+        parts.len().saturating_sub(1)
+    };
+    for _ in 0..depth {
+        dir = dir.parent()?;
+    }
+    Some(dir.to_path_buf())
 }
 
 /// The file of the module `parts` below the folder `base`: the `__init__.py` of a package, or

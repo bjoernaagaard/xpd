@@ -10,8 +10,8 @@ Use `xpd untangle` to put pieces that change together in the same module, sever 
 | Group | Finding kinds |
 | --- | --- |
 | Hidden links | `copy`, `near-copy`, `changes-together`, `shared-state` |
-| Needless links | `volatile-import`, `import-cycle`, `private-reach`, `vague-module` |
-| Surplus | `pass-through`, `default-argument`, `unreferenced`, `constant-parameter` |
+| Needless links | `volatile-import`, `import-cycle`, `private-reach`, `vague-module`, `mixed-responsibilities` |
+| Surplus | `pass-through`, `default-argument`, `unreferenced`, `constant-parameter`, `orphaned-module`, `facade-module`, `single-use-module` |
 | Special cases | `one-value-branch`, `one-caller-parameter` |
 
 Each module with a finding gets six structural checklist items. Run `xpd untangle --questions` to inspect the catalog. Supported fix goals are `shorter` (requires a lower line count) and `design` (requires editing a file owning a cited checklist item). For a data script refactor, prove behavior did not change with `xpd equiv` and note the result in the commit.

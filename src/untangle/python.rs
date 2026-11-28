@@ -1,14 +1,16 @@
 //! What `xpd untangle` reads from Python: the facts of one module, and the findings that
 //! follow from the modules of a project together.
 
-use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet, VecDeque};
 use std::path::{Path, PathBuf};
 
-use crate::imports::{self, Import};
+use crate::imports::{self, Import, ImportScope};
+use crate::ledger::python::local_nodes;
+use crate::names::{is_bound, is_parameter_name};
 use crate::syntax::{Node, Root};
 
+use super::zones::{EntryPoints, Zone, classify};
 use super::{Finding, Kind, Place};
-use crate::source;
 
 /// The fewest commits of an imported module before its importer is compared with it. Below
 /// this, the history is too short to call the module volatile.
@@ -17,6 +19,46 @@ const VOLATILE_COMMITS: usize = 8;
 const CALLS_FOR_ONE_CALLER: usize = 3;
 /// How much of a condition is quoted in the evidence.
 const QUOTED_CHARS: usize = 60;
+/// Minimum lines before a module with zero importers is flagged as orphaned.
+const ORPHANED_MIN_LOC: usize = 10;
+/// Maximum importers before a re-export facade is treated as an established public surface.
+const FACADE_MAX_IMPORTERS: usize = 20;
+/// Minimum lines for a single-use helper module to be flagged as an inlining candidate.
+const SINGLE_USE_MIN_LOC: usize = 20;
+/// Maximum lines for a single-use helper module to be flagged as an inlining candidate.
+const SINGLE_USE_MAX_LOC: usize = 300;
+/// Minimum lines before a module is checked for disconnected responsibility clusters.
+const COHESION_MIN_LOC: usize = 300;
+/// Minimum top-level functions before a module is checked for disconnected responsibility clusters.
+const COHESION_MIN_FUNCTIONS: usize = 10;
+
+/// Call names that construct mutable containers at module level.
+const MUTABLE_CONSTRUCTORS: &[&str] = &[
+    "set",
+    "list",
+    "dict",
+    "defaultdict",
+    "OrderedDict",
+    "Counter",
+    "deque",
+];
+
+/// Methods that mutate a container in place without rebinding its name.
+const MUTATING_METHODS: &[&str] = &[
+    "append",
+    "extend",
+    "insert",
+    "pop",
+    "remove",
+    "clear",
+    "update",
+    "setdefault",
+    "add",
+    "discard",
+    "popitem",
+    "sort",
+    "reverse",
+];
 
 /// One Python file of the project.
 #[derive(Debug)]
@@ -39,15 +81,25 @@ impl Module {
 }
 
 /// What one Python file holds, read without the other files.
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub(super) struct Facts {
+    zone: Zone,
+    module_name: Option<String>,
+    loc: usize,
+    has_dunder_all: bool,
+    has_main_guard: bool,
+    is_facade: bool,
     imports: Vec<Import>,
     /// How often each identifier is written in the file.
     mentions: HashMap<String, usize>,
     /// How often each identifier is written in an import statement.
     import_mentions: HashMap<String, usize>,
+    /// Identifiers referenced by module top-level code outside top-level definitions.
+    top_level_mentions: HashSet<String>,
     /// The strings that hold one identifier, as `__all__` and `getattr` name a definition.
     quoted: HashSet<String>,
+    /// Dotted module paths written as strings, such as `"pkg.plugins.foo"`.
+    quoted_modules: HashSet<String>,
     definitions: Vec<Definition>,
     /// The name of every `def`, also of a method and of a nested function.
     function_names: Vec<String>,
@@ -60,15 +112,27 @@ pub(super) struct Facts {
 /// A finding of one file: its kind, its line, its evidence and how strong the evidence is.
 pub(super) type Local = (Kind, usize, String, usize);
 
+/// Whether a top-level definition is a function or a class.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum DefKind {
+    Function,
+    Class,
+}
+
 /// A function or class at the top of a module.
 #[derive(Debug)]
 struct Definition {
+    kind: DefKind,
     name: String,
     line: usize,
     decorated: bool,
     /// `None` for a class, and for a function with `*args` or `**kwargs`, whose calls cannot be
     /// matched to its parameters.
     parameters: Option<Vec<Parameter>>,
+    /// Identifiers referenced inside this definition or its decorators.
+    references: HashSet<String>,
+    /// Top-level import root packages referenced inside a function definition.
+    import_roots: BTreeSet<String>,
 }
 
 #[derive(Debug)]
@@ -107,6 +171,10 @@ fn private(name: &str) -> bool {
     name.starts_with('_') && !name.starts_with("__")
 }
 
+fn is_init_py(path: &Path) -> bool {
+    path.file_name().is_some_and(|name| name == "__init__.py")
+}
+
 fn line(node: &Node<'_>) -> usize {
     node.start_pos().line() + 1
 }
@@ -116,14 +184,31 @@ fn quoted(text: &str) -> String {
     crate::output::quote_one_line(text, QUOTED_CHARS)
 }
 
-/// The facts of the Python file at `path`, whose parsed source is `root`. In a test, a branch
-/// for one value is left out, because a test names the situations it checks, and a wait and a
-/// retry are left to the rules of `xpd check`, which the ledger takes over.
-pub(super) fn facts(path: &Path, root: &Root) -> Facts {
+/// The facts of the Python file at `path`, whose parsed source is `root` and text is `text`.
+/// `exists` checks whether a resolved import target file exists in the surveyed tree or commit.
+pub(super) fn facts(path: &Path, root: &Root, text: &str, exists: impl Fn(&Path) -> bool) -> Facts {
+    let zone = classify(path);
+    let module_root = root.root();
+    let import_alias_roots = top_level_import_roots(&module_root);
+    let top_summary = inspect_top_level(&module_root);
     let mut facts = Facts {
-        imports: imports::imported(path, root),
-        definitions: definitions(root),
-        ..Facts::default()
+        zone,
+        module_name: imports::module_name(path, &exists),
+        loc: text.lines().count(),
+        has_dunder_all: top_summary.has_dunder_all,
+        has_main_guard: top_summary.has_main_guard,
+        is_facade: top_summary.is_facade,
+        imports: imports::imported_with(path, root, &exists),
+        mentions: HashMap::new(),
+        import_mentions: HashMap::new(),
+        top_level_mentions: top_summary.mentions,
+        quoted: HashSet::new(),
+        quoted_modules: HashSet::new(),
+        definitions: definitions(root, &import_alias_roots),
+        function_names: Vec::new(),
+        calls: Vec::new(),
+        branches: Vec::new(),
+        local: Vec::new(),
     };
     for import in &facts.imports {
         if let Some(name) = import.name.as_deref().filter(|name| private(name)) {
@@ -139,9 +224,9 @@ pub(super) fn facts(path: &Path, root: &Root) -> Facts {
         .filter(|import| import.name.is_none())
         .map(|import| import.bound.as_str())
         .collect();
-    let in_test = source::is_test(path);
+    let skip_branches = zone == Zone::Test || zone.is_generated_or_vendor();
     let mut local = Vec::new();
-    for node in root.root().dfs() {
+    for node in module_root.dfs() {
         match node.kind().as_ref() {
             "identifier" => {
                 let name = node.text().into_owned();
@@ -158,8 +243,11 @@ pub(super) fn facts(path: &Path, root: &Root) -> Facts {
             }
             "string_content" => {
                 let content = node.text();
-                if !content.is_empty() && content.chars().all(|c| c.is_alphanumeric() || c == '_') {
-                    facts.quoted.insert(content.into_owned());
+                let trimmed = content.trim_start_matches('.');
+                if is_identifier_like(trimmed) {
+                    facts.quoted.insert(trimmed.to_owned());
+                } else if is_dotted_module_string(trimmed) {
+                    facts.quoted_modules.insert(trimmed.to_owned());
                 }
             }
             "function_definition" => {
@@ -168,35 +256,371 @@ pub(super) fn facts(path: &Path, root: &Root) -> Facts {
                 }
             }
             "call" => facts.calls.extend(call(&node)),
-            "if_statement" if !in_test => facts.branches.extend(one_value(&node)),
+            "if_statement" if !skip_branches => facts.branches.extend(one_value(&node)),
             _ => {}
         }
-        let found = link(&node, &modules);
+        let found = link(&node, &modules, zone);
         local.extend(found.map(|(kind, evidence, weight)| (kind, line(&node), evidence, weight)));
     }
+    local.extend(mutable_container_mutations(&module_root, zone));
     facts.local.extend(local);
     facts
 }
 
+fn is_identifier_like(text: &str) -> bool {
+    !text.is_empty() && text.chars().all(|c| c.is_alphanumeric() || c == '_')
+}
+
+fn is_dotted_module_string(text: &str) -> bool {
+    text.contains('.') && text.split('.').all(is_identifier_like)
+}
+
+/// Summary of top-level statements in one Python module.
+struct TopSummary {
+    has_dunder_all: bool,
+    has_main_guard: bool,
+    is_facade: bool,
+    mentions: HashSet<String>,
+}
+
+/// Inspects top-level statements for `__all__`, `__main__` guards, facade shape, and references
+/// outside top-level function and class definitions.
+fn inspect_top_level(module: &Node<'_>) -> TopSummary {
+    let mut has_dunder_all = false;
+    let mut has_main_guard = false;
+    let mut has_reexport_import = false;
+    let mut only_facade_items = true;
+    let mut mentions = HashSet::new();
+
+    for child in module.children() {
+        let kind = child.kind();
+        match kind.as_ref() {
+            "comment" | "future_import_statement" => {}
+            "import_statement" | "import_from_statement" => {
+                has_reexport_import = true;
+            }
+            "function_definition" | "class_definition" | "decorated_definition" => {
+                only_facade_items = false;
+            }
+            "expression_statement" => {
+                collect_identifiers(&child, &mut mentions);
+                let Some(expr) = child.named_children().next() else {
+                    only_facade_items = false;
+                    continue;
+                };
+                match expr.kind().as_ref() {
+                    "string" => {}
+                    "assignment" | "augmented_assignment"
+                        if expr.field("left").is_some_and(|left| {
+                            left.kind() == "identifier" && left.text() == "__all__"
+                        }) =>
+                    {
+                        has_dunder_all = true;
+                    }
+                    _ => {
+                        only_facade_items = false;
+                    }
+                }
+            }
+            "if_statement" => {
+                only_facade_items = false;
+                if is_main_guard_if(&child) {
+                    has_main_guard = true;
+                }
+                collect_identifiers(&child, &mut mentions);
+            }
+            _ => {
+                if child.is_named() {
+                    only_facade_items = false;
+                    collect_identifiers(&child, &mut mentions);
+                }
+            }
+        }
+    }
+
+    TopSummary {
+        has_dunder_all,
+        has_main_guard,
+        is_facade: has_reexport_import && only_facade_items,
+        mentions,
+    }
+}
+
+fn collect_identifiers(node: &Node<'_>, into: &mut HashSet<String>) {
+    for item in node.dfs() {
+        if item.kind() == "identifier" {
+            into.insert(item.text().into_owned());
+        }
+    }
+}
+
+fn is_main_guard_if(statement: &Node<'_>) -> bool {
+    let Some(condition) = statement.field("condition") else {
+        return false;
+    };
+    let mut saw_name = false;
+    let mut saw_main = false;
+    for node in condition.dfs() {
+        if node.kind() == "identifier" && node.text() == "__name__" {
+            saw_name = true;
+        } else if node.kind() == "string_content" && node.text() == "__main__" {
+            saw_main = true;
+        }
+    }
+    saw_name && saw_main
+}
+
+/// Maps each local name bound by a top-level import to its root package or module name.
+fn top_level_import_roots(module: &Node<'_>) -> HashMap<String, String> {
+    let mut roots = HashMap::new();
+    for child in module.children() {
+        match child.kind().as_ref() {
+            "import_statement" => {
+                for name in child.field_children("name") {
+                    if let Some((local, root)) = import_alias_root(&name, None) {
+                        roots.insert(local, root);
+                    }
+                }
+            }
+            "import_from_statement" => {
+                let from_root = child.field("module_name").and_then(|node| {
+                    let raw = node.text();
+                    let trimmed = raw.trim_start_matches('.');
+                    let first = trimmed.split('.').next().unwrap_or("");
+                    (!first.is_empty()).then(|| first.to_owned())
+                });
+                for name in child.field_children("name") {
+                    if let Some((local, root)) = import_alias_root(&name, from_root.as_deref()) {
+                        roots.insert(local, root);
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+    roots
+}
+
+fn import_alias_root(node: &Node<'_>, from_root: Option<&str>) -> Option<(String, String)> {
+    match node.kind().as_ref() {
+        "dotted_name" => {
+            let text = node.text();
+            let first = text.split('.').next()?.trim();
+            let root = from_root.unwrap_or(first);
+            Some((first.to_owned(), root.to_owned()))
+        }
+        "aliased_import" => {
+            let target = node.field("name")?.text();
+            let first = target.split('.').next()?.trim();
+            let alias = node.field("alias")?.text().into_owned();
+            let root = from_root.unwrap_or(first);
+            Some((alias, root.to_owned()))
+        }
+        _ => None,
+    }
+}
+
 /// The functions and classes at the top of the module in `root`.
-fn definitions(root: &Root) -> Vec<Definition> {
-    crate::ledger::python::top_level_definitions(&root.root())
-        .into_iter()
-        .filter_map(|(definition, decorated)| {
-            let class = definition.kind() == "class_definition";
+fn definitions(root: &Root, import_alias_roots: &HashMap<String, String>) -> Vec<Definition> {
+    root.root()
+        .children()
+        .filter_map(|item| {
+            let decorated = item.kind() == "decorated_definition";
+            let definition = if decorated {
+                item.field("definition")?
+            } else {
+                item.clone()
+            };
+            let kind = match definition.kind().as_ref() {
+                "function_definition" => DefKind::Function,
+                "class_definition" => DefKind::Class,
+                _ => return None,
+            };
+            let name_node = definition.field("name")?;
+            let name_id = name_node.node_id();
+            let name = name_node.text().into_owned();
+            let mut references = HashSet::new();
+            let mut import_roots = BTreeSet::new();
+            for node in item.dfs() {
+                if node.kind() == "identifier" && node.node_id() != name_id {
+                    let text = node.text();
+                    if kind == DefKind::Function
+                        && let Some(root_pkg) = import_alias_roots.get(text.as_ref())
+                    {
+                        import_roots.insert(root_pkg.clone());
+                    }
+                    references.insert(text.into_owned());
+                }
+            }
             Some(Definition {
-                name: definition.field("name")?.text().into_owned(),
+                kind,
+                name,
                 line: line(&definition),
                 decorated,
-                parameters: if class { None } else { parameters(&definition) },
+                parameters: if kind == DefKind::Class {
+                    None
+                } else {
+                    parameters(&definition)
+                },
+                references,
+                import_roots,
             })
         })
         .collect()
 }
 
+/// Detects module-level mutable containers mutated inside functions without `global`.
+fn mutable_container_mutations(module: &Node<'_>, zone: Zone) -> Vec<Local> {
+    if zone == Zone::Test || zone.is_generated_or_vendor() {
+        return Vec::new();
+    }
+    let mutables = module_level_mutable_containers(module);
+    if mutables.is_empty() {
+        return Vec::new();
+    }
+    let mut mutated: BTreeMap<String, usize> = BTreeMap::new();
+    for function in module
+        .dfs()
+        .filter(|node| node.kind() == "function_definition")
+    {
+        let mut globals = HashSet::new();
+        let mut shadowed = HashSet::new();
+        for node in local_nodes(&function) {
+            if node.kind() == "global_statement" {
+                for child in node.children().filter(|child| child.kind() == "identifier") {
+                    globals.insert(child.text().into_owned());
+                }
+                continue;
+            }
+            if node.kind() == "identifier"
+                && (is_parameter_name(&node) || is_local_rebinding(&node))
+            {
+                shadowed.insert(node.text().into_owned());
+            }
+        }
+        for name in &globals {
+            shadowed.remove(name);
+        }
+        for node in local_nodes(&function) {
+            let hit = match node.kind().as_ref() {
+                "assignment" | "augmented_assignment" => node
+                    .field("left")
+                    .filter(|left| left.kind() == "subscript")
+                    .and_then(|sub| subscript_target_name(&sub)),
+                "delete_statement" => node
+                    .named_children()
+                    .find(|child| child.kind() == "subscript")
+                    .and_then(|sub| subscript_target_name(&sub)),
+                "call" => mutating_method_target(&node),
+                _ => None,
+            };
+            if let Some(name) = hit
+                && mutables.contains(&name)
+                && !shadowed.contains(&name)
+            {
+                let at = line(&node);
+                mutated
+                    .entry(name)
+                    .and_modify(|first| *first = (*first).min(at))
+                    .or_insert(at);
+            }
+        }
+    }
+    mutated
+        .into_iter()
+        .map(|(name, at)| {
+            (
+                Kind::SharedState,
+                at,
+                format!(
+                    "This function mutates the module level container {name}, which its callers do not pass."
+                ),
+                1,
+            )
+        })
+        .collect()
+}
+
+fn is_local_rebinding(identifier: &Node<'_>) -> bool {
+    if !is_bound(identifier) {
+        return false;
+    }
+    !identifier.parent().is_some_and(|parent| {
+        matches!(
+            parent.kind().as_ref(),
+            "global_statement" | "nonlocal_statement" | "delete_statement"
+        )
+    })
+}
+
+fn module_level_mutable_containers(module: &Node<'_>) -> HashSet<String> {
+    let mut containers = HashSet::new();
+    for statement in module.children() {
+        if statement.kind() != "expression_statement" {
+            continue;
+        }
+        let Some(assignment) = statement
+            .named_children()
+            .next()
+            .filter(|node| node.kind() == "assignment")
+        else {
+            continue;
+        };
+        let Some(left) = assignment
+            .field("left")
+            .filter(|left| left.kind() == "identifier")
+        else {
+            continue;
+        };
+        let Some(right) = assignment.field("right") else {
+            continue;
+        };
+        if is_mutable_container(&right) {
+            containers.insert(left.text().into_owned());
+        }
+    }
+    containers
+}
+
+fn is_mutable_container(value: &Node<'_>) -> bool {
+    match value.kind().as_ref() {
+        "list" | "dictionary" | "set" => true,
+        "call" => value
+            .field("function")
+            .and_then(|function| match function.kind().as_ref() {
+                "identifier" => Some(function.text().into_owned()),
+                "attribute" => Some(function.field("attribute")?.text().into_owned()),
+                _ => None,
+            })
+            .is_some_and(|name| MUTABLE_CONSTRUCTORS.contains(&name.as_str())),
+        _ => false,
+    }
+}
+
+fn subscript_target_name(node: &Node<'_>) -> Option<String> {
+    let mut current = node.clone();
+    while current.kind() == "subscript" {
+        current = current.field("value")?;
+    }
+    (current.kind() == "identifier").then(|| current.text().into_owned())
+}
+
+fn mutating_method_target(call: &Node<'_>) -> Option<String> {
+    let function = call
+        .field("function")
+        .filter(|node| node.kind() == "attribute")?;
+    let method = function.field("attribute")?.text();
+    if !MUTATING_METHODS.contains(&method.as_ref()) {
+        return None;
+    }
+    let object = function.field("object")?;
+    (object.kind() == "identifier").then(|| object.text().into_owned())
+}
+
 /// The link that `node` makes to state outside its function or to the inside of another
 /// module. `modules` holds the names that the file gives to the project modules it imports.
-fn link(node: &Node<'_>, modules: &HashSet<&str>) -> Option<(Kind, String, usize)> {
+fn link(node: &Node<'_>, modules: &HashSet<&str>, zone: Zone) -> Option<(Kind, String, usize)> {
+    let skip_shared_state = zone == Zone::Test || zone.is_generated_or_vendor();
     let of_module = |attribute: &Node<'_>| {
         let object = attribute.field("object")?;
         let name = attribute.field("attribute")?;
@@ -205,7 +629,7 @@ fn link(node: &Node<'_>, modules: &HashSet<&str>) -> Option<(Kind, String, usize
             .then(|| (object.text().into_owned(), name.text().into_owned()))
     };
     match node.kind().as_ref() {
-        "global_statement" => {
+        "global_statement" if !skip_shared_state => {
             let names: Vec<_> = (node.children())
                 .filter(|child| child.kind() == "identifier")
                 .map(|child| child.text().into_owned())
@@ -219,7 +643,7 @@ fn link(node: &Node<'_>, modules: &HashSet<&str>) -> Option<(Kind, String, usize
                 1,
             ))
         }
-        "assignment" | "augmented_assignment" => {
+        "assignment" | "augmented_assignment" if !skip_shared_state => {
             let target = node
                 .field("left")
                 .filter(|left| left.kind() == "attribute")?;
@@ -345,16 +769,129 @@ fn one_value(statement: &Node<'_>) -> Option<Branch> {
 
 /// The findings that follow from the modules together. `changes` holds the commits that changed
 /// each tracked file, newest first, and is empty without a history.
-pub(super) fn findings(modules: &[Module], changes: &HashMap<&str, Vec<usize>>) -> Vec<Finding> {
+pub(super) fn findings(
+    modules: &[Module],
+    changes: &HashMap<&str, Vec<usize>>,
+    entry_points: &EntryPoints,
+) -> Vec<Finding> {
     let mut findings = Vec::new();
     let graph = Graph::new(modules);
+    let project = Project::new(modules);
     findings.extend(graph.volatile(changes));
     findings.extend(graph.cycles());
-    let project = Project::new(modules);
+    findings.extend(graph.orphaned(entry_points, &project));
+    findings.extend(graph.facades());
+    findings.extend(graph.single_use(entry_points));
+    findings.extend(cohesion(modules));
     findings.extend(branches(modules));
-    findings.extend(project.unreferenced());
+    findings.extend(project.unreferenced(entry_points));
     findings.extend(project.parameters());
     findings
+}
+
+/// Large production modules whose top-level functions split into disconnected clusters.
+fn cohesion(modules: &[Module]) -> Vec<Finding> {
+    let mut findings = Vec::new();
+    for module in modules {
+        if module.facts.zone != Zone::Production || module.facts.loc < COHESION_MIN_LOC {
+            continue;
+        }
+        let functions: Vec<&Definition> = module
+            .facts
+            .definitions
+            .iter()
+            .filter(|def| def.kind == DefKind::Function)
+            .collect();
+        if functions.len() < COHESION_MIN_FUNCTIONS {
+            continue;
+        }
+        let by_name: HashMap<&str, usize> = functions
+            .iter()
+            .enumerate()
+            .map(|(idx, def)| (def.name.as_str(), idx))
+            .collect();
+        let mut adjacency: Vec<Vec<usize>> = vec![Vec::new(); functions.len()];
+        let mut families: HashSet<&str> = HashSet::new();
+        let mut import_sets: BTreeSet<&BTreeSet<String>> = BTreeSet::new();
+
+        for (idx, def) in functions.iter().enumerate() {
+            families.insert(name_family(&def.name));
+            if !def.import_roots.is_empty() {
+                import_sets.insert(&def.import_roots);
+            }
+            for reference in &def.references {
+                if let Some(&other) = by_name.get(reference.as_str())
+                    && other != idx
+                {
+                    adjacency[idx].push(other);
+                    adjacency[other].push(idx);
+                }
+            }
+        }
+
+        let mut comp_sizes = component_sizes(&adjacency);
+        comp_sizes.sort_unstable_by(|a, b| b.cmp(a));
+        let largest = comp_sizes.first().copied().unwrap_or(0);
+        let min_component_size = (functions.len() / 10).max(2);
+        let significant = comp_sizes
+            .iter()
+            .filter(|&&size| size >= min_component_size)
+            .count();
+
+        let disconnected = comp_sizes.len() >= 3 && largest * 2 <= functions.len();
+        let mixed_families = families.len() >= 5 && significant >= 3;
+        let import_divergence = import_sets.len() >= 4 && significant >= 3;
+        if !(disconnected || mixed_families || import_divergence) {
+            continue;
+        }
+
+        findings.push(Finding {
+            kind: Kind::MixedResponsibilities,
+            key: module.key().to_owned(),
+            places: vec![Place::file(&module.shown)],
+            evidence: format!(
+                "{} has {} top-level functions split across {} disconnected groups ({} name families, {} import sets).",
+                module.shown,
+                functions.len(),
+                comp_sizes.len(),
+                families.len(),
+                import_sets.len(),
+            ),
+            weight: comp_sizes.len() * 10 + families.len(),
+        });
+    }
+    findings
+}
+
+fn name_family(name: &str) -> &str {
+    let trimmed = name.trim_start_matches('_');
+    trimmed
+        .split_once('_')
+        .map_or(trimmed, |(prefix, _)| prefix)
+}
+
+fn component_sizes(adjacency: &[Vec<usize>]) -> Vec<usize> {
+    let mut visited = vec![false; adjacency.len()];
+    let mut sizes = Vec::new();
+    for start in 0..adjacency.len() {
+        if visited[start] {
+            continue;
+        }
+        let mut stack = vec![start];
+        visited[start] = true;
+        let mut size = 0;
+        while let Some(node) = stack.pop() {
+            size += 1;
+            for &neighbor in &adjacency[node] {
+                if !visited[neighbor] {
+                    visited[neighbor] = true;
+                    stack.push(neighbor);
+                }
+            }
+        }
+        sizes.push(size);
+    }
+    sizes
 }
 
 /// The branches for one value, one finding for each value with every place that checks it. A
@@ -421,8 +958,12 @@ pub(super) fn imports(modules: &[Module]) -> HashSet<(&str, &str)> {
 /// Which module imports which, by the index of each in the list of modules.
 struct Graph<'m> {
     modules: &'m [Module],
-    /// For each module, the modules it imports with the line of the first import of each.
+    /// For each module, all modules it imports (any scope) with the line of the first import.
     imports: Vec<BTreeMap<usize, usize>>,
+    /// For each module, top-level eager imports only, used for runtime import cycle detection.
+    eager_imports: Vec<BTreeMap<usize, usize>>,
+    /// For each module, the modules that import it across any scope.
+    importers: Vec<Vec<usize>>,
 }
 
 impl<'m> Graph<'m> {
@@ -430,24 +971,46 @@ impl<'m> Graph<'m> {
         let index: HashMap<&Path, usize> = (modules.iter().enumerate())
             .map(|(nth, module)| (module.file.as_path(), nth))
             .collect();
-        let imports = (modules.iter().enumerate())
-            .map(|(nth, module)| {
-                let mut found = BTreeMap::new();
-                for import in &module.facts.imports {
-                    if let Some(&imported) = index.get(import.module.as_path())
-                        && imported != nth
-                    {
-                        found.entry(imported).or_insert(import.line);
+        let mut imports = Vec::with_capacity(modules.len());
+        let mut eager_imports = Vec::with_capacity(modules.len());
+        let mut importers = vec![Vec::new(); modules.len()];
+
+        for (nth, module) in modules.iter().enumerate() {
+            let mut all_edges = BTreeMap::new();
+            let mut eager_edges = BTreeMap::new();
+            for import in &module.facts.imports {
+                if let Some(&imported) = index.get(import.module.as_path())
+                    && imported != nth
+                {
+                    all_edges.entry(imported).or_insert(import.line);
+                    if import.scope == ImportScope::TopLevel {
+                        eager_edges.entry(imported).or_insert(import.line);
                     }
                 }
-                found
-            })
-            .collect();
-        Self { modules, imports }
+            }
+            for &imported in all_edges.keys() {
+                importers[imported].push(nth);
+            }
+            imports.push(all_edges);
+            eager_imports.push(eager_edges);
+        }
+        Self {
+            modules,
+            imports,
+            eager_imports,
+            importers,
+        }
     }
 
     fn place(&self, module: usize, line: usize) -> Place {
         Place::line(&self.modules[module].shown, line)
+    }
+
+    fn production_count(&self) -> usize {
+        self.modules
+            .iter()
+            .filter(|module| module.facts.zone == Zone::Production)
+            .count()
     }
 
     /// Each import of a module that changed at least twice as often as its importer, counted
@@ -460,8 +1023,11 @@ impl<'m> Graph<'m> {
         };
         let mut findings = Vec::new();
         for (importer, imports) in self.imports.iter().enumerate() {
-            let file = &self.modules[importer].file;
-            if source::is_test(file) || file.file_name().is_some_and(|name| name == "__init__.py") {
+            let module = &self.modules[importer];
+            if module.facts.zone == Zone::Test
+                || module.facts.zone.is_generated_or_vendor()
+                || is_init_py(&module.file)
+            {
                 continue;
             }
             for (&imported, &line) in imports {
@@ -499,11 +1065,11 @@ impl<'m> Graph<'m> {
         findings
     }
 
-    /// Each group of modules that import one another in a circle, found as the strongly
-    /// connected parts of the graph.
+    /// Each group of modules that import one another eagerly at module level, found as the
+    /// strongly connected parts of the eager import graph.
     fn cycles(&self) -> Vec<Finding> {
         let mut state = Tarjan {
-            imports: &self.imports,
+            imports: &self.eager_imports,
             order: vec![None; self.modules.len()],
             low: vec![0; self.modules.len()],
             stack: Vec::new(),
@@ -517,12 +1083,18 @@ impl<'m> Graph<'m> {
             }
         }
         (state.parts.into_iter())
-            .filter(|part| part.len() > 1)
+            .filter(|part| {
+                part.len() > 1
+                    && !part.iter().all(|&module| {
+                        let zone = self.modules[module].facts.zone;
+                        zone == Zone::Test || zone.is_generated_or_vendor()
+                    })
+            })
             .map(|mut part| {
                 part.sort_unstable();
                 let places = (part.iter())
                     .map(|&module| {
-                        let line = (self.imports[module].iter())
+                        let line = (self.eager_imports[module].iter())
                             .find(|(imported, _)| part.contains(imported))
                             .map_or(1, |(_, line)| *line);
                         self.place(module, line)
@@ -535,13 +1107,143 @@ impl<'m> Graph<'m> {
                         .join("\n"),
                     places,
                     evidence: format!(
-                        "These {} modules import one another in a circle, so none of them can change alone.",
+                        "These {} modules import one another in a circle at load time, so none of them can change alone.",
                         part.len()
                     ),
                     weight: part.len(),
                 }
             })
             .collect()
+    }
+
+    /// Production modules with zero surveyed importers that are not entry points or public surfaces.
+    fn orphaned(&self, entry_points: &EntryPoints, project: &Project<'_>) -> Vec<Finding> {
+        if self.production_count() < 2 {
+            return Vec::new();
+        }
+        let mut findings = Vec::new();
+        for (nth, module) in self.modules.iter().enumerate() {
+            let facts = &module.facts;
+            if facts.zone != Zone::Production
+                || !self.importers[nth].is_empty()
+                || is_init_py(&module.file)
+                || facts.loc < ORPHANED_MIN_LOC
+                || facts.has_dunder_all
+                || facts.has_main_guard
+                || facts
+                    .module_name
+                    .as_deref()
+                    .is_some_and(|name| entry_points.contains(name))
+                || project.is_dynamically_referenced(nth, module)
+            {
+                continue;
+            }
+            findings.push(Finding {
+                kind: Kind::OrphanedModule,
+                key: module.key().to_owned(),
+                places: vec![Place::file(&module.shown)],
+                evidence: format!(
+                    "No surveyed Python file imports {} ({} lines).",
+                    module.shown, facts.loc
+                ),
+                weight: facts.loc,
+            });
+        }
+        findings
+    }
+
+    /// Pure re-export forwarding modules that add indirection without owning logic.
+    fn facades(&self) -> Vec<Finding> {
+        let mut dir_counts: HashMap<&Path, usize> = HashMap::new();
+        for module in self.modules {
+            if let Some(dir) = module.file.parent() {
+                *dir_counts.entry(dir).or_default() += 1;
+            }
+        }
+        let mut findings = Vec::new();
+        for (nth, module) in self.modules.iter().enumerate() {
+            let facts = &module.facts;
+            let importers = self.importers[nth].len();
+            if facts.zone != Zone::Production
+                || !facts.is_facade
+                || importers > FACADE_MAX_IMPORTERS
+            {
+                continue;
+            }
+            if is_init_py(&module.file)
+                && module
+                    .file
+                    .parent()
+                    .and_then(|dir| dir_counts.get(dir))
+                    .is_some_and(|&count| count > 1)
+            {
+                continue;
+            }
+            findings.push(Finding {
+                kind: Kind::FacadeModule,
+                key: module.key().to_owned(),
+                places: vec![Place::file(&module.shown)],
+                evidence: format!(
+                    "{} only re-exports names from other modules and has {} {}.",
+                    module.shown,
+                    importers,
+                    if importers == 1 {
+                        "importer"
+                    } else {
+                        "importers"
+                    }
+                ),
+                weight: facts.loc + (FACADE_MAX_IMPORTERS + 1).saturating_sub(importers),
+            });
+        }
+        findings
+    }
+
+    /// Production helper modules imported by only one non-test file.
+    fn single_use(&self, entry_points: &EntryPoints) -> Vec<Finding> {
+        if self.production_count() < 2 {
+            return Vec::new();
+        }
+        let mut findings = Vec::new();
+        for (nth, module) in self.modules.iter().enumerate() {
+            let facts = &module.facts;
+            if facts.zone != Zone::Production
+                || is_init_py(&module.file)
+                || facts.is_facade
+                || facts.has_dunder_all
+                || facts.has_main_guard
+                || facts.loc < SINGLE_USE_MIN_LOC
+                || facts.loc > SINGLE_USE_MAX_LOC
+                || facts
+                    .module_name
+                    .as_deref()
+                    .is_some_and(|name| entry_points.contains(name))
+            {
+                continue;
+            }
+            let [sole_idx] = self.importers[nth].as_slice() else {
+                continue;
+            };
+            let sole = &self.modules[*sole_idx];
+            if matches!(sole.facts.zone, Zone::Test | Zone::Script)
+                || is_init_py(&sole.file)
+                || sole.facts.loc + facts.loc > SINGLE_USE_MAX_LOC
+                || self.imports[*sole_idx].len() >= 5
+            {
+                continue;
+            }
+            findings.push(Finding {
+                kind: Kind::SingleUseModule,
+                key: module.key().to_owned(),
+                places: vec![Place::file(&module.shown), Place::file(&sole.shown)],
+                evidence: format!(
+                    "Only {} imports {} ({} lines), so it may belong in its sole caller.",
+                    sole.shown, module.shown, facts.loc
+                ),
+                weight: facts.loc,
+            });
+        }
+        findings
     }
 }
 
@@ -634,33 +1336,98 @@ impl<'m> Project<'m> {
         project
     }
 
-    /// Each function or class that no file mentions but the one line that defines it. A
-    /// decorated definition is left out, because a decorator can register it, and so is a test
-    /// and a name that a string holds, as `__all__` does.
-    fn unreferenced(&self) -> Vec<Finding> {
+    /// Whether another surveyed module references `module` dynamically by dotted name or via
+    /// `importlib` with the module's stem.
+    fn is_dynamically_referenced(&self, idx: usize, module: &Module) -> bool {
+        let dotted = module.facts.module_name.as_deref();
+        let stem = module.file.file_stem().and_then(|part| part.to_str());
+        for (other_idx, other) in self.modules.iter().enumerate() {
+            if other_idx == idx {
+                continue;
+            }
+            if let Some(name) = dotted
+                && other.facts.quoted_modules.contains(name)
+            {
+                return true;
+            }
+            let dynamic_loader = other.facts.mentions.contains_key("import_module")
+                || other.facts.mentions.contains_key("__import__")
+                || other.facts.mentions.contains_key("importlib");
+            if dynamic_loader
+                && let Some(stem) = stem
+                && other.facts.quoted.contains(stem)
+            {
+                return true;
+            }
+        }
+        false
+    }
+
+    /// Each top-level function or class unreachable from any cross-file reference, decorator,
+    /// quoted string, `main`, dunder, entry-point callable, or module top-level code. Catches
+    /// self-recursive and mutually recursive dead helpers as well as single-mention definitions.
+    fn unreferenced(&self, entry_points: &EntryPoints) -> Vec<Finding> {
         let mut findings = Vec::new();
         for module in self.modules {
-            let skipped = source::is_test(&module.file)
-                || module
-                    .file
-                    .file_name()
-                    .is_some_and(|name| name == "__init__.py");
+            let skipped = module.facts.zone == Zone::Test
+                || module.facts.zone.is_generated_or_vendor()
+                || is_init_py(&module.file);
             if skipped {
                 continue;
             }
-            for definition in &module.facts.definitions {
+            let defs = &module.facts.definitions;
+            let mut by_name: HashMap<&str, Vec<usize>> = HashMap::new();
+            for (idx, definition) in defs.iter().enumerate() {
+                by_name
+                    .entry(definition.name.as_str())
+                    .or_default()
+                    .push(idx);
+            }
+            let mut live = vec![false; defs.len()];
+            let mut queue = VecDeque::new();
+            for (idx, definition) in defs.iter().enumerate() {
                 let name = definition.name.as_str();
-                let known = definition.decorated
+                let total_mentions = self.mentions.get(name).copied().unwrap_or(0);
+                let local_mentions = module.facts.mentions.get(name).copied().unwrap_or(0);
+                let mentioned_elsewhere = total_mentions > local_mentions;
+                let declared_entry = module
+                    .facts
+                    .module_name
+                    .as_deref()
+                    .is_some_and(|dotted| entry_points.is_callable(dotted, name));
+                let root = definition.decorated
                     || name == "main"
                     || name.starts_with("__")
-                    || self.quoted.contains(name);
-                if !known && self.mentions.get(name) == Some(&1) {
+                    || declared_entry
+                    || self.quoted.contains(name)
+                    || module.facts.top_level_mentions.contains(name)
+                    || mentioned_elsewhere;
+                if root {
+                    live[idx] = true;
+                    queue.push_back(idx);
+                }
+            }
+            while let Some(idx) = queue.pop_front() {
+                for reference in &defs[idx].references {
+                    if let Some(targets) = by_name.get(reference.as_str()) {
+                        for &target in targets {
+                            if !live[target] {
+                                live[target] = true;
+                                queue.push_back(target);
+                            }
+                        }
+                    }
+                }
+            }
+            for (idx, definition) in defs.iter().enumerate() {
+                if !live[idx] {
+                    let name = definition.name.as_str();
                     findings.push(Finding {
                         kind: Kind::Unreferenced,
                         key: format!("{}\n{name}", module.key()),
                         places: vec![Place::line(&module.shown, definition.line)],
                         evidence: format!(
-                            "No Python file that was read mentions {name}, apart from this definition."
+                            "No live code path in the surveyed Python files reaches {name}."
                         ),
                         weight: 1,
                     });

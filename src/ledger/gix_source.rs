@@ -27,11 +27,15 @@ pub(crate) struct Listing {
 
 #[derive(Debug)]
 enum Origin {
-    Disk,
+    Disk {
+        top: Option<PathBuf>,
+    },
     /// The files of a commit, each with its path below the top of the repository and the id of
     /// its blob.
     Commit {
         source: GixSource,
+        commit: String,
+        copy: PathBuf,
         blobs: HashMap<PathBuf, (String, String)>,
     },
 }
@@ -53,7 +57,9 @@ impl Listing {
         }
         Ok(Self {
             files: ledger::files(paths),
-            origin: Origin::Disk,
+            origin: Origin::Disk {
+                top: top.map(Path::to_path_buf),
+            },
         })
     }
 
@@ -77,15 +83,20 @@ impl Listing {
         files.dedup_by(|a, b| a.0 == b.0);
         Ok(Self {
             files,
-            origin: Origin::Commit { source, blobs },
+            origin: Origin::Commit {
+                source,
+                commit: commit.to_owned(),
+                copy: copy.to_path_buf(),
+                blobs,
+            },
         })
     }
 
     /// The text of the file at `path`. `None` for a file that cannot be read or is not UTF-8.
     pub(crate) fn text(&self, path: &Path) -> Option<Arc<str>> {
         match &self.origin {
-            Origin::Disk => fs::read_to_string(path).ok().map(Arc::from),
-            Origin::Commit { source, blobs } => {
+            Origin::Disk { .. } => fs::read_to_string(path).ok().map(Arc::from),
+            Origin::Commit { source, blobs, .. } => {
                 use crate::ledger::ContentSource as _;
 
                 let (below, blob) = blobs.get(path)?;
@@ -98,8 +109,40 @@ impl Listing {
     /// top. A file of a commit keeps the path it has in the copy of the commit.
     pub(crate) fn absolute(&self, path: &Path) -> Option<PathBuf> {
         match &self.origin {
-            Origin::Disk => fs::canonicalize(path).ok(),
+            Origin::Disk { .. } => fs::canonicalize(path).ok(),
             Origin::Commit { blobs, .. } => blobs.contains_key(path).then(|| path.to_path_buf()),
+        }
+    }
+
+    /// Whether a regular file exists at `path` in the surveyed tree or commit.
+    pub(crate) fn exists(&self, path: &Path) -> bool {
+        match &self.origin {
+            Origin::Disk { .. } => path.is_file(),
+            Origin::Commit {
+                source,
+                commit,
+                copy,
+                blobs,
+            } => {
+                if blobs.contains_key(path) {
+                    return true;
+                }
+                let Ok(below) = path.strip_prefix(copy) else {
+                    return false;
+                };
+                source.has_file_at(commit, below)
+            }
+        }
+    }
+
+    /// Reads a UTF-8 file at `rel_path` below the repository top, from disk or the surveyed commit.
+    pub(crate) fn repo_file(&self, rel_path: &str) -> Option<String> {
+        match &self.origin {
+            Origin::Disk { top } => {
+                let root = top.as_deref().unwrap_or_else(|| Path::new("."));
+                fs::read_to_string(root.join(rel_path)).ok()
+            }
+            Origin::Commit { source, commit, .. } => source.read_file_at(commit, rel_path),
         }
     }
 }
@@ -161,6 +204,41 @@ mod commit {
                 let (_, repo) = opened.as_ref().context("the repository was just opened")?;
                 read(repo)
             })
+        }
+
+        /// Whether a regular file exists at `rel_path` in `commit`.
+        pub(super) fn has_file_at(&self, commit: &str, rel_path: &Path) -> bool {
+            let rel = below_top(rel_path);
+            if rel.is_empty() {
+                return false;
+            }
+            self.with(|repo| {
+                let id = ObjectId::from_hex(commit.as_bytes())?;
+                let tree = repo.find_commit(id)?.tree()?;
+                let Some(entry) = tree.lookup_entry_by_path(&rel)? else {
+                    return Ok(false);
+                };
+                Ok(regular(entry.mode().kind()))
+            })
+            .unwrap_or(false)
+        }
+
+        /// Reads the UTF-8 regular file at `rel_path` in `commit`, if present.
+        pub(super) fn read_file_at(&self, commit: &str, rel_path: &str) -> Option<String> {
+            self.with(|repo| {
+                let id = ObjectId::from_hex(commit.as_bytes())?;
+                let tree = repo.find_commit(id)?.tree()?;
+                let Some(entry) = tree.lookup_entry_by_path(rel_path)? else {
+                    return Ok(None);
+                };
+                if !regular(entry.mode().kind()) {
+                    return Ok(None);
+                }
+                let blob = entry.object()?.into_blob();
+                Ok(std::str::from_utf8(&blob.data).ok().map(str::to_owned))
+            })
+            .ok()
+            .flatten()
         }
     }
 

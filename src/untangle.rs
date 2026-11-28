@@ -2,6 +2,7 @@ mod copies;
 mod history;
 mod python;
 mod redundancy;
+mod zones;
 
 use std::collections::{BTreeSet, HashMap, HashSet};
 use std::fmt::Write as _;
@@ -66,6 +67,14 @@ pub(crate) enum Kind {
     OneCallerParameter,
     NearCopy,
     DefaultArgument,
+    /// A production module that no other surveyed Python file imports.
+    OrphanedModule,
+    /// A module that only re-exports names from other modules.
+    FacadeModule,
+    /// A helper module imported by only one non-test file.
+    SingleUseModule,
+    /// A large module whose top-level functions split into unrelated clusters.
+    MixedResponsibilities,
 }
 
 impl ledger::Kind for Kind {
@@ -87,13 +96,18 @@ impl ledger::Kind for Kind {
             Self::Copy | Self::NearCopy | Self::ChangesTogether | Self::SharedState => {
                 Group::HiddenLink
             }
-            Self::VolatileImport | Self::ImportCycle | Self::PrivateReach | Self::VagueModule => {
-                Group::NeedlessLink
-            }
+            Self::VolatileImport
+            | Self::ImportCycle
+            | Self::PrivateReach
+            | Self::VagueModule
+            | Self::MixedResponsibilities => Group::NeedlessLink,
             Self::DefaultArgument
             | Self::PassThrough
             | Self::Unreferenced
-            | Self::ConstantParameter => Group::Surplus,
+            | Self::ConstantParameter
+            | Self::OrphanedModule
+            | Self::FacadeModule
+            | Self::SingleUseModule => Group::Surplus,
             Self::OneValueBranch | Self::OneCallerParameter => Group::SpecialCase,
         }
     }
@@ -234,7 +248,9 @@ fn read(
                 ruled.push((kind, line, issue.message, 1));
             }
         }
-        let facts = python::facts(&absolute, &root);
+        let facts = python::facts(&absolute, &root, &text, |candidate| {
+            listing.exists(candidate)
+        });
         (absolute, facts)
     });
     Some(Surveyed {
@@ -397,7 +413,16 @@ fn survey(
             })
         })
         .collect();
-    findings.extend(python::findings(&modules, &history.changes()));
+    let entry_points = listing
+        .repo_file("pyproject.toml")
+        .as_deref()
+        .map(zones::EntryPoints::from_pyproject)
+        .unwrap_or_default();
+    findings.extend(python::findings(
+        &modules,
+        &history.changes(),
+        &entry_points,
+    ));
     findings.extend(changed_together(
         history,
         &shown_as,
