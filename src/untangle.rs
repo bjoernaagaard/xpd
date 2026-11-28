@@ -512,6 +512,13 @@ fn collect(tree: Tree<'_>, listing: &Listing, history: &History) -> Result<Colle
         &history.changes(),
         &entry_points,
     ));
+    if files
+        .iter()
+        .any(|(_, language)| *language == SupportLang::Rust)
+    {
+        let rust_map = rust_graph::build_rust_graph(tree, listing);
+        findings.extend(rust_graph::rust_findings(&rust_map));
+    }
     findings.extend(changed_together(
         history,
         &shown_as,
