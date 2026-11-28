@@ -36,9 +36,9 @@ use crate::workspace::Workspace;
 /// The agent skill that `xpd skill` prints.
 const SKILL: &str = include_str!("../skills/xpd/SKILL.md");
 /// The scripts that `profile`, `refit` and `equiv` hand to the project's Python.
-const PROFILE_PY: &str = include_str!("../py/profile.py");
-const REFIT_PY: &str = include_str!("../py/refit.py");
-const EQUIV_PY: &str = include_str!("../py/equiv.py");
+pub(crate) const PROFILE_PY: &str = include_str!("../py/profile.py");
+pub(crate) const REFIT_PY: &str = include_str!("../py/refit.py");
+pub(crate) const EQUIV_PY: &str = include_str!("../py/equiv.py");
 
 /// Exit code when xpd itself fails, as opposed to finding issues.
 const CHECK_FAILED: u8 = 2;
@@ -319,6 +319,9 @@ enum Cmd {
         /// The contract JSON that the training script saved beside its model.
         contract: PathBuf,
     },
+    /// Verify a saved pipeline contract and scripts through a durable workflow.
+    #[command(subcommand)]
+    Gates(crate::gates::GatesCommand),
     /// Print the dataflow of step code or Hamilton modules: what reads what, and what does not
     /// connect.
     ///
@@ -362,7 +365,7 @@ enum Cmd {
     Optimize(crate::optimize::OptimizeArgs),
     Harden(crate::harden::HardenArgs),
     Discover(crate::discover::DiscoverArgs),
-    /// Serve the runs of `xpd untangle`, `xpd optimize`, and `xpd chart-review` from a shared PostgreSQL store.
+    /// Serve ledger runs from a shared PostgreSQL store.
     #[cfg(feature = "ledger-distributed")]
     #[command(subcommand)]
     Ledger(LedgerCommand),
@@ -507,6 +510,7 @@ pub fn run() -> ExitCode {
         }
         Cmd::Profile { file } => run_py(PROFILE_PY, &[file]),
         Cmd::Refit { contract } => run_py(REFIT_PY, &[contract]),
+        Cmd::Gates(command) => command_result(command.run(default_format)),
         Cmd::Equiv {
             scripts,
             since,

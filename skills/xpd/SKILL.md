@@ -34,6 +34,7 @@ Each review command surveys mechanical findings and a per-entity checklist, then
 - `xpd graph <files> --format json`: trace step pipelines and Apache Hamilton dataflow without running Python. Reuse existing columns from `pipelines[].steps`, pass `pipelines[].source` to `columns=` in `pd.read_parquet`, and return `frame.assign(...)` or `frame.join(...)` instead of mutating an input frame.
 - `xpd equiv script.py --since HEAD` (or `xpd equiv old.py new.py`): prove a data logic refactor preserves `result` on real rows. Needs pandas.
 - `xpd refit <contract.json>`: refit a saved scikit-learn Pipeline on raw training rows and compare scores with the contract. Needs pandas and scikit-learn.
+- `xpd gates start --contract <contract.json> --train <train.py> --predict <predict.py> --features <features.py>`: run `profile`, `check`, `graph`, `refit`, and `equiv` in a durable workflow, then `xpd gates retry <run>`, `xpd gates status <run>`, or `xpd gates resume <run>` to reuse cached evidence across fix rounds.
 - `xpd doctor --format json`: compare the project against xpd's Ruff, ty, and pytest profile. Run `xpd doctor --apply` only when the user asks.
 - `xpd animate guide` or MCP `animate_guide`: build and preview an editable Manim animation before rendering the final video.
 

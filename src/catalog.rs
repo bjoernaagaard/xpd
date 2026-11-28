@@ -255,7 +255,7 @@ impl Catalog {
 /// `since`, which is no version at all when one document applies to every version.
 #[derive(Debug)]
 pub(crate) struct Entry<'a> {
-    id: RuleId,
+    pub(crate) id: RuleId,
     category: RuleCategory,
     /// The severity that the catalog's run reports the rule with.
     severity: Severity,

@@ -1,10 +1,5 @@
 """The tools that judge a pipeline run, from raw rows to a saved model: `contract` reads what the
-training script saved, and `gates` runs the stages and turns their results into one verdict.
-
-`gates` runs `xpd profile`, `check`, `graph`, `equiv` and `refit` on the files of the run, so
-the agent hands on no result of its own."""
-
-from collections.abc import Sequence
+training script saved, and `gates` runs the durable `xpd gates` workflow on the binary."""
 
 from fastmcp import Context, FastMCP
 from fastmcp.exceptions import ToolError
@@ -12,323 +7,11 @@ from mcp.types import InputRequiredResult
 from pydantic import ValidationError
 
 from xpd.mcp.base import READS, RUNS_CODE, rooted
-from xpd.mcp.catalog import Catalog
-from xpd.mcp.models import (
-    CheckReport,
-    Contract,
-    DiscoveryProof,
-    Equivalence,
-    Evidence,
-    Gate,
-    GateReport,
-    GraphReport,
-    Profile,
-    Proof,
-    Refit,
-    Scripts,
-    Stage,
-)
+from xpd.mcp.binary import GATES_RETRY, GATES_START
+from xpd.mcp.models import Contract, DiscoveryProof, GateReport, Scripts
 from xpd.mcp.names import ToolName
 from xpd.mcp.root import Root
 from xpd.mcp.tools import Analysis
-
-# The rules of each pack that report a split, an estimator, an encoder, a bootstrap, a simulation
-# or an optimizer run that draws without a seed. A pack without such a rule is not listed.
-SEED_RULES = {
-    "sklearn": ("scikit-learn", ("missing-random-state", "random-state-without-shuffle")),
-    "sklego": ("scikit-lego", ("unseeded-random-estimator",)),
-    "mapie": ("MAPIE", ("unseeded-resampling",)),
-    "category_encoders": ("Category Encoders", ("encoder-noise-without-seed",)),
-    "arch": ("arch", ("arch-unseeded-draws",)),
-    "pymoo": ("pymoo", ("unseeded-run", "numpy-seed-ignored")),
-}
-PIPELINE = "sklearn.pipeline.Pipeline"
-# What a later run needs to rebuild the environment that wrote the model.
-VERSIONS = ("python", "scikit-learn", "pandas")
-MIN_FOLDS = 2
-# The libraries that SEED_RULES covers, as the detail of `split-is-seeded` names them.
-*seed_libraries, last_library = (label for label, _ in SEED_RULES.values())
-SEED_LIBRARIES = f"{', '.join(seed_libraries)} or {last_library}"
-SEED_IDS: set[tuple[str, str]] = set()
-for seed_pack, (_, seed_rules) in SEED_RULES.items():
-    SEED_IDS.update((seed_pack, rule) for rule in seed_rules)
-
-
-NO_SOURCE = "which is no input column and which no earlier step adds."
-
-
-def gate(
-    name: str, stage: Stage, evidence: Sequence[Evidence], failures: Sequence[str], found: str
-) -> Gate:
-    return Gate(
-        name=name,
-        stage=stage,
-        evidence=list(evidence),
-        passed=not failures,
-        detail=" ".join(failures) or found,
-    )
-
-
-def data_is_profiled(profile: Profile, contract: Contract) -> Gate:
-    data = contract.data
-    failures = []
-    if data.file != profile.file:
-        failures.append(f"The contract names {data.file}, and the profile is of {profile.file}.")
-    if data.rows != profile.rows:
-        failures.append(f"The contract counts {data.rows} rows, and the file has {profile.rows}.")
-    named = (column for column in profile.columns if column.column == data.target)
-    target = next(named, None)
-    if target is None:
-        failures.append(f"{profile.file} has no column {data.target}.")
-    elif target.nulls:
-        failures.append(f"The target {data.target} has {target.nulls} nulls.")
-    found = f"{data.file} has {data.rows} rows, and the target {data.target} has no nulls."
-    return gate("data-is-profiled", "raw data", ["profile", "contract"], failures, found)
-
-
-def split_covers_every_row(profile: Profile, contract: Contract) -> Gate:
-    split = contract.split
-    failures = []
-    if min(split.train_rows, split.test_rows) < 1:
-        failures.append("The split leaves no rows on one side.")
-    if split.train_rows + split.test_rows != profile.rows:
-        failures.append(
-            f"{split.train_rows} training rows and {split.test_rows} held out rows are not the "
-            f"{profile.rows} rows of the file."
-        )
-    found = (
-        f"The contract counts {split.train_rows} training rows and {split.test_rows} held out rows."
-    )
-    return gate("split-covers-every-row", "split", ["profile", "contract"], failures, found)
-
-
-def split_is_seeded(lint: CheckReport, contract: Contract) -> Gate:
-    unseeded = [issue for issue in lint.issues if (issue.package, issue.rule) in SEED_IDS]
-    failures = [f"{issue.file}:{issue.line} {issue.package}/{issue.rule}." for issue in unseeded]
-    found = (
-        f"The contract records the seed {contract.split.seed}, and check reports no unseeded "
-        f"{SEED_LIBRARIES} draw."
-    )
-    return gate("split-is-seeded", "split", ["check", "contract"], failures, found)
-
-
-def check_reports_no_error(lint: CheckReport) -> Gate:
-    """Every error of every pack counts, and not a list of rules. The leaks among them are
-    `fit-before-split`, `fit-on-test` and `tune-on-test` of sklearn, `calibrate-on-training-rows`
-    and `coverage-on-seen-rows` of mapie, and `encode-before-split` and
-    `transform-with-test-target` of category_encoders. sklego has no rule about a leak, and its
-    errors fail the gate as wrong results.
-
-    The gate does not show that a run has no leak. A rule reads the code and knows the held out
-    rows by names such as `X_test`, so it misses a leak under another name and a leak that no
-    rule describes."""
-    errors = [issue for issue in lint.issues if issue.severity == "error"]
-    failures = [f"{issue.file}:{issue.line} {issue.package}/{issue.rule}." for issue in errors]
-    return gate("check-reports-no-error", "proof", ["check"], failures, "check reports no error.")
-
-
-def inputs_are_file_columns(profile: Profile, contract: Contract) -> Gate:
-    """Compares names and dtypes. It does not compare values, so a column that the training
-    script overwrites before the split passes."""
-    raw = {column.column: column.dtype for column in profile.columns}
-    failures = []
-    for column in contract.inputs:
-        if column.column == contract.data.target:
-            failures.append(f"The target {column.column} is an input.")
-        elif column.column not in raw:
-            failures.append(
-                f"The input {column.column} is no column of {profile.file}, so code outside the "
-                "Pipeline made it."
-            )
-        elif raw[column.column] != column.dtype:
-            failures.append(
-                f"The input {column.column} is {column.dtype}, and the file holds "
-                f"{raw[column.column]}."
-            )
-    if not contract.inputs:
-        failures.append("The contract lists no input column.")
-    found = (
-        f"The {len(contract.inputs)} inputs of the contract have the names and dtypes of columns "
-        f"of {profile.file}."
-    )
-    return gate(
-        "inputs-are-file-columns", "preprocessing", ["profile", "contract"], failures, found
-    )
-
-
-def one_pipeline(contract: Contract) -> Gate:
-    failures = []
-    if contract.model.type != PIPELINE:
-        failures.append(
-            f"The contract names the saved object as {contract.model.type}, not {PIPELINE}."
-        )
-    if not contract.steps:
-        failures.append("The contract lists no step.")
-    found = " then ".join(step.estimator for step in contract.steps)
-    return gate(
-        "one-pipeline",
-        "model",
-        ["contract"],
-        failures,
-        f"The contract lists one Pipeline of {found}.",
-    )
-
-
-def dataflow_connects(dataflow: GraphReport, contract: Contract) -> Gate:
-    """A step may read the model's input columns and the columns of the steps before it. A read
-    of anything else is a column that is missing when the model predicts, or the target."""
-    reported = {"error", "warning"}
-    problems = [problem for problem in dataflow.problems if problem.severity in reported]
-    failures = [f"{problem.file}:{problem.line} {problem.message}" for problem in problems]
-    inputs = {column.column for column in contract.inputs}
-    steps = 0
-    for pipeline in dataflow.pipelines:
-        known = set(inputs)
-        for step in pipeline.steps:
-            steps += 1
-            place = f"{pipeline.file}:{step.line} {step.name}()"
-            unknown = [column for column in step.reads if column not in known]
-            failures.extend(f"{place} reads {column}, {NO_SOURCE}" for column in unknown)
-            known.update(step.columns)
-    found = f"{steps} feature steps read only input columns and columns of earlier steps."
-    return gate("dataflow-connects", "preprocessing", ["graph", "contract"], failures, found)
-
-
-def cross_validated(contract: Contract) -> Gate:
-    """Check that the contract records one score per fold."""
-    validation = contract.validation
-    failures = []
-    if validation.folds < MIN_FOLDS:
-        failures.append(f"{validation.folds} folds is no cross-validation.")
-    if len(validation.cv_scores) != validation.folds:
-        failures.append(
-            f"The contract has {len(validation.cv_scores)} scores for {validation.folds} folds."
-        )
-    found = (
-        f"The contract records {validation.scoring} {min(validation.cv_scores, default=0)} to "
-        f"{max(validation.cv_scores, default=0)} on {validation.folds} folds, and "
-        f"{validation.test_score} as the held out score."
-    )
-    return gate("cross-validated", "validation", ["contract"], failures, found)
-
-
-def equivalent(name: str, stage: Stage, result: Equivalence, found: str) -> Gate:
-    failures = [] if result.equivalent else [result.detail or "The results differ."]
-    return gate(name, stage, ["equiv"], failures, found)
-
-
-def versions_recorded(profile: Profile, contract: Contract) -> Gate:
-    versions = contract.model.versions
-    missing = [name for name in VERSIONS if not versions.get(name)]
-    failures = [f"The contract records no version of {name}." for name in missing]
-    if versions.get("pandas") not in {None, profile.pandas}:
-        failures.append(
-            f"The model was written with pandas {versions['pandas']}, and the project's Python "
-            f"has {profile.pandas}."
-        )
-    found = ", ".join(f"{name} {version}" for name, version in versions.items())
-    return gate(
-        "versions-recorded",
-        "persisted model",
-        ["profile", "contract"],
-        failures,
-        f"The contract records {found}.",
-    )
-
-
-def refit_matches_model(result: Refit) -> Gate:
-    failures = []
-    if not result.model_matches:
-        failures.append(
-            f"The raw training refit differs on {result.output}. "
-            f"The largest gap is {result.largest_gap}."
-        )
-    return gate(
-        "refit-matches-model",
-        "proof",
-        ["refit"],
-        failures,
-        f"The raw training refit matches the saved model on {result.output}.",
-    )
-
-
-def refit_matches_scores(contract: Contract, result: Refit) -> Gate:
-    failures = []
-    if contract.validation.test_score != result.refit_test_score:
-        failures.append(
-            f"The contract held out score is {contract.validation.test_score}, "
-            f"and the refit gives {result.refit_test_score}."
-        )
-    if contract.validation.cv_scores != result.refit_cv_scores:
-        failures.append(
-            f"The contract fold scores are {contract.validation.cv_scores}, "
-            f"and the refit gives {result.refit_cv_scores}."
-        )
-    if (
-        result.rows != contract.data.rows
-        or result.train_rows != contract.split.train_rows
-        or result.test_rows != contract.split.test_rows
-        or len(result.refit_cv_scores) != contract.validation.folds
-    ):
-        failures.append("The refit row or fold counts differ.")
-    return gate(
-        "refit-matches-scores",
-        "validation",
-        ["refit", "contract"],
-        failures,
-        "The contract scores and row and fold counts match the raw training refit.",
-    )
-
-
-def discovery_gates(contract: Contract, proof: Proof) -> list[Gate]:
-    if contract.discovery is None and proof.discovery is None:
-        return []
-    gates = []
-
-    failures = []
-    if proof.discovery is None:
-        failures.append("No discovery_gate result was supplied.")
-    else:
-        gates.append(proof.discovery.gate)
-        recorded = contract.discovery.decision() if contract.discovery else None
-        if recorded != proof.discovery.discovery.decision():
-            failures.append("The contract and proof record different discovery choices.")
-    found = "The contract records the discovery question, candidates and reason of the proof."
-    gates.append(gate("discovery-is-recorded", "discovery", ["contract"], failures, found))
-    return gates
-
-
-def judge(profile: Profile, contract: Contract, proof: Proof) -> GateReport:
-    gates = [
-        data_is_profiled(profile, contract),
-        split_covers_every_row(profile, contract),
-        split_is_seeded(proof.lint, contract),
-        inputs_are_file_columns(profile, contract),
-        dataflow_connects(proof.dataflow, contract),
-        one_pipeline(contract),
-        check_reports_no_error(proof.lint),
-        cross_validated(contract),
-        equivalent(
-            "reproducible",
-            "proof",
-            proof.reproducible,
-            "Two runs of the training script, each in its own Python process, leave an equal "
-            "`result`.",
-        ),
-        refit_matches_model(proof.refit),
-        refit_matches_scores(contract, proof.refit),
-        equivalent(
-            "saved-model-predicts",
-            "persisted model",
-            proof.served,
-            "The prediction script, in its own Python process, leaves the `result` that the "
-            "training script left.",
-        ),
-        versions_recorded(profile, contract),
-    ]
-    gates.extend(discovery_gates(contract, proof))
-    failed = [gate.name for gate in gates if not gate.passed]
-    return GateReport(passed=not failed, failed=failed, gates=gates)
 
 
 def read_contract(root: Root, file: str) -> Contract:
@@ -361,12 +44,9 @@ def read_contract(root: Root, file: str) -> Contract:
     )
 
 
-def register(mcp: FastMCP, analysis: Analysis, rules: Catalog) -> None:
+def register(mcp: FastMCP, analysis: Analysis) -> None:
     project = analysis.project
-
-    # A rule that the binary renamed would never match, and its gate would pass every run.
-    for package, rule in SEED_IDS:
-        rules.find(package, rule)
+    xpd = analysis.xpd
 
     @mcp.tool(name=ToolName.CONTRACT, tags={"pipeline"}, annotations=READS)
     @rooted
@@ -387,30 +67,19 @@ def register(mcp: FastMCP, analysis: Analysis, rules: Catalog) -> None:
     @mcp.tool(name=ToolName.GATES, tags={"pipeline"}, annotations=RUNS_CODE, task=True)
     @rooted
     async def gates(
-        ctx: Context, contract: str, scripts: Scripts, discovery: DiscoveryProof | None = None
+        ctx: Context,
+        contract: str,
+        scripts: Scripts,
+        discovery: DiscoveryProof | None = None,
+        run: str | None = None,
     ) -> GateReport | InputRequiredResult:
-        """Run the stages of a pipeline run, from raw rows to a saved model, and judge them.
-        Each gate is one requirement, with the commands whose results decide it. The run is
-        done when `passed` is true.
+        """Run the durable `xpd gates` workflow on a pipeline run, from raw rows to a saved model,
+        and judge it. Each gate is one requirement, with the commands whose results decide it. The
+        run is done when `passed` is true.
 
-        It runs `xpd profile` on the data file that the contract names, `xpd check` on the
-        three scripts, `xpd graph` on the feature steps, `xpd equiv` of the training script
-        with itself and with the prediction script, and `xpd refit` on the contract. It runs
-        the scripts with the project's Python, so run it on code you trust. It changes no
-        saved file.
-
-        The gates: the data is the profiled file and its target has no nulls, the split
-        covers every row, `check` reports no draw without a seed in scikit-learn, scikit-lego,
-        MAPIE, Category Encoders, arch or pymoo code, the inputs have the names and dtypes of
-        columns of the file, one Pipeline holds every step, the feature steps connect, `check`
-        reports no error, the contract has a score for each fold, a raw training refit matches
-        the saved model and the recorded scores, two training runs leave an equal `result`,
-        the prediction script leaves that `result` too, and the versions are recorded. With
-        `discovery`, its indexed-api-calls result is a gate too, and the contract's discovery
-        record must match it. Without it, thirteen gates apply.
-
-        A passed report does not judge choices made across separate runs or raw columns
-        that stand in for the target.
+        Pass `run` from an earlier failed response to retry the same durable run and reuse cached
+        results for unchanged inputs (`profile`, `check`, `graph`, `refit`, and `equiv`). It runs
+        the scripts with the project's Python, so run it on code you trust.
 
         Args:
             contract: The contract that the training script saved, a JSON file inside the
@@ -419,27 +88,44 @@ def register(mcp: FastMCP, analysis: Analysis, rules: Catalog) -> None:
                 feature steps.
             discovery: The result of `discovery_gate` for this run, when the choice of a
                 library was recorded.
+            run: Optional run ID from a previous `gates` call to retry with cached evidence.
         """
         root = await project.required_root(ctx)
-        read = read_contract(root, contract)
-        results = (
-            await analysis.profile(ctx, read.data.file),
-            await analysis.check(ctx, [scripts.train, scripts.predict, scripts.features]),
-            await analysis.graph(ctx, [scripts.features]),
-            await analysis.equiv(ctx, scripts.train, scripts.train),
-            await analysis.refit(ctx, contract),
-            await analysis.equiv(ctx, scripts.train, scripts.predict),
+        read_contract(root, contract)
+        stdin = discovery.model_dump_json().encode() if discovery is not None else None
+        discovery_flags = ("--discovery", "-") if discovery is not None else ()
+        if run is not None:
+            await ctx.report_progress(0, 1, f"Retrying gates run {run}")
+            report = await xpd.run(
+                GATES_RETRY,
+                root.path,
+                [run],
+                *discovery_flags,
+                project_root=root.path,
+                stdin=stdin,
+            )
+            await ctx.report_progress(1, 1, f"Gates run {run} finished")
+            return report
+
+        flags = (
+            "--contract",
+            root.inside(contract),
+            "--train",
+            root.inside(scripts.train),
+            "--predict",
+            root.inside(scripts.predict),
+            "--features",
+            root.inside(scripts.features),
+            *discovery_flags,
         )
-        for result in results:
-            if isinstance(result, InputRequiredResult):
-                return result
-        profile, lint, dataflow, reproducible, refit, served = results
-        proof = Proof(
-            discovery=discovery,
-            lint=lint,
-            dataflow=dataflow,
-            reproducible=reproducible,
-            refit=refit,
-            served=served,
+        await ctx.report_progress(0, 1, "Running durable pipeline gates")
+        report = await xpd.run(
+            GATES_START,
+            root.path,
+            (),
+            *flags,
+            project_root=root.path,
+            stdin=stdin,
         )
-        return judge(profile, read, proof)
+        await ctx.report_progress(1, 1, f"Gates run {report.run or ''} finished".strip())
+        return report

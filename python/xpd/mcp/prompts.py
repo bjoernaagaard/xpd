@@ -167,8 +167,8 @@ Never install silently, and do not treat successful discovery as proof of instal
 6. Call `{ToolName.GATES}` with the contract model/contract.json, the scripts train.py,
    predict.py and features.py, and the result of `{ToolName.DISCOVERY_GATE}` as `discovery`.
    It runs the stages itself. The run is done when `passed` is true. For a gate that failed,
-   read its `detail`, fix the scripts and call `{ToolName.GATES}` again. Never edit the
-   contract by hand.
+   read its `detail`, fix the scripts and call `{ToolName.GATES}` again with `run` set to the
+   returned run ID so unchanged stages reuse cached evidence. Never edit the contract by hand.
 7. Refit checks the saved model against raw training rows. Review choices across separate
    runs and raw columns that stand in for the target, since those need other evidence.
 

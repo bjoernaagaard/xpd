@@ -19,6 +19,7 @@ mod embed;
 mod feature_review;
 mod fix_safety;
 mod frames;
+mod gates;
 mod git;
 mod graph;
 mod graph_diagnostic;

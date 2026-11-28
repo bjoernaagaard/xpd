@@ -88,7 +88,7 @@ def build(settings: Settings) -> FastMCP:
     discovery.register(mcp, xpd, project)
     views.register(mcp, analysis)
     catalog.register(mcp, fallback_rules, xpd, project)
-    pipeline.register(mcp, analysis, fallback_rules)
+    pipeline.register(mcp, analysis)
     prompts.register(mcp, skill_uris["python-review"])
     animation.register(mcp, xpd, project, local=transport == "stdio")
 

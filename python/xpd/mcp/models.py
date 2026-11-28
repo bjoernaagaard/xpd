@@ -177,13 +177,6 @@ class Profile(Output):
     )
 
 
-class Equivalence(Output):
-    """Whether two scripts leave an equal `result`."""
-
-    equivalent: bool
-    detail: str | None = Field(default=None, description="How the results differ.")
-
-
 class RuleSummary(Output):
     """One rule or package check of `xpd rules`, without its documentation."""
 
@@ -364,23 +357,6 @@ class Splitter(Written):
     args: dict[str, JsonValue]
 
 
-class Refit(Output):
-    rows: int
-    train_rows: int
-    test_rows: int
-    output: Literal["predict_proba", "decision_function", "predict"]
-    largest_gap: float | None
-    model_matches: bool
-    contract_test_score: float
-    refit_test_score: float
-    contract_cv_scores: list[float]
-    refit_cv_scores: list[float]
-    test_score_matches: bool
-    cv_scores_match: bool
-    counts_match: bool
-    passed: bool
-
-
 class Validation(Written):
     splitter: Splitter
     scoring: str = Field(description="The scorer name, such as accuracy.")
@@ -426,9 +402,10 @@ class Gate(BaseModel):
     detail: str = Field(description="What was found, or each reason the gate failed.")
 
 
-class GateReport(BaseModel):
-    model_config = ConfigDict(frozen=True)
-
+class GateReport(Output):
+    run: str | None = Field(
+        default=None, description="Durable gates run ID to pass back on retry for cached rounds."
+    )
     passed: bool = Field(description="True when every gate passed.")
     failed: list[str] = Field(description="The names of the gates that failed.")
     gates: list[Gate]
@@ -452,18 +429,3 @@ class Scripts(BaseModel):
         description="The script that loads the saved model and leaves the same `result`."
     )
     features: str = Field(description="The file with the feature steps.")
-
-
-class Proof(BaseModel):
-    """What xpd's tools found about the scripts of a pipeline run."""
-
-    model_config = ConfigDict(frozen=True)
-
-    discovery: DiscoveryProof | None = None
-    lint: CheckReport = Field(description="`check` on the training, prediction and step files.")
-    dataflow: GraphReport = Field(description="`graph` on the file with the feature steps.")
-    reproducible: Equivalence = Field(description="`equiv` of the training script with itself.")
-    refit: Refit = Field(description="`refit` on the saved contract.")
-    served: Equivalence = Field(
-        description="`equiv` of the training script with the script that loads the saved model."
-    )

@@ -18,10 +18,9 @@ from pydantic import TypeAdapter
 from xpd.mcp.models import (
     CheckReport,
     DiscoveryEntry,
-    Equivalence,
+    GateReport,
     GraphReport,
     Profile,
-    Refit,
     Rule,
     SkillSource,
 )
@@ -43,8 +42,12 @@ API = Command(("api", "--format", "json"), TypeAdapter(list[DiscoveryEntry]).val
 CHECK = Command(("check", "--format", "json"), TypeAdapter(CheckReport).validate_json, FINDINGS)
 GRAPH = Command(("graph", "--format", "json"), TypeAdapter(GraphReport).validate_json, FINDINGS)
 PROFILE = Command(("profile",), TypeAdapter(Profile).validate_json, SUCCESS)
-REFIT = Command(("refit",), TypeAdapter(Refit).validate_json, FINDINGS)
-EQUIV = Command(("equiv",), TypeAdapter(Equivalence).validate_json, FINDINGS)
+GATES_START = Command(
+    ("gates", "start", "--format", "json"), TypeAdapter(GateReport).validate_json, FINDINGS
+)
+GATES_RETRY = Command(
+    ("gates", "retry", "--format", "json"), TypeAdapter(GateReport).validate_json, FINDINGS
+)
 RULES = Command(("rules", "--format", "json"), TypeAdapter(list[Rule]).validate_json, SUCCESS)
 BUILTIN_RULES = Command(("rules", "--builtin", "--format", "json"), RULES.decode, SUCCESS)
 SKILLS = Command(("skill", "--json"), TypeAdapter(list[SkillSource]).validate_json, SUCCESS)
@@ -64,6 +67,8 @@ def json_error(stdout: bytes) -> bytes | None:
 def argv(paths: Sequence[str], flags: Sequence[str]) -> tuple[str, ...]:
     """The arguments after the command. A client names the paths, so they follow `--`, which
     keeps a path such as `--fix` from being read as a flag."""
+    if not paths:
+        return tuple(flags)
     return (*flags, "--", *paths)
 
 
