@@ -4,6 +4,8 @@ mod history;
 mod module_graph;
 mod python_facts;
 mod redundancy;
+mod refactor;
+mod rust_graph;
 mod shared_state;
 mod symbol_reach;
 mod zones;
@@ -170,6 +172,8 @@ struct Read {
   xpd untangle
   xpd untangle src/ --format json
   xpd untangle src/ --map
+  xpd untangle --move pkg/old.py pkg/new.py --apply
+  xpd untangle --inline-facade pkg/shim.py --apply
   xpd untangle --kind copy,changes-together --limit 0
   xpd untangle --since main")]
 pub(crate) struct UntangleArgs {
@@ -177,16 +181,47 @@ pub(crate) struct UntangleArgs {
     select: Select<UntangleKind>,
     #[arg(long)]
     questions: bool,
-    /// Print a Mermaid (or JSON with --format json) module coupling and health map.
+    /// Print a Mermaid (or JSON with --format json) module coupling and health map for Python or Rust.
     #[arg(long)]
     map: bool,
+    /// Mechanically move a Python module (`FROM TO`) and rewrite project imports (dry-run unless `--apply`).
+    #[arg(long = "move", num_args = 2, value_names = ["FROM", "TO"], conflicts_with_all = ["map", "inline_facade", "questions"])]
+    move_module: Option<Vec<PathBuf>>,
+    /// Inline a pure re-export Python facade module into its callers and remove it (dry-run unless `--apply`).
+    #[arg(long, value_name = "FILE", conflicts_with_all = ["map", "move_module", "questions"])]
+    inline_facade: Option<PathBuf>,
+    /// Write mechanical refactor changes to disk instead of printing a preview diff.
+    #[arg(long)]
+    apply: bool,
 }
 
 impl UntangleArgs {
     pub(crate) fn run(self, default: Format) -> Result<ExitCode> {
         let catalog = QuestionCatalog::load(include_str!("../rules/xpd/untangle.yml"))?;
+        let chosen_format = self.select.format_override().unwrap_or(default);
         if self.questions {
-            return catalog.print(self.select.format_override().unwrap_or(default));
+            return catalog.print(chosen_format);
+        }
+        let refactor_mode = if self.apply {
+            refactor::RefactorMode::Apply
+        } else {
+            refactor::RefactorMode::DryRun
+        };
+        if let Some(pair) = self.move_module {
+            let root = self.select.paths().first().map_or_else(
+                || std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")),
+                PathBuf::clone,
+            );
+            refactor::move_module(&root, &pair[0], &pair[1], refactor_mode, chosen_format)?;
+            return Ok(ExitCode::SUCCESS);
+        }
+        if let Some(facade) = self.inline_facade {
+            let root = self.select.paths().first().map_or_else(
+                || std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")),
+                PathBuf::clone,
+            );
+            refactor::inline_facade(&root, &facade, refactor_mode, chosen_format)?;
+            return Ok(ExitCode::SUCCESS);
         }
         if self.map {
             let paths = self.select.paths();
@@ -200,13 +235,23 @@ impl UntangleArgs {
                 .map_or_else(History::default, |top| History::read(top, "HEAD"));
             let listing = Listing::of(paths, files, top.as_deref(), "HEAD")?;
             let collected = collect(files, &listing, &history)?;
-            let edges = module_graph::resolve_module_edges(&collected.modules);
-            coupling_map::print_coupling_map(
-                &collected.modules,
-                &edges,
-                &collected.findings,
-                self.select.format_override().unwrap_or(default),
-            )?;
+            if collected.modules.is_empty()
+                && listing
+                    .files
+                    .iter()
+                    .any(|(_, lang)| *lang == SupportLang::Rust)
+            {
+                let rust_map = rust_graph::build_rust_graph(files, &listing);
+                coupling_map::print_rust_coupling_map(&rust_map, chosen_format)?;
+            } else {
+                let edges = module_graph::resolve_module_edges(&collected.modules);
+                coupling_map::print_coupling_map(
+                    &collected.modules,
+                    &edges,
+                    &collected.findings,
+                    chosen_format,
+                )?;
+            }
             return Ok(ExitCode::SUCCESS);
         }
         let survey = |paths: &[PathBuf],

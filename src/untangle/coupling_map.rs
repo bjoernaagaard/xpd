@@ -10,6 +10,7 @@ use crate::output::Format;
 
 use super::module_graph::ModuleImportEdge;
 use super::python_facts::SurveyedModule;
+use super::rust_graph::RustGraph;
 use super::zones::Zone;
 use super::{Finding, UntangleKind};
 
@@ -97,6 +98,85 @@ pub(super) fn print_coupling_map(
     format: Format,
 ) -> anyhow::Result<()> {
     let map = build(modules, edges, findings);
+    match format {
+        Format::Json => println!("{}", serde_json::to_string_pretty(&map)?),
+        Format::Text => print!("{}", render_mermaid(&map)),
+    }
+    Ok(())
+}
+
+/// Prints the Rust `mod` and `use` coupling map in Mermaid (`Format::Text`) or JSON (`Format::Json`).
+pub(super) fn print_rust_coupling_map(graph: &RustGraph, format: Format) -> anyhow::Result<()> {
+    let total = graph.modules.len();
+    let roles: Vec<Role> = (0..total)
+        .map(|idx| {
+            if graph.cycle_nodes.contains(&idx) {
+                Role::Cycle
+            } else if graph.orphan_nodes.contains(&idx) {
+                Role::Orphan
+            } else {
+                Role::Normal
+            }
+        })
+        .collect();
+    let (kept, focused) = if total <= FULL_MAP_LIMIT {
+        ((0..total).collect::<Vec<_>>(), false)
+    } else {
+        let mut active: BTreeSet<usize> = (0..total)
+            .filter(|&idx| roles[idx] != Role::Normal)
+            .collect();
+        let seeds = active.clone();
+        for edge in &graph.edges {
+            if seeds.contains(&edge.from) || seeds.contains(&edge.to) {
+                active.insert(edge.from);
+                active.insert(edge.to);
+            }
+        }
+        let chosen = if active.is_empty() {
+            (0..total).take(FULL_MAP_LIMIT).collect()
+        } else {
+            active.into_iter().collect()
+        };
+        (chosen, true)
+    };
+    let id_of: HashMap<usize, String> = kept
+        .iter()
+        .enumerate()
+        .map(|(slot, &idx)| (idx, format!("m{slot}")))
+        .collect();
+    let nodes: Vec<MapNode> = kept
+        .iter()
+        .map(|&idx| {
+            let module = &graph.modules[idx];
+            MapNode {
+                id: id_of[&idx].clone(),
+                path: module.shown.clone(),
+                package: package_dir(&module.shown),
+                loc: module.loc,
+                role: roles[idx],
+            }
+        })
+        .collect();
+    let edges: Vec<MapEdge> = graph
+        .edges
+        .iter()
+        .filter_map(|edge| {
+            Some(MapEdge {
+                from: id_of.get(&edge.from)?.clone(),
+                to: id_of.get(&edge.to)?.clone(),
+                eager: true,
+                cycle: edge.cycle,
+                volatile: false,
+            })
+        })
+        .collect();
+    let map = CouplingMap {
+        focused,
+        total_modules: total,
+        nodes,
+        edges,
+        hidden_links: Vec::new(),
+    };
     match format {
         Format::Json => println!("{}", serde_json::to_string_pretty(&map)?),
         Format::Text => print!("{}", render_mermaid(&map)),

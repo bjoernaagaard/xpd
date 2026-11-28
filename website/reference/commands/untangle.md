@@ -7,7 +7,9 @@ Run `xpd untangle` to find pieces that change together in separate modules, need
 | Surplus | `pass-through`, `default-argument`, `unreferenced`, `constant-parameter`, `orphaned-module`, `facade-module`, `single-use-module` |
 | Special cases | `one-value-branch`, `one-caller-parameter` |
 
-A module with a finding gets six structural checklist items. Run `xpd untangle --questions` to read the questions and the facts that inform them, or `xpd untangle <paths> --map` to print a Mermaid module coupling and health map (add `--format json` for structured nodes, edges, and hidden links). The supported fix goals are `shorter` and `design`.
+A module with a finding gets six structural checklist items. Run `xpd untangle --questions` to read the questions and the facts that inform them, or `xpd untangle <paths> --map` to print a Mermaid module coupling and health map for Python or Rust trees (add `--format json` for structured nodes, edges, and hidden links). The supported fix goals are `shorter` and `design`.
+
+For mechanical Python cleanups, preview diffs with `xpd untangle --move <from> <to>` or `xpd untangle --inline-facade <file>` and pass `--apply` to write the validated changes.
 
 A `shorter` fix requires a lower line count. For a data script refactor, run `xpd equiv` on the old and new versions and record the result in the fix commit.
 
