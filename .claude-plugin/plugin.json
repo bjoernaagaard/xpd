@@ -1,6 +1,6 @@
 {
   "name": "xpd",
-  "version": "0.65.0",
+  "version": "1.0.0",
   "description": "Static linter, project library index, unified repo audit, 10 recorded review ledgers, and Manim animation tools for Python (pandas, Polars, NumPy, SciPy, scikit-learn, LightGBM, XGBoost, statsmodels, CVXPY, skfolio, pymoo, Nixtla, plotly, Hamilton) over hooks, LSP, and 14 MCP tools.",
   "author": {
     "name": "Bjørn Aagaard",
