@@ -21,7 +21,7 @@ pub(super) struct History {
 
 /// Two files that changed in the same commits.
 #[derive(Debug, PartialEq, Eq)]
-pub(super) struct Pair {
+pub(super) struct CochangePair {
     pub(super) first: String,
     pub(super) second: String,
     /// The commits that changed both files.
@@ -114,7 +114,7 @@ impl History {
 
     /// The pairs of `files` that changed together in at least five commits, and in at least
     /// half of the commits of the file that changed less often. Sweeps are left out.
-    pub(super) fn pairs(&self, files: &BTreeSet<&str>) -> Vec<Pair> {
+    pub(super) fn pairs(&self, files: &BTreeSet<&str>) -> Vec<CochangePair> {
         let mut alone: BTreeMap<&str, usize> = BTreeMap::new();
         let mut together: BTreeMap<(&str, &str), usize> = BTreeMap::new();
         for commit in &self.commits {
@@ -131,10 +131,10 @@ impl History {
                 }
             }
         }
-        let mut pairs: Vec<Pair> = (together.into_iter())
+        let mut pairs: Vec<CochangePair> = (together.into_iter())
             .filter_map(|((first, second), together)| {
                 let of = alone[first].min(alone[second]);
-                (together >= SHARED_COMMITS && together * 2 >= of).then(|| Pair {
+                (together >= SHARED_COMMITS && together * 2 >= of).then(|| CochangePair {
                     first: first.to_owned(),
                     second: second.to_owned(),
                     together,

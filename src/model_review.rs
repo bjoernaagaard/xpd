@@ -9,7 +9,7 @@ use anyhow::Result;
 use clap::ValueEnum;
 use serde::{Deserialize, Serialize};
 
-use crate::ledger::{self, Catalog, Goal, Select};
+use crate::ledger::{self, Goal, QuestionCatalog, Select, WorkflowId};
 use crate::output::Format;
 
 const MODEL_CATALOG: &str = include_str!("../rules/xpd/model-review.yml");
@@ -17,7 +17,7 @@ const MODEL_CATALOG: &str = include_str!("../rules/xpd/model-review.yml");
 #[derive(Deserialize, Serialize)]
 struct ModelCatalog {
     #[serde(flatten)]
-    checklist: Catalog,
+    checklist: QuestionCatalog,
     mcp_gates: Vec<String>,
     rules: BTreeMap<String, Kind>,
 }
@@ -53,9 +53,9 @@ enum Kind {
     BoostingValidation,
 }
 
-impl ledger::Kind for Kind {
+impl ledger::LedgerKind for Kind {
     type Group = Group;
-    const COMMAND: &str = "model-review";
+    const WORKFLOW: WorkflowId = WorkflowId::ModelReview;
     const GROUPS: &[Group] = &[Group::Validation, Group::Comparison, Group::Calibration];
     const GOALS: &[Goal] = &[Goal::Design];
 
@@ -105,7 +105,7 @@ impl ModelReviewArgs {
                     Ok(ExitCode::SUCCESS)
                 }
                 Format::Text => {
-                    catalog.checklist.print(Format::Text)?;
+                    let _ = catalog.checklist.print(Format::Text)?;
                     println!("MCP gates\n  {}", catalog.mcp_gates.join("\n  "));
                     Ok(ExitCode::SUCCESS)
                 }

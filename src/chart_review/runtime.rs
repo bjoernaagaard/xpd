@@ -10,8 +10,8 @@ use anyhow::{Result, bail};
 use regex::Regex;
 use serde_json::{Value, json};
 
-use crate::ledger::adapter::invoke_adapter;
-use crate::ledger::{AdapterPolicy, Place};
+use crate::ledger::adapter_runner::invoke_adapter;
+use crate::ledger::{AdapterPolicy, FindingPlace};
 
 use super::{Finding, Kind, is_all_caps, looks_like_identifier};
 
@@ -80,7 +80,7 @@ impl FigureCtx<'_> {
         findings.push(Finding {
             kind,
             key: format!("runtime\n{}\n{detail_key}", self.name),
-            places: vec![Place::file(self.adapter)],
+            places: vec![FindingPlace::file(self.adapter)],
             evidence: format!("[{}] {evidence}", self.name),
             weight,
         });

@@ -4,7 +4,7 @@
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::path::Path;
 
-use crate::ledger::python::{called, imports_of, root_name};
+use crate::ledger::python_ast::{called_method_name as called, imports_of, root_name};
 use crate::source;
 use crate::syntax::{Node, Root};
 

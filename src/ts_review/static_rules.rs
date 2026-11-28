@@ -3,7 +3,7 @@ use ast_grep_config::{GlobalRules, RuleConfig};
 use ast_grep_language::SupportLang;
 use clap::ValueEnum;
 
-use crate::ledger::{Finding, Place};
+use crate::ledger::{FindingPlace, LedgerFinding};
 use crate::syntax::{self, Node};
 
 use super::Kind;
@@ -378,7 +378,7 @@ pub(super) fn findings(
     shown: &str,
     tracked: &str,
     demand: Demand,
-) -> Vec<Finding<Kind>> {
+) -> Vec<LedgerFinding<Kind>> {
     let tree = syntax::parse(text);
     let root = tree.root();
     let mut findings = Vec::new();
@@ -396,10 +396,10 @@ pub(super) fn findings(
                 _ => false,
             };
             if violates {
-                findings.push(Finding {
+                findings.push(LedgerFinding {
                     kind,
                     key: format!("{tracked}\n{}", call.text()),
-                    places: vec![Place::line(shown, call.start_pos().line() + 1)],
+                    places: vec![FindingPlace::line(shown, call.start_pos().line() + 1)],
                     evidence: format!("{} {}", call.text(), config.message),
                     weight: 1,
                 });

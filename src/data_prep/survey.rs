@@ -10,19 +10,21 @@ use serde_json::Value;
 use crate::catalog::Filters;
 use crate::graph::Graph;
 use crate::ledger::gix_source::Listing;
-use crate::ledger::{self, AdapterPolicy, Catalog, Finding, Place, SurveyOutput, Tree};
+use crate::ledger::{
+    self, AdapterPolicy, FindingPlace, LedgerFinding, QuestionCatalog, SurveyOutput, Tree,
+};
 use crate::source;
 use crate::style::Style;
 use crate::workspace::Workspace;
 
-use super::{CATALOG, Kind, adapter};
+use super::{CATALOG, Kind, column_adapter};
 
 #[derive(Debug, Serialize)]
 pub(super) struct Read {
     pub(super) files: usize,
     graph: Value,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub(super) facts: Option<adapter::Facts>,
+    pub(super) facts: Option<column_adapter::Facts>,
 }
 
 pub(super) fn survey(
@@ -65,19 +67,19 @@ pub(super) fn survey(
         &cwd
     };
     let facts = match spec
-        .map(|spec| adapter::measure(spec, directory))
+        .map(|spec| column_adapter::measure(spec, directory))
         .transpose()
     {
         Ok(facts) => facts.flatten(),
-        Err(error) if policy == AdapterPolicy::BestEffort => Some(adapter::Facts {
+        Err(error) if policy == AdapterPolicy::BestEffort => Some(column_adapter::Facts {
             error: Some(error.to_string()),
-            ..adapter::Facts::default()
+            ..column_adapter::Facts::default()
         }),
         Err(error) => return Err(error),
     };
     let mut checklist = Vec::new();
     if let Some(facts) = &facts {
-        let catalog = Catalog::load(CATALOG)?;
+        let catalog = QuestionCatalog::load(CATALOG)?;
         let owner = files.first().map_or_else(
             || {
                 paths
@@ -132,7 +134,7 @@ fn check_file(
     text: &str,
     shown: &str,
     tracked: &str,
-) -> Vec<Finding<Kind>> {
+) -> Vec<LedgerFinding<Kind>> {
     let linted = workspace.analyze(source::File::on_disk(path), text);
     let keyed_joins: BTreeSet<_> = linted
         .found
@@ -168,10 +170,13 @@ fn check_file(
                 "polars-silent-dtype-coercion" => Kind::SilentDtypeCoercion,
                 _ => Kind::from_str(name, false).ok()?,
             };
-            Some(Finding {
+            Some(LedgerFinding {
                 kind,
                 key: format!("{tracked}\n{rule}\n{}", issue.message),
-                places: vec![Place::line(shown, issue.position.map_or(1, |pos| pos.line))],
+                places: vec![FindingPlace::line(
+                    shown,
+                    issue.position.map_or(1, |pos| pos.line),
+                )],
                 evidence: format!("`{rule}` ({}): {}", issue.severity, issue.message),
                 weight: 1,
             })

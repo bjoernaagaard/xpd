@@ -15,7 +15,7 @@ use anyhow::{Context, Result};
 use ast_grep_core::Language;
 use ast_grep_language::SupportLang;
 use clap::ValueEnum;
-use serde::Serialize;
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use siphasher::sip::SipHasher13;
 
 use crate::catalog::Filters;
@@ -23,37 +23,57 @@ use crate::git;
 use crate::style::Style;
 use crate::workspace::Workspace;
 
-pub(crate) mod adapter;
-mod catalog;
+pub(crate) mod adapter_runner;
 mod durable;
+mod durable_store;
 mod feature_evidence;
+mod gate_judge;
 pub(crate) mod gix_source;
 mod orchestration;
-pub(crate) mod python;
-mod run;
-pub(crate) use catalog::Catalog;
-pub(crate) use run::Goal;
+pub(crate) mod python_ast;
+mod question_catalog;
+mod run_journal;
+mod run_probes;
+mod run_stage;
+pub(crate) use question_catalog::QuestionCatalog;
+pub(crate) use run_journal::Goal;
 pub(crate) mod salsa_db;
 pub(crate) mod twins;
+pub(crate) mod workflow_registry;
+pub(crate) use workflow_registry::WorkflowId;
 #[cfg(feature = "ledger-distributed")]
 pub(crate) mod worker;
 
 use crate::output::Format;
+use workflow_registry::{FeatureEvidencePolicy, HeadMeasurementPolicy};
+
+impl Serialize for WorkflowId {
+    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        serializer.serialize_str(self.as_str())
+    }
+}
+
+impl<'de> Deserialize<'de> for WorkflowId {
+    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let raw = String::deserialize(deserializer)?;
+        raw.parse().map_err(serde::de::Error::custom)
+    }
+}
 
 /// How many places of a finding the text shows. The JSON holds every place.
 const PLACES_SHOWN: usize = 3;
 
 /// What a finding of one command is. The kinds of a command are in groups, and the ledger
 /// lists the groups in the order of `GROUPS`.
-pub(crate) trait Kind:
+pub(crate) trait LedgerKind:
     Copy + Ord + Hash + std::fmt::Debug + Serialize + ValueEnum + Send + Sync + 'static
 {
     type Group: Copy + Ord + std::fmt::Debug + Serialize + Send + Sync;
 
     const GROUPS: &'static [Self::Group];
 
-    /// The name of the command that lists findings of this kind, such as `untangle`.
-    const COMMAND: &'static str;
+    /// The registered workflow identity for findings of this kind.
+    const WORKFLOW: WorkflowId;
     const GOALS: &'static [Goal] = &[Goal::Shorter, Goal::Faster, Goal::Both, Goal::Design];
 
     fn source_rule(self) -> Option<&'static str> {
@@ -75,7 +95,7 @@ pub(crate) trait Kind:
 
 /// One place of a finding. Lines count from 1.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize)]
-pub(crate) struct Place {
+pub(crate) struct FindingPlace {
     pub(crate) path: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) line: Option<usize>,
@@ -85,7 +105,7 @@ pub(crate) struct Place {
     pub(crate) column: Option<usize>,
 }
 
-impl Place {
+impl FindingPlace {
     pub(crate) fn file(path: &str) -> Self {
         Self {
             path: path.to_owned(),
@@ -121,13 +141,13 @@ impl Place {
 
 /// One entry of the ledger.
 #[derive(Debug, Clone, Serialize)]
-pub(crate) struct Finding<K> {
+pub(crate) struct LedgerFinding<K> {
     pub(crate) kind: K,
     /// What the finding is about, without a line or a count, so that the same finding has the
     /// same key at another commit.
     #[serde(skip)]
     pub(crate) key: String,
-    pub(crate) places: Vec<Place>,
+    pub(crate) places: Vec<FindingPlace>,
     /// What was measured, as one sentence.
     pub(crate) evidence: String,
     /// How strong the evidence is among findings of the same kind. The strongest come first.
@@ -137,7 +157,7 @@ pub(crate) struct Finding<K> {
 
 /// A finding as the ledger lists it.
 #[derive(Debug, Clone, Serialize)]
-pub(crate) struct Entry<K> {
+pub(crate) struct LedgerEntry<K> {
     /// The name of the finding, which it keeps at another commit as long as its files keep
     /// their paths. Of two findings that are alike in one file, the first in the file has the
     /// first id.
@@ -154,16 +174,20 @@ pub(crate) struct Entry<K> {
     #[serde(rename = "new", skip_serializing_if = "Option::is_none")]
     fresh: Option<bool>,
     #[serde(flatten)]
-    pub(crate) finding: Finding<K>,
+    pub(crate) finding: LedgerFinding<K>,
 }
 
-impl<K> Entry<K> {
+impl<K> LedgerEntry<K> {
     /// The finding on one line: its id, `new` when the commit of `--since` did not have it,
     /// its first places and its evidence.
     fn text(&self) -> String {
         let finding = &self.finding;
-        let mut places: Vec<_> =
-            (finding.places.iter().take(PLACES_SHOWN).map(Place::text)).collect();
+        let mut places: Vec<_> = (finding
+            .places
+            .iter()
+            .take(PLACES_SHOWN)
+            .map(FindingPlace::text))
+        .collect();
         if finding.places.len() > PLACES_SHOWN {
             places.push(format!("{} more", finding.places.len() - PLACES_SHOWN));
         }
@@ -182,7 +206,7 @@ impl<K> Entry<K> {
 }
 
 /// The findings by group, kind and strength, each with its id.
-pub(crate) fn named<K: Kind>(mut findings: Vec<Finding<K>>) -> Vec<Entry<K>> {
+pub(crate) fn named<K: LedgerKind>(mut findings: Vec<LedgerFinding<K>>) -> Vec<LedgerEntry<K>> {
     findings.sort_by(|a, b| {
         (
             a.kind.group(),
@@ -204,8 +228,8 @@ pub(crate) fn named<K: Kind>(mut findings: Vec<Finding<K>>) -> Vec<Entry<K>> {
                 .entry((finding.kind, finding.key.clone()))
                 .or_default();
             *nth += 1;
-            Entry {
-                id: id(&finding.kind.name(), &finding.key, *nth),
+            LedgerEntry {
+                id: finding_id(&finding.kind.name(), &finding.key, *nth),
                 source_rule: finding.kind.source_rule().map(str::to_owned),
                 model: None,
                 legacy_id: legacy_id(&finding.kind.name(), &finding.key, *nth),
@@ -222,7 +246,7 @@ const ID_KEY: [u8; 16] = *b"xpd ledger id v1";
 /// The id of the `nth` finding of `kind` with `key`: SipHash-1-3 under `ID_KEY`, cut to 32 bits.
 /// Each part goes in as its length and its bytes, in little-endian order, so that the id is the
 /// same on every target and does not depend on how `Hash` writes a value.
-pub(crate) fn id(kind: &str, key: &str, nth: usize) -> String {
+pub(crate) fn finding_id(kind: &str, key: &str, nth: usize) -> String {
     let mut hasher = SipHasher13::new_with_key(&ID_KEY);
     for part in [kind.as_bytes(), key.as_bytes()] {
         hasher.write(&u64::try_from(part.len()).unwrap_or(u64::MAX).to_le_bytes());
@@ -254,7 +278,7 @@ pub(crate) struct ChecklistEntry {
 #[derive(Debug)]
 pub(crate) struct SurveyOutput<K, R> {
     pub(crate) read: R,
-    pub(crate) findings: Vec<Entry<K>>,
+    pub(crate) findings: Vec<LedgerEntry<K>>,
     pub(crate) checklist: Vec<ChecklistEntry>,
 }
 
@@ -336,8 +360,8 @@ struct KindCount<K> {
 }
 
 #[derive(Debug, Serialize)]
-#[serde(bound(serialize = "K: Kind"))]
-struct GroupCount<K: Kind> {
+#[serde(bound(serialize = "K: LedgerKind"))]
+struct GroupCount<K: LedgerKind> {
     group: K::Group,
     count: usize,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -346,8 +370,8 @@ struct GroupCount<K: Kind> {
 }
 
 #[derive(Debug, Serialize)]
-#[serde(bound(serialize = "K: Kind"))]
-pub(crate) struct Summary<K: Kind> {
+#[serde(bound(serialize = "K: LedgerKind"))]
+pub(crate) struct Summary<K: LedgerKind> {
     pub(crate) count: usize,
     #[serde(skip_serializing_if = "Option::is_none")]
     was: Option<usize>,
@@ -361,8 +385,11 @@ pub(crate) struct Summary<K: Kind> {
 }
 
 /// The count of each kind and group, with the counts of `before` beside them.
-fn summary<K: Kind>(findings: &[Entry<K>], before: Option<&[Entry<K>]>) -> Summary<K> {
-    let count = |findings: &[Entry<K>], kind: K| {
+fn summary<K: LedgerKind>(
+    findings: &[LedgerEntry<K>],
+    before: Option<&[LedgerEntry<K>]>,
+) -> Summary<K> {
+    let count = |findings: &[LedgerEntry<K>], kind: K| {
         findings
             .iter()
             .filter(|entry| entry.finding.kind == kind)
@@ -388,7 +415,7 @@ fn summary<K: Kind>(findings: &[Entry<K>], before: Option<&[Entry<K>]>) -> Summa
         .collect();
     Summary {
         count: findings.len(),
-        was: before.map(<[Entry<K>]>::len),
+        was: before.map(<[LedgerEntry<K>]>::len),
         fresh: None,
         fixed: None,
         groups,
@@ -404,12 +431,12 @@ struct Listed<'k, K> {
     limit: usize,
 }
 
-impl<K: Kind> Listed<'_, K> {
+impl<K: LedgerKind> Listed<'_, K> {
     fn selects(&self, kind: K) -> bool {
         self.kinds.is_empty() || self.kinds.contains(&kind)
     }
 
-    fn of(&self, findings: Vec<Entry<K>>) -> Vec<Entry<K>> {
+    fn of(&self, findings: Vec<LedgerEntry<K>>) -> Vec<LedgerEntry<K>> {
         let mut listed: HashMap<K, usize> = HashMap::new();
         (findings.into_iter())
             .filter(|entry| self.selects(entry.finding.kind))
@@ -425,10 +452,10 @@ impl<K: Kind> Listed<'_, K> {
 /// The arguments of a command of the ledger.
 #[derive(Debug, clap::Args)]
 #[command(args_conflicts_with_subcommands = true)]
-pub(crate) struct Select<K: Kind> {
+pub(crate) struct Select<K: LedgerKind> {
     /// A stage of a refactor run, which xpd records in the git folder of the repository.
     #[command(subcommand)]
-    action: Option<run::Action>,
+    action: Option<run_stage::Action>,
     /// Files or directories (directories respect .gitignore).
     #[arg(default_value = ".")]
     paths: Vec<PathBuf>,
@@ -454,7 +481,7 @@ pub(crate) enum AdapterPolicy {
     Required,
 }
 
-impl<K: Kind> Select<K> {
+impl<K: LedgerKind> Select<K> {
     /// Output format flag passed on the command line, if any.
     pub(crate) fn format_override(&self) -> Option<Format> {
         self.format
@@ -482,12 +509,13 @@ impl<K: Kind> Select<K> {
         header: impl FnOnce(&Ledger<K, R>) -> String,
     ) -> Result<ExitCode> {
         if let Some(action) = self.action {
-            return run::act(action, self.format.unwrap_or(default), survey);
+            return run_stage::run_ledger_action(action, self.format.unwrap_or(default), survey);
         }
-        let top = repository(&self.paths[0]);
-        let recorded = if K::COMMAND == "feature-review" {
+        let spec = K::WORKFLOW.spec();
+        let top = git_repository(&self.paths[0]);
+        let recorded = if spec.feature_evidence == FeatureEvidencePolicy::FoldAblation {
             top.as_deref()
-                .map(run::RecordedFeatureList::open)
+                .map(feature_evidence::RecordedFeatureList::open)
                 .transpose()?
                 .flatten()
         } else {
@@ -525,7 +553,7 @@ impl<K: Kind> Select<K> {
                         self.paths[0].display()
                     )
                 })?;
-                let commit = if K::COMMAND == "ts-review"
+                let commit = if spec.head == HeadMeasurementPolicy::CleanSinceParent
                     && commit == "HEAD"
                     && crate::git::output(top, &["diff", "HEAD", "--quiet"]).is_ok()
                     && crate::git::output(top, &["rev-parse", "--verify", "HEAD^"]).is_ok()
@@ -570,31 +598,31 @@ impl<K: Kind> Select<K> {
 
 /// What a command of the ledger prints. `R` says what the run read.
 #[derive(Debug, Serialize)]
-#[serde(bound(serialize = "K: Kind, R: Serialize"))]
-pub(crate) struct Ledger<K: Kind, R> {
+#[serde(bound(serialize = "K: LedgerKind, R: Serialize"))]
+pub(crate) struct Ledger<K: LedgerKind, R> {
     pub(crate) read: R,
     /// The commit that `was` counts.
     #[serde(skip_serializing_if = "Option::is_none")]
     since: Option<String>,
     pub(crate) summary: Summary<K>,
     /// The strongest findings of each kind, up to the limit.
-    findings: Vec<Entry<K>>,
+    findings: Vec<LedgerEntry<K>>,
     /// With `--since`: the findings of the commit that are gone today, up to the limit.
     #[serde(skip_serializing_if = "Option::is_none")]
-    fixed: Option<Vec<Entry<K>>>,
+    fixed: Option<Vec<LedgerEntry<K>>>,
     /// Remaining judgment questions scoped per figure, omitted for commands without a checklist.
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub(crate) checklist: Vec<ChecklistEntry>,
 }
 
-impl<K: Kind, R> Ledger<K, R> {
+impl<K: LedgerKind, R> Ledger<K, R> {
     /// The ledger of `findings`. `since` holds the commit of `--since` and the findings the
     /// files had at it.
     fn new(
         read: R,
-        mut findings: Vec<Entry<K>>,
+        mut findings: Vec<LedgerEntry<K>>,
         checklist: Vec<ChecklistEntry>,
-        since: Option<(String, Vec<Entry<K>>)>,
+        since: Option<(String, Vec<LedgerEntry<K>>)>,
         listed: Listed<'_, K>,
     ) -> Self {
         let (since, before) = since.unzip();
@@ -718,7 +746,7 @@ impl<K: Kind, R> Ledger<K, R> {
 }
 
 /// The top folder of the git repository that holds `path`. `None` outside a repository.
-pub(crate) fn repository(path: &Path) -> Option<PathBuf> {
+pub(crate) fn git_repository(path: &Path) -> Option<PathBuf> {
     let folder = if path.is_dir() {
         path
     } else {
@@ -828,7 +856,7 @@ fn code(path: &Path) -> Option<SupportLang> {
 
 /// The files of code under `paths`, in path order. A folder that cannot be read is named on
 /// stderr, and the rest of the project is still read.
-pub(crate) fn files(paths: &[PathBuf]) -> Vec<(PathBuf, SupportLang)> {
+pub(crate) fn walk_code_files(paths: &[PathBuf]) -> Vec<(PathBuf, SupportLang)> {
     let (first, rest) = paths.split_first().expect("clap gives a default path");
     let mut walk = ignore::WalkBuilder::new(first);
     for path in rest {

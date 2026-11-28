@@ -8,9 +8,10 @@ use serde::Serialize;
 
 use crate::output::Format;
 
-use super::python::{Edge, Module};
+use super::module_graph::ModuleImportEdge;
+use super::python_facts::SurveyedModule;
 use super::zones::Zone;
-use super::{Finding, Kind};
+use super::{Finding, UntangleKind};
 
 /// Maximum modules drawn in full before focusing on modules with findings and their neighbors.
 const FULL_MAP_LIMIT: usize = 60;
@@ -89,9 +90,9 @@ struct CouplingMap {
 }
 
 /// Prints the coupling map of `modules` in Mermaid (`Format::Text`) or JSON (`Format::Json`).
-pub(super) fn print(
-    modules: &[Module],
-    edges: &[Edge],
+pub(super) fn print_coupling_map(
+    modules: &[SurveyedModule],
+    edges: &[ModuleImportEdge],
     findings: &[Finding],
     format: Format,
 ) -> anyhow::Result<()> {
@@ -103,7 +104,11 @@ pub(super) fn print(
     Ok(())
 }
 
-fn build(modules: &[Module], edges: &[Edge], findings: &[Finding]) -> CouplingMap {
+fn build(
+    modules: &[SurveyedModule],
+    edges: &[ModuleImportEdge],
+    findings: &[Finding],
+) -> CouplingMap {
     let roles = node_roles(modules, findings);
     let cycle_pairs = cycle_edge_pairs(modules, findings);
     let volatile_pairs = volatile_edge_pairs(modules, findings);
@@ -166,8 +171,8 @@ fn build(modules: &[Module], edges: &[Edge], findings: &[Finding]) -> CouplingMa
 }
 
 fn select_nodes(
-    modules: &[Module],
-    edges: &[Edge],
+    modules: &[SurveyedModule],
+    edges: &[ModuleImportEdge],
     roles: &[Role],
     volatile_pairs: &HashSet<(usize, usize)>,
     hidden_pairs: &BTreeSet<(usize, usize)>,
@@ -237,7 +242,7 @@ fn short_name(shown: &str) -> String {
         .to_owned()
 }
 
-fn node_roles(modules: &[Module], findings: &[Finding]) -> Vec<Role> {
+fn node_roles(modules: &[SurveyedModule], findings: &[Finding]) -> Vec<Role> {
     let by_shown: HashMap<&str, usize> = modules
         .iter()
         .enumerate()
@@ -253,27 +258,27 @@ fn node_roles(modules: &[Module], findings: &[Finding]) -> Vec<Role> {
     };
     for finding in findings {
         match finding.kind {
-            Kind::ImportCycle => {
+            UntangleKind::ImportCycle => {
                 for place in &finding.places {
                     set_role(&place.path, Role::Cycle);
                 }
             }
-            Kind::MixedResponsibilities => {
+            UntangleKind::MixedResponsibilities => {
                 for place in &finding.places {
                     set_role(&place.path, Role::Mixed);
                 }
             }
-            Kind::OrphanedModule => {
+            UntangleKind::OrphanedModule => {
                 for place in &finding.places {
                     set_role(&place.path, Role::Orphan);
                 }
             }
-            Kind::FacadeModule => {
+            UntangleKind::FacadeModule => {
                 for place in &finding.places {
                     set_role(&place.path, Role::Facade);
                 }
             }
-            Kind::SingleUseModule => {
+            UntangleKind::SingleUseModule => {
                 if let Some(first) = finding.places.first() {
                     set_role(&first.path, Role::SingleUse);
                 }
@@ -284,7 +289,7 @@ fn node_roles(modules: &[Module], findings: &[Finding]) -> Vec<Role> {
     roles
 }
 
-fn cycle_edge_pairs(modules: &[Module], findings: &[Finding]) -> HashSet<(usize, usize)> {
+fn cycle_edge_pairs(modules: &[SurveyedModule], findings: &[Finding]) -> HashSet<(usize, usize)> {
     let by_shown: HashMap<&str, usize> = modules
         .iter()
         .enumerate()
@@ -292,7 +297,7 @@ fn cycle_edge_pairs(modules: &[Module], findings: &[Finding]) -> HashSet<(usize,
         .collect();
     let mut pairs = HashSet::new();
     for finding in findings {
-        if finding.kind != Kind::ImportCycle {
+        if finding.kind != UntangleKind::ImportCycle {
             continue;
         }
         let members: Vec<usize> = finding
@@ -311,7 +316,10 @@ fn cycle_edge_pairs(modules: &[Module], findings: &[Finding]) -> HashSet<(usize,
     pairs
 }
 
-fn volatile_edge_pairs(modules: &[Module], findings: &[Finding]) -> HashSet<(usize, usize)> {
+fn volatile_edge_pairs(
+    modules: &[SurveyedModule],
+    findings: &[Finding],
+) -> HashSet<(usize, usize)> {
     let by_key: HashMap<&str, usize> = modules
         .iter()
         .enumerate()
@@ -319,7 +327,7 @@ fn volatile_edge_pairs(modules: &[Module], findings: &[Finding]) -> HashSet<(usi
         .collect();
     let mut pairs = HashSet::new();
     for finding in findings {
-        if finding.kind != Kind::VolatileImport {
+        if finding.kind != UntangleKind::VolatileImport {
             continue;
         }
         if let Some((importer, imported)) = finding.key.split_once('\n')
@@ -331,7 +339,7 @@ fn volatile_edge_pairs(modules: &[Module], findings: &[Finding]) -> HashSet<(usi
     pairs
 }
 
-fn hidden_link_pairs(modules: &[Module], findings: &[Finding]) -> BTreeSet<(usize, usize)> {
+fn hidden_link_pairs(modules: &[SurveyedModule], findings: &[Finding]) -> BTreeSet<(usize, usize)> {
     let by_key: HashMap<&str, usize> = modules
         .iter()
         .enumerate()
@@ -339,7 +347,7 @@ fn hidden_link_pairs(modules: &[Module], findings: &[Finding]) -> BTreeSet<(usiz
         .collect();
     let mut pairs = BTreeSet::new();
     for finding in findings {
-        if finding.kind != Kind::ChangesTogether {
+        if finding.kind != UntangleKind::ChangesTogether {
             continue;
         }
         if let Some((first, second)) = finding.key.split_once('\n')

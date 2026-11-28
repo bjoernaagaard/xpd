@@ -10,8 +10,10 @@ use serde_json::Value;
 use crate::catalog::Filters;
 use crate::graph::Graph;
 use crate::ledger::gix_source::Listing;
-use crate::ledger::python::{called, imports_of};
-use crate::ledger::{self, AdapterPolicy, Catalog, Finding, Place, SurveyOutput, Tree};
+use crate::ledger::python_ast::{called_method_name, imports_of};
+use crate::ledger::{
+    self, AdapterPolicy, FindingPlace, LedgerFinding, QuestionCatalog, SurveyOutput, Tree,
+};
 use crate::source;
 use crate::syntax::{self, Node};
 use crate::workspace::Workspace;
@@ -118,7 +120,7 @@ pub(super) fn survey(
         ),
         (None, _) => Value::Null,
     };
-    let catalog = Catalog::load(CATALOG)?;
+    let catalog = QuestionCatalog::load(CATALOG)?;
     let checklist = features
         .iter()
         .flat_map(|feature| {
@@ -161,19 +163,19 @@ fn append_pack_findings(
     root: &Path,
     owner: &str,
     text: &str,
-    findings: &mut Vec<Finding<Kind>>,
+    findings: &mut Vec<LedgerFinding<Kind>>,
 ) {
     let linted = workspace.analyze(source::File::on_disk(&root.join(owner)), text);
     for found in &linted.found {
         let issue = found.issue();
         let rule = issue.id.to_string();
         if let Some(kind) = rules.get(rule.as_str()) {
-            let mut place = Place::file(owner);
+            let mut place = FindingPlace::file(owner);
             if let Some(at) = issue.position {
                 place.line = Some(at.line);
                 place.column = Some(at.column);
             }
-            findings.push(Finding {
+            findings.push(LedgerFinding {
                 kind: *kind,
                 key: format!("{owner}\n{rule}\n{}", issue.message),
                 places: vec![place],
@@ -284,16 +286,21 @@ fn feature_nodes<'a>(
     Ok(resolved)
 }
 
-fn position(owner: &str, node: &Node<'_>) -> Place {
+fn position(owner: &str, node: &Node<'_>) -> FindingPlace {
     let at = node.start_pos();
-    Place {
+    FindingPlace {
         column: Some(at.column(node) + 1),
-        ..Place::line(owner, at.line() + 1)
+        ..FindingPlace::line(owner, at.line() + 1)
     }
 }
 
-fn finding(kind: Kind, key: String, places: Vec<Place>, evidence: String) -> Finding<Kind> {
-    Finding {
+fn finding(
+    kind: Kind,
+    key: String,
+    places: Vec<FindingPlace>,
+    evidence: String,
+) -> LedgerFinding<Kind> {
+    LedgerFinding {
         kind,
         key,
         places,
@@ -349,7 +356,7 @@ fn prior_binding<'t>(root: &Node<'t>, name: &Node<'t>) -> Option<Node<'t>> {
 }
 
 fn call_is(node: &Node<'_>, name: &str) -> bool {
-    called(node).is_some_and(|called| called == name)
+    called_method_name(node).is_some_and(|called| called == name)
 }
 
 fn body_expression<'t>(function: &Node<'t>) -> Option<Node<'t>> {
@@ -453,14 +460,14 @@ fn rolling_findings(
     function: &Node<'_>,
     feature: &Feature,
     spec: &Rolling,
-    out: &mut Vec<Finding<Kind>>,
+    out: &mut Vec<LedgerFinding<Kind>>,
 ) {
     let Some(returned) = body_expression(function) else {
         return;
     };
     let expression = prior_binding(function, &returned).unwrap_or(returned);
     for reduction in expression.dfs().filter(|call| {
-        called(call).is_some_and(|name| {
+        called_method_name(call).is_some_and(|name| {
             matches!(
                 name.as_str(),
                 "mean" | "median" | "sum" | "min" | "max" | "std" | "var" | "count" | "quantile"
@@ -558,14 +565,17 @@ fn node_arithmetic(function: &Node<'_>, graph_node: &Value) -> Option<String> {
     Some(format!("{dependencies:?} {expression}"))
 }
 
-fn duplicate_findings(computations: Vec<(&Feature, Place, String)>, out: &mut Vec<Finding<Kind>>) {
+fn duplicate_findings(
+    computations: Vec<(&Feature, FindingPlace, String)>,
+    out: &mut Vec<LedgerFinding<Kind>>,
+) {
     let mut first = BTreeMap::new();
     for (feature, place, expression) in computations {
         if let Some((original, location)) = first.get(&expression) {
             out.push(finding(
                 Kind::DuplicateFeatureComputation,
                 format!("{}\n{}", feature.owner, feature.id),
-                vec![place, Place::clone(location)],
+                vec![place, FindingPlace::clone(location)],
                 format!(
                     "{} repeats the arithmetic and dependencies of {original}.",
                     feature.id
@@ -667,7 +677,7 @@ fn fitted_encoder<'t>(root: &Node<'t>, data: &Node<'t>, imports: &HashMap<String
         })
 }
 
-fn encoder_findings(root: &Node<'_>, owner: &str, out: &mut Vec<Finding<Kind>>) {
+fn encoder_findings(root: &Node<'_>, owner: &str, out: &mut Vec<LedgerFinding<Kind>>) {
     let mut scoped_imports = BTreeMap::<usize, HashMap<String, String>>::new();
     for import in root.dfs().filter(|node| {
         matches!(

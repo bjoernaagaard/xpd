@@ -1,3 +1,5 @@
+//! Shared Python syntax tree query helpers for ledger surveys.
+
 use crate::names::{is_bound, is_parameter_name};
 use crate::syntax::Node;
 
@@ -34,7 +36,7 @@ pub(crate) fn top_level_definitions<'t>(module: &Node<'t>) -> Vec<(Node<'t>, boo
 }
 
 /// The last name of what `call` calls, as `groupby` in `frame.groupby(keys)`.
-pub(crate) fn called(call: &Node<'_>) -> Option<String> {
+pub(crate) fn called_method_name(call: &Node<'_>) -> Option<String> {
     let function = call.field("function")?;
     match function.kind().as_ref() {
         "identifier" => Some(function.text().into_owned()),
@@ -87,27 +89,31 @@ pub(crate) fn imports_of(import: &Node<'_>) -> Vec<(String, String)> {
     }
 }
 
-pub(crate) fn scope(node: &Node<'_>) -> bool {
+/// Whether `node` introduces a Python lexical scope (module, function, class, or lambda).
+pub(crate) fn is_python_scope(node: &Node<'_>) -> bool {
     matches!(
         node.kind().as_ref(),
         "module" | "function_definition" | "class_definition" | "lambda"
     )
 }
 
-pub(crate) fn owner<'t>(node: &Node<'t>) -> Option<Node<'t>> {
-    node.ancestors().find(scope)
+/// Nearest enclosing Python lexical scope ancestor of `node`.
+pub(crate) fn enclosing_scope<'t>(node: &Node<'t>) -> Option<Node<'t>> {
+    node.ancestors().find(is_python_scope)
 }
 
+/// Iterates over syntax nodes belonging directly to the lexical scope `root`.
 pub(crate) fn local_nodes<'t>(root: &Node<'t>) -> impl Iterator<Item = Node<'t>> {
     let id = root.node_id();
     root.dfs()
-        .filter(move |node| owner(node).is_some_and(|owner| owner.node_id() == id))
+        .filter(move |node| enclosing_scope(node).is_some_and(|scope| scope.node_id() == id))
 }
 
-pub(crate) fn qualified(node: &Node<'_>, name: &str) -> String {
+/// Builds a dotted scope-qualified name for `name` using its enclosing function and class scopes.
+pub(crate) fn scope_qualified_name(node: &Node<'_>, name: &str) -> String {
     let mut names: Vec<_> = node
         .ancestors()
-        .filter(scope)
+        .filter(is_python_scope)
         .filter_map(|parent| parent.field("name").map(|name| name.text().into_owned()))
         .collect();
     names.reverse();
@@ -115,11 +121,13 @@ pub(crate) fn qualified(node: &Node<'_>, name: &str) -> String {
     names.join(".")
 }
 
+/// Extracts `(left, right)` from an `assignment` node.
 pub(crate) fn assignments<'t>(node: &Node<'t>) -> Option<(Node<'t>, Node<'t>)> {
     (node.kind() == "assignment").then_some(())?;
     Some((node.field("left")?, node.field("right")?))
 }
 
+/// Returns the identifier text when `node` is an `identifier`.
 pub(crate) fn identifier(node: &Node<'_>) -> Option<String> {
     (node.kind() == "identifier").then(|| node.text().into_owned())
 }
@@ -137,8 +145,8 @@ fn dotted(node: &Node<'_>) -> Option<String> {
 }
 
 fn enclosing_import(node: &Node<'_>, name: &str) -> Option<String> {
-    for owner in node.ancestors().filter(scope) {
-        let mut imports = local_nodes(&owner)
+    for scope in node.ancestors().filter(is_python_scope) {
+        let mut imports = local_nodes(&scope)
             .filter(|item| {
                 matches!(
                     item.kind().as_ref(),
@@ -155,7 +163,7 @@ fn enclosing_import(node: &Node<'_>, name: &str) -> Option<String> {
         if imports.next().is_some() {
             return None;
         }
-        let rebound = local_nodes(&owner).any(|item| {
+        let rebound = local_nodes(&scope).any(|item| {
             let defines_name = matches!(
                 item.kind().as_ref(),
                 "function_definition" | "class_definition"
@@ -182,10 +190,12 @@ fn enclosing_import(node: &Node<'_>, name: &str) -> Option<String> {
     None
 }
 
+/// Resolves the imported target of a `call` node's function expression.
 pub(crate) fn resolved_call(node: &Node<'_>) -> Option<String> {
     resolved_name(&node.field("function")?)
 }
 
+/// Resolves an identifier or dotted attribute expression against enclosing imports.
 pub(crate) fn resolved_name(node: &Node<'_>) -> Option<String> {
     let written = dotted(node)?;
     let (head, tail) = written.split_once('.').unwrap_or((&written, ""));
@@ -197,7 +207,8 @@ pub(crate) fn resolved_name(node: &Node<'_>) -> Option<String> {
     Some(imported)
 }
 
-pub(crate) fn args<'t>(call: &Node<'t>) -> Vec<Node<'t>> {
+/// Returns the positional (non-keyword, non-comment) arguments of a Python `call`.
+pub(crate) fn positional_call_args<'t>(call: &Node<'t>) -> Vec<Node<'t>> {
     call.field("arguments")
         .into_iter()
         .flat_map(|args| {
@@ -208,6 +219,7 @@ pub(crate) fn args<'t>(call: &Node<'t>) -> Vec<Node<'t>> {
         .collect()
 }
 
-pub(crate) fn receiver<'t>(call: &Node<'t>) -> Option<Node<'t>> {
+/// Returns the receiver object of an attribute method `call`, as `model` in `model.fit(X)`.
+pub(crate) fn call_receiver<'t>(call: &Node<'t>) -> Option<Node<'t>> {
     call.field("function")?.field("object")
 }

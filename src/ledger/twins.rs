@@ -19,7 +19,7 @@ const DIFFERENT_PERCENT: usize = 25;
 
 /// A stretch of one file that is long enough to be a near copy.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub(crate) struct Block {
+pub(crate) struct ShapeBlock {
     /// The same for two stretches with the same kinds of tokens in the same structure.
     pub(crate) shape: u64,
     /// The index of the nearest stretch around this one, in the blocks of the file.
@@ -34,7 +34,7 @@ pub(crate) struct Block {
 /// The stretches of one file, and the text of each of its tokens.
 #[derive(Debug, Default, Clone, PartialEq, Eq, Hash)]
 pub(crate) struct Shapes {
-    blocks: Vec<Block>,
+    blocks: Vec<ShapeBlock>,
     leaves: Vec<String>,
 }
 
@@ -104,7 +104,7 @@ fn visit(node: &Node<'_>, shapes: &mut Shapes) -> (usize, u64, Vec<usize>) {
     for inner in nearest {
         shapes.blocks[inner].parent = Some(index);
     }
-    shapes.blocks.push(Block {
+    shapes.blocks.push(ShapeBlock {
         shape,
         parent: None,
         tokens,
@@ -124,7 +124,7 @@ pub(crate) type Swap<'f> = (&'f str, &'f str);
 #[derive(Debug)]
 pub(crate) struct Twins<'f> {
     /// The file and the stretch of each, in the order of the files.
-    pub(crate) members: Vec<(&'f str, &'f Block)>,
+    pub(crate) members: Vec<(&'f str, &'f ShapeBlock)>,
     /// The texts that differ between the first stretch and another one.
     pub(crate) swaps: Vec<Swap<'f>>,
 }
@@ -149,7 +149,7 @@ fn swaps<'f>(a: &'f [String], b: &'f [String]) -> Option<Vec<Swap<'f>>> {
 
 /// The groups of near copies among the files, each file with its path. A stretch inside a
 /// larger near copy is left out, so each one is named once, at its full size.
-pub(crate) fn groups<'f>(files: &'f [(&'f str, Shapes)]) -> Vec<Twins<'f>> {
+pub(crate) fn near_copy_groups<'f>(files: &'f [(&'f str, Shapes)]) -> Vec<Twins<'f>> {
     let mut by_shape: HashMap<u64, Vec<At>> = HashMap::new();
     for (file, (_, shapes)) in files.iter().enumerate() {
         for (index, block) in shapes.blocks.iter().enumerate() {

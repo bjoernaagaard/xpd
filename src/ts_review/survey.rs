@@ -8,10 +8,11 @@ use serde::Serialize;
 use serde_json::{Value, json};
 
 use crate::catalog::Filters;
-use crate::ledger::adapter::invoke_adapter;
+use crate::ledger::adapter_runner::invoke_adapter;
 use crate::ledger::gix_source::Listing;
 use crate::ledger::{
-    self, AdapterPolicy, Catalog, ChecklistEntry, Finding, Place, SurveyOutput, Tree,
+    self, AdapterPolicy, ChecklistEntry, FindingPlace, LedgerFinding, QuestionCatalog,
+    SurveyOutput, Tree,
 };
 use crate::source;
 use crate::workspace::Workspace;
@@ -107,7 +108,7 @@ pub(super) fn survey(
         (shown.clone(), shown)
     });
     let checklist = if let Some(facts) = &facts {
-        let catalog = Catalog::load(CATALOG)?;
+        let catalog = QuestionCatalog::load(CATALOG)?;
         add_runtime_findings(facts, &shown, &tracked, &mut findings);
         build_series_checklist(facts, &catalog, &tracked)
     } else {
@@ -160,7 +161,7 @@ fn check_catalog(
     text: &str,
     shown: &str,
     tracked: &str,
-) -> Vec<Finding<Kind>> {
+) -> Vec<LedgerFinding<Kind>> {
     workspace
         .analyze(source::File::on_disk(path), text)
         .found
@@ -172,10 +173,10 @@ fn check_catalog(
                 return None;
             }
             let kind = Kind::from_str(rule.name(), false).ok()?;
-            Some(Finding {
+            Some(LedgerFinding {
                 kind,
                 key: format!("{tracked}\n{rule}\n{}", issue.message),
-                places: vec![Place::line(
+                places: vec![FindingPlace::line(
                     shown,
                     issue.position.map_or(1, |position| position.line),
                 )],
@@ -190,13 +191,13 @@ fn add_runtime_findings(
     facts: &Value,
     shown: &str,
     tracked: &str,
-    findings: &mut Vec<Finding<Kind>>,
+    findings: &mut Vec<LedgerFinding<Kind>>,
 ) {
     let mut add = |kind, entity, evidence| {
-        findings.push(Finding {
+        findings.push(LedgerFinding {
             kind,
             key: format!("{tracked}\n{entity}"),
-            places: vec![Place::line(shown, 1)],
+            places: vec![FindingPlace::line(shown, 1)],
             evidence,
             weight: 1,
         });
@@ -231,7 +232,11 @@ fn add_runtime_findings(
     }
 }
 
-fn build_series_checklist(facts: &Value, catalog: &Catalog, owner: &str) -> Vec<ChecklistEntry> {
+fn build_series_checklist(
+    facts: &Value,
+    catalog: &QuestionCatalog,
+    owner: &str,
+) -> Vec<ChecklistEntry> {
     let mut checklist = Vec::new();
     for series in rows(facts, "series") {
         let Some(id) = series["unique_id"].as_str() else {

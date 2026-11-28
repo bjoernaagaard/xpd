@@ -6,7 +6,7 @@ use anyhow::{Context as _, Result, ensure};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 
-use crate::ledger::adapter::invoke_adapter;
+use crate::ledger::adapter_runner::invoke_adapter;
 
 use super::{FeatureKind, Manifest};
 

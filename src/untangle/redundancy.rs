@@ -4,13 +4,13 @@ use anyhow::Result;
 
 use crate::index::{self, Library, Method};
 use crate::ledger::{
-    Place,
-    python::{called, imports_of, root_name},
+    FindingPlace,
+    python_ast::{called_method_name, imports_of, root_name},
     twins,
 };
 use crate::syntax::{Node, Root};
 
-use super::{Finding, Kind, Surveyed};
+use super::{Finding, Surveyed, UntangleKind};
 
 const CLASSES_SHOWN: usize = 3;
 
@@ -25,7 +25,7 @@ fn swapped(text: &str) -> String {
 
 /// The near copies among the files.
 pub(super) fn near_copies(files: &[(&str, twins::Shapes)]) -> Vec<Finding> {
-    (twins::groups(files).into_iter())
+    (twins::near_copy_groups(files).into_iter())
         .map(|twins| {
             let (_, block) = twins.members[0];
             let lines = block.lines.1 - block.lines.0 + 1;
@@ -39,10 +39,10 @@ pub(super) fn near_copies(files: &[(&str, twins::Shapes)]) -> Vec<Finding> {
                 .map(|(here, there)| format!("{here}\t{there}"))
                 .collect();
             Finding {
-                kind: Kind::NearCopy,
+                kind: UntangleKind::NearCopy,
                 key: format!("{:016x}\n{}", block.shape, swaps.join("\n")),
                 places: (twins.members.iter())
-                    .map(|(file, block)| Place::lines(file, block.lines))
+                    .map(|(file, block)| FindingPlace::lines(file, block.lines))
                     .collect(),
                 evidence: format!(
                     "These {} stretches of {lines} lines are the same code but for {}.",
@@ -75,7 +75,7 @@ pub(super) struct Keyword {
 
 /// What one Python file gives the ledger.
 #[derive(Debug, Default)]
-pub(super) struct Facts {
+pub(super) struct DefaultArgFacts {
     pub(super) keywords: Vec<Keyword>,
     /// The packages the file imports, by the first part of the module name.
     pub(super) packages: BTreeSet<String>,
@@ -107,7 +107,9 @@ fn callee(call: &Node<'_>, imports: &HashMap<String, String>) -> Option<Callee> 
         return Some(Callee::Symbol(format!("{module}{rest}")));
     }
     let method = function.kind() == "attribute" && !matches!(root.as_str(), "self" | "cls");
-    method.then(|| called(call).map(Callee::Method)).flatten()
+    method
+        .then(|| called_method_name(call).map(Callee::Method))
+        .flatten()
 }
 
 /// The name and the default of a parameter as the source of a library writes it, as
@@ -224,8 +226,8 @@ fn line(node: &Node<'_>) -> usize {
     node.start_pos().line() + 1
 }
 
-pub(super) fn facts(root: &Root) -> Facts {
-    let mut facts = Facts::default();
+pub(super) fn extract_default_arg_facts(root: &Root) -> DefaultArgFacts {
+    let mut facts = DefaultArgFacts::default();
     let mut imports = HashMap::new();
     for node in root.root().dfs() {
         match node.kind().as_ref() {
@@ -291,13 +293,13 @@ pub(super) fn default_arguments(surveyed: &[Surveyed]) -> Result<Vec<Finding>> {
                 Callee::Symbol(name) | Callee::Method(name) => name,
             };
             findings.push(Finding {
-                kind: Kind::DefaultArgument,
+                kind: UntangleKind::DefaultArgument,
                 key: format!(
                     "{}\n{callee}\n{}",
                     file.tracked.as_deref().unwrap_or(&file.shown),
                     keyword.name
                 ),
-                places: vec![Place::line(&file.shown, keyword.line)],
+                places: vec![FindingPlace::line(&file.shown, keyword.line)],
                 evidence,
                 weight: 1,
             });

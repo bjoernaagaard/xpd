@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::path::Path;
 
-use crate::ledger::python::imports_of;
+use crate::ledger::python_ast::imports_of;
 use crate::source;
 use crate::syntax::{Node, Root};
 

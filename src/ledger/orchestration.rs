@@ -18,15 +18,16 @@ use duroxide::{OrchestrationContext, RetryPolicy};
 use super::feature_evidence::{
     FeatureEvidence, gate_invalidation, invalidate_answers, plan_invalidation,
 };
-pub(super) use super::run::{AnswerRecord, Answered, Compared, Goal, Timing};
-use super::run::{GateEvidence, judge_fix};
+use super::gate_judge::{Compared, GateEvidence, judge_fix};
+pub(super) use super::run_journal::{AnswerRecord, Answered, Goal, Timing};
+use super::workflow_registry::{FeatureEvidencePolicy, WorkflowId};
 
 /// The name the orchestration is registered and started under.
 pub(crate) const ORCHESTRATION_NAME: &str = "LedgerRun";
 /// The durable queue that every mutating command arrives on, in order.
 pub(crate) const COMMAND_QUEUE: &str = "commands";
 /// How many times a fix may fail its gate before the next stage is to drop it.
-pub(crate) const ATTEMPTS: usize = 2;
+pub(crate) const MAX_GATE_ATTEMPTS: usize = 2;
 
 /// The activity that measures the commit a run starts from.
 pub(crate) const ACT_INIT_BASELINE: &str = "InitBaseline";
@@ -65,7 +66,7 @@ pub(crate) struct BenchState {
 /// How a fix ended. The shape matches the journal a run prints.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case", tag = "outcome")]
-pub(crate) enum Outcome {
+pub(crate) enum FixOutcome {
     Kept {
         commit: String,
         fixed: Vec<String>,
@@ -102,7 +103,7 @@ pub(crate) struct FixState {
     #[serde(default)]
     pub(crate) attempts: Vec<String>,
     #[serde(default, flatten, skip_serializing_if = "Option::is_none")]
-    pub(crate) outcome: Option<Outcome>,
+    pub(crate) outcome: Option<FixOutcome>,
 }
 
 /// A finding that is right as it is.
@@ -172,22 +173,23 @@ impl JournalState {
         Ok(fix)
     }
 
-    /// The stage that comes next. `command` is the command of the ledger.
-    pub(crate) fn next(&self, command: &str) -> NextState {
+    /// The stage that comes next for `workflow`.
+    pub(crate) fn next(&self, workflow: WorkflowId) -> NextState {
+        let cli = workflow.as_str();
         if self.finished {
             return NextState {
                 stage: "finished".to_owned(),
-                text: format!("The run is finished. `xpd {command} start` starts another."),
+                text: format!("The run is finished. `xpd {cli} start` starts another."),
             };
         }
         let Some(fix) = self.open() else {
             return NextState {
                 stage: "plan".to_owned(),
                 text: format!(
-                    "Read the ledger with `xpd {command} --format json` and judge each \
+                    "Read the ledger with `xpd {cli} --format json` and judge each \
                      finding against the code. Write the plan as JSON and run \
-                     `xpd {command} plan <file>`. When no finding is worth a fix, run \
-                     `xpd {command} finish`."
+                     `xpd {cli} plan <file>`. When no finding is worth a fix, run \
+                     `xpd {cli} finish`."
                 ),
             };
         };
@@ -197,18 +199,18 @@ impl JournalState {
                 stage: "ask".to_owned(),
                 text: format!(
                     "The fix {id}, \"{}\", changes what callers or users see. Ask the \
-                     user. After a yes run `xpd {command} approve {id}`, and after a no \
-                     run `xpd {command} drop {id} --reason \"the user said no\"`.",
+                     user. After a yes run `xpd {cli} approve {id}`, and after a no \
+                     run `xpd {cli} drop {id} --reason \"the user said no\"`.",
                     fix.title
                 ),
             };
         }
-        if fix.attempts.len() >= ATTEMPTS {
+        if fix.attempts.len() >= MAX_GATE_ATTEMPTS {
             return NextState {
                 stage: "drop".to_owned(),
                 text: format!(
                     "The fix {id} failed its gate {} times. Restore the files with \
-                     `git reset --hard {}` and run `xpd {command} drop {id} \
+                     `git reset --hard {}` and run `xpd {cli} drop {id} \
                      --reason \"...\"`.",
                     fix.attempts.len(),
                     self.current
@@ -220,13 +222,13 @@ impl JournalState {
             text: if fix.findings.is_empty() {
                 format!(
                     "Make the fix {id}, \"{}\", commit it, and run \
-                     `xpd {command} gate {id}`.",
+                     `xpd {cli} gate {id}`.",
                     fix.title
                 )
             } else {
                 format!(
                     "Make the fix {id}, \"{}\", which removes the findings {}. Keep the \
-                     behavior the same, commit it, and run `xpd {command} gate {id}`.",
+                     behavior the same, commit it, and run `xpd {cli} gate {id}`.",
                     fix.title,
                     fix.findings.join(", ")
                 )
@@ -234,15 +236,15 @@ impl JournalState {
         }
     }
 
-    pub(crate) fn snapshot(&self, command: &str) -> Snapshot {
+    pub(crate) fn snapshot(&self, workflow: WorkflowId) -> Snapshot {
         Snapshot {
             run: self.clone(),
-            next: self.next(command),
+            next: self.next(workflow),
         }
     }
 
-    fn snapshot_json(&self, command: &str) -> String {
-        serde_json::to_string(&self.snapshot(command))
+    fn snapshot_json(&self, workflow: WorkflowId) -> String {
+        serde_json::to_string(&self.snapshot(workflow))
             .expect("a journal snapshot always serializes")
     }
 }
@@ -253,8 +255,8 @@ impl JournalState {
 pub(crate) struct RunStartInput {
     /// The command id the start itself is receipted under.
     pub(crate) command_id: String,
-    /// The command of the ledger, such as `untangle`.
-    pub(crate) command: String,
+    /// The registered ledger workflow, serialized as its kebab-case CLI name.
+    pub(crate) command: WorkflowId,
     pub(crate) paths: Vec<String>,
     pub(crate) checks: Vec<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -406,9 +408,9 @@ impl Receipt {
 }
 
 /// Whether a fix is kept, with the exact rules of the journal gate.
-fn judge(command: &str, fix: &FixState, output: &GateOutput) -> Result<Compared, String> {
+fn judge(workflow: WorkflowId, fix: &FixState, output: &GateOutput) -> Result<Compared, String> {
     judge_fix(&GateEvidence {
-        command,
+        workflow,
         findings: &fix.findings,
         questions: &fix.questions,
         goal: fix.goal,
@@ -422,8 +424,8 @@ fn judge(command: &str, fix: &FixState, output: &GateOutput) -> Result<Compared,
     })
 }
 
-fn publish(ctx: &OrchestrationContext, state: &JournalState, command: &str) {
-    ctx.set_custom_status(state.snapshot_json(command));
+fn publish(ctx: &OrchestrationContext, state: &JournalState, workflow: WorkflowId) {
+    ctx.set_custom_status(state.snapshot_json(workflow));
 }
 
 fn receipt(ctx: &OrchestrationContext, receipt: &Receipt) {
@@ -536,7 +538,7 @@ async fn apply_plan(
 
 async fn apply_gate(
     ctx: &OrchestrationContext,
-    command: &str,
+    workflow: WorkflowId,
     state: &mut JournalState,
     id: &str,
     head: &str,
@@ -584,7 +586,7 @@ async fn apply_gate(
     .map_err(|error| error.to_string())?;
     let judged = {
         let fix = state.fix_mut(id)?;
-        judge(command, fix, &output)
+        judge(workflow, fix, &output)
     };
     let questions = {
         let fix = state.fix_mut(id)?;
@@ -593,7 +595,7 @@ async fn apply_gate(
     let fix = state.fix_mut(id)?;
     match judged {
         Ok(compared) => {
-            fix.outcome = Some(Outcome::Kept {
+            fix.outcome = Some(FixOutcome::Kept {
                 commit: output.commit.clone(),
                 fixed: compared.fixed,
                 added: compared.added,
@@ -611,7 +613,7 @@ async fn apply_gate(
             }
             for item in questions
                 .into_iter()
-                .filter(|_| command != "feature-review")
+                .filter(|_| workflow.spec().feature_evidence != FeatureEvidencePolicy::FoldAblation)
             {
                 state.answered.insert(
                     item,
@@ -690,7 +692,7 @@ async fn apply_finish(ctx: &OrchestrationContext, state: &mut JournalState) -> R
 pub(crate) async fn ledger_run(ctx: OrchestrationContext, input: String) -> Result<String, String> {
     let start: RunStartInput =
         serde_json::from_str(&input).map_err(|error| format!("bad run start: {error}"))?;
-    let command = start.command.clone();
+    let workflow = start.command;
     let mut state = if let Some(state) = start.initial_state {
         state
     } else {
@@ -714,13 +716,13 @@ pub(crate) async fn ledger_run(ctx: OrchestrationContext, input: String) -> Resu
             finished: false,
         }
     };
-    publish(&ctx, &state, &command);
+    publish(&ctx, &state, workflow);
     receipt(
         &ctx,
-        &Receipt::applied(&start.command_id, &state.next(&command).stage),
+        &Receipt::applied(&start.command_id, &state.next(workflow).stage),
     );
     if state.finished {
-        return Ok(state.snapshot_json(&command));
+        return Ok(state.snapshot_json(workflow));
     }
     loop {
         let raw = ctx.dequeue_event(COMMAND_QUEUE).await;
@@ -747,12 +749,12 @@ pub(crate) async fn ledger_run(ctx: OrchestrationContext, input: String) -> Resu
                 fix.approved = true;
             }),
             Command::Gate { fix, head } => {
-                apply_gate(&ctx, &command, &mut state, &fix, &head).await
+                apply_gate(&ctx, workflow, &mut state, &fix, &head).await
             }
             Command::Drop { fix, reason, head } => {
                 if head == state.current {
                     state.fix_mut(&fix).map(|fix| {
-                        fix.outcome = Some(Outcome::Dropped { reason });
+                        fix.outcome = Some(FixOutcome::Dropped { reason });
                     })
                 } else {
                     Err(format!(
@@ -763,15 +765,15 @@ pub(crate) async fn ledger_run(ctx: OrchestrationContext, input: String) -> Resu
             }
             Command::Finish => apply_finish(&ctx, &mut state).await,
         };
-        let stage_after = state.next(&command).stage;
+        let stage_after = state.next(workflow).stage;
         let receipt_value = match applied {
             Ok(()) => Receipt::applied(&envelope.command_id, &stage_after),
             Err(detail) => Receipt::rejected(&envelope.command_id, &stage_after, detail),
         };
-        publish(&ctx, &state, &command);
+        publish(&ctx, &state, workflow);
         receipt(&ctx, &receipt_value);
         if state.finished {
-            return Ok(state.snapshot_json(&command));
+            return Ok(state.snapshot_json(workflow));
         }
     }
 }

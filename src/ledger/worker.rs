@@ -42,15 +42,16 @@ use super::durable::{
     orchestration_registry, run_branch,
 };
 use super::feature_evidence::FeatureEvidence;
+use super::gate_judge::gate_checklist_files;
 use super::orchestration::{
     ACT_FINISH_RUN, ACT_GATE_FIX, ACT_INIT_BASELINE, ACT_VALIDATE_PLAN, BaselineOutput, BenchState,
     CheckState, FinishOutput, GateOutput, RunStartInput, Snapshot, Timing, ValidatePlanOutput,
 };
-use super::run::SurveyedFindings;
-use super::run::{
-    broken_checks, changed_files, count_lines, gate_checklist_files, host_fingerprint,
-    measure_bench, passes,
+use super::run_probes::{
+    SurveyedFindings, broken_checks, count_lines, diff_changed_files, host_fingerprint,
+    measure_bench, shell_check_passes,
 };
+use super::workflow_registry::{FeatureEvidencePolicy, HeadMeasurementPolicy, WorkflowId};
 
 /// Serve the ledger runs of a PostgreSQL store: take their orchestration turns, and gate
 /// their fixes in detached worktrees of a clone of the repository.
@@ -149,8 +150,8 @@ fn variable(name: &str) -> Option<String> {
     std::env::var(name).ok().filter(|value| !value.is_empty())
 }
 
-/// Runs the worker until Ctrl-C.
-pub(crate) fn run(args: WorkerArgs) -> Result<ExitCode> {
+/// Runs the distributed ledger worker until Ctrl-C.
+pub(crate) fn run_ledger_worker(args: WorkerArgs) -> Result<ExitCode> {
     let url = (args.pg_url.or_else(|| variable(PG_URL_VAR)))
         .context("name the PostgreSQL store with --pg-url or XPD_LEDGER_PG_URL")?;
     let schema = args.schema.or_else(|| variable(PG_SCHEMA_VAR));
@@ -470,8 +471,9 @@ impl Worker {
         input: &str,
         snapshot: Option<&Snapshot>,
     ) -> Result<String> {
-        let command = (instance.split("::").nth(1))
-            .with_context(|| format!("the instance {instance} names no command"))?;
+        let workflow: WorkflowId = (instance.split("::").nth(1))
+            .with_context(|| format!("the instance {instance} names no command"))?
+            .parse()?;
         let branch = run_branch(instance);
         self.fetch(&branch)?;
         let head = format!("refs/remotes/{}/{branch}/head", self.remote);
@@ -482,9 +484,9 @@ impl Worker {
             (ACT_VALIDATE_PLAN, Some(snapshot)) => {
                 let paths: Vec<String> = decode(input)?;
                 let worktree = self.worktree(&head)?;
-                self.require_feature_head(command, &head, snapshot)?;
+                self.require_feature_head(workflow, &head, snapshot)?;
                 let (known, checklist, feature_evidence) =
-                    self.findings(&worktree, command, &paths, snapshot.run.adapter.as_deref())?;
+                    self.findings(&worktree, workflow, &paths, snapshot.run.adapter.as_deref())?;
                 encode(&ValidatePlanOutput {
                     known,
                     checklist: super::checklist_files(checklist),
@@ -492,11 +494,11 @@ impl Worker {
                 })
             }
             (ACT_GATE_FIX, Some(snapshot)) => {
-                encode(&self.gate(instance, &branch, command, &decode(input)?, snapshot)?)
+                encode(&self.gate(instance, &branch, workflow, &decode(input)?, snapshot)?)
             }
             (ACT_FINISH_RUN, Some(snapshot)) => {
                 let paths: Vec<String> = decode(input)?;
-                encode(&self.finish(command, &paths, &head, snapshot)?)
+                encode(&self.finish(workflow, &paths, &head, snapshot)?)
             }
             _ => bail!("this worker has no activity {name}"),
         }
@@ -544,17 +546,18 @@ impl Worker {
         Ok(resolved.trim().to_owned())
     }
 
-    /// The finding ids and checklist map (`id -> tracked file`) of `command` under `paths` in
+    /// The finding ids and checklist map (`id -> tracked file`) of `workflow` under `paths` in
     /// a worktree. The survey is xpd itself, run in the worktree, so its ids match the CLI.
     fn findings(
         &self,
         worktree: &Worktree<'_>,
-        command: &str,
+        workflow: WorkflowId,
         paths: &[String],
         adapter: Option<&str>,
     ) -> Result<SurveyedFindings> {
+        let cli = workflow.as_str();
         let mut cmd = Command::new(&self.xpd);
-        cmd.args([command, "--format", "json", "--limit", "0"]);
+        cmd.args([cli, "--format", "json", "--limit", "0"]);
         if let Some(adapter) = adapter {
             cmd.args(["--adapter", adapter]);
         }
@@ -567,24 +570,13 @@ impl Worker {
             .context("cannot run the survey")?;
         if !output.status.success() {
             bail!(
-                "the survey `xpd {command}` failed: {}",
+                "the survey `xpd {cli}` failed: {}",
                 String::from_utf8_lossy(&output.stderr).trim()
             );
         }
         let ledger: serde_json::Value =
             serde_json::from_slice(&output.stdout).context("the survey printed no JSON")?;
-        if matches!(command, "data-prep" | "ts-review" | "model-review")
-            && let Some(error) = ledger["read"]["facts"]["error"].as_str()
-        {
-            bail!("the {command} adapter failed: {error}");
-        }
-        ensure!(
-            command != "model-review"
-                || ledger["read"]["ambiguities"]
-                    .as_array()
-                    .is_some_and(Vec::is_empty),
-            "ambiguous model bindings in the selected Python files"
-        );
+        validate_worker_survey(workflow, &ledger)?;
         let ids: BTreeSet<String> = (ledger["findings"].as_array())
             .context("the survey printed no findings")?
             .iter()
@@ -608,7 +600,8 @@ impl Worker {
                 }
             }
         }
-        let feature_evidence = (command == "feature-review")
+        let feature_evidence = (workflow.spec().feature_evidence
+            == FeatureEvidencePolicy::FoldAblation)
             .then(|| FeatureEvidence::from_read(&ledger["read"]))
             .transpose()?;
         Ok((ids, checklist, feature_evidence))
@@ -628,24 +621,19 @@ impl Worker {
             let _in = InFolder::enter(&worktree)?;
             let checks = (start.checks.iter())
                 .map(|command| CheckState {
-                    passed: passes(command).0,
+                    passed: shell_check_passes(command).0,
                     command: command.clone(),
                 })
                 .collect();
             let (findings, checklist, feature_evidence) = self.findings(
                 &worktree,
-                &start.command,
+                start.command,
                 &start.paths,
                 start.adapter.as_deref(),
             )?;
-            ensure!(
-                start.command != "model-review" || !checklist.is_empty(),
-                "no models found in the selected Python files"
-            );
-            ensure!(
-                start.command != "opt-review" || !checklist.is_empty(),
-                "no optimization problems found in the selected Python files"
-            );
+            if let Some(empty_error) = start.command.spec().checklist.empty_inventory_error() {
+                ensure!(!checklist.is_empty(), "{empty_error}");
+            }
             let paths: Vec<PathBuf> = start.paths.iter().map(PathBuf::from).collect();
             (
                 checks,
@@ -691,7 +679,7 @@ impl Worker {
         &self,
         instance: &str,
         branch: &str,
-        command: &str,
+        workflow: WorkflowId,
         request: &GateRequest,
         snapshot: &Snapshot,
     ) -> Result<GateOutput> {
@@ -703,13 +691,13 @@ impl Worker {
         let (broken, after, lines_after, checklist_after, feature_after) = {
             let _in = InFolder::enter(&after_tree)?;
             let broken = broken_checks(
-                command,
+                workflow,
                 run.checks
                     .iter()
                     .map(|check| (check.command.as_str(), check.passed)),
             );
             let (after, checklist_after, feature_after) =
-                self.findings(&after_tree, command, &request.paths, adapter)?;
+                self.findings(&after_tree, workflow, &request.paths, adapter)?;
             let paths: Vec<PathBuf> = request.paths.iter().map(PathBuf::from).collect();
             (
                 broken,
@@ -741,8 +729,8 @@ impl Worker {
         let timing = timed.map(|reply| (reply.before.unwrap_or(reply.after), reply.after));
         let before_tree = self.worktree(&current)?;
         let (before, checklist_before, feature_before) =
-            self.findings(&before_tree, command, &request.paths, adapter)?;
-        let changed = changed_files(&self.top, &current, &commit)?;
+            self.findings(&before_tree, workflow, &request.paths, adapter)?;
+        let changed = diff_changed_files(&self.top, &current, &commit)?;
         Ok(GateOutput {
             commit,
             broken,
@@ -753,7 +741,7 @@ impl Worker {
             timing,
             paired,
             checklist_before: gate_checklist_files(
-                command,
+                workflow,
                 checklist_before,
                 &checklist_after,
                 &changed,
@@ -764,8 +752,13 @@ impl Worker {
         })
     }
 
-    fn require_feature_head(&self, command: &str, head: &str, snapshot: &Snapshot) -> Result<()> {
-        if command == "feature-review" {
+    fn require_feature_head(
+        &self,
+        workflow: WorkflowId,
+        head: &str,
+        snapshot: &Snapshot,
+    ) -> Result<()> {
+        if workflow.spec().head == HeadMeasurementPolicy::LockedKeptCommit {
             ensure!(
                 self.resolve(head)? == snapshot.run.current,
                 "feature review must measure the last kept commit {}",
@@ -779,23 +772,23 @@ impl Worker {
     /// commit, and the lines of the latter.
     fn finish(
         &self,
-        command: &str,
+        workflow: WorkflowId,
         paths: &[String],
         head: &str,
         snapshot: &Snapshot,
     ) -> Result<FinishOutput> {
-        self.require_feature_head(command, head, snapshot)?;
+        self.require_feature_head(workflow, head, snapshot)?;
         let adapter = snapshot.run.adapter.as_deref();
         let head_tree = self.worktree(&self.resolve(head)?)?;
         let (after, checklist, feature_evidence) =
-            self.findings(&head_tree, command, paths, adapter)?;
+            self.findings(&head_tree, workflow, paths, adapter)?;
         let current_lines = {
             let _in = InFolder::enter(&head_tree)?;
             count_lines(&paths.iter().map(PathBuf::from).collect::<Vec<_>>())
         };
         drop(head_tree);
         let base_tree = self.worktree(&self.resolve(&snapshot.run.base)?)?;
-        let (before, _, _) = self.findings(&base_tree, command, paths, adapter)?;
+        let (before, _, _) = self.findings(&base_tree, workflow, paths, adapter)?;
         Ok(FinishOutput {
             before,
             after,
@@ -808,6 +801,39 @@ impl Worker {
             checklist_after: checklist.into_keys().collect(),
             feature_evidence,
         })
+    }
+}
+
+/// Validates workflow-specific invariants on the JSON emitted by a worker's `xpd <workflow>` run.
+///
+/// Matches every [`WorkflowId`] variant explicitly without a wildcard arm so adding a workflow
+/// without defining its worker validation fails compilation with `E0004`.
+fn validate_worker_survey(workflow: WorkflowId, ledger: &serde_json::Value) -> Result<()> {
+    let check_facts_error = || -> Result<()> {
+        if let Some(error) = ledger["read"]["facts"]["error"].as_str() {
+            bail!("the {} adapter failed: {error}", workflow.as_str());
+        }
+        Ok(())
+    };
+    match workflow {
+        WorkflowId::ChartReview
+        | WorkflowId::Discover
+        | WorkflowId::FeatureReview
+        | WorkflowId::Harden
+        | WorkflowId::OptReview
+        | WorkflowId::Optimize
+        | WorkflowId::Untangle => Ok(()),
+        WorkflowId::DataPrep | WorkflowId::TsReview => check_facts_error(),
+        WorkflowId::ModelReview => {
+            check_facts_error()?;
+            ensure!(
+                ledger["read"]["ambiguities"]
+                    .as_array()
+                    .is_some_and(Vec::is_empty),
+                "ambiguous model bindings in the selected Python files"
+            );
+            Ok(())
+        }
     }
 }
 

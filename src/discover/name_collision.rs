@@ -5,8 +5,8 @@ use std::path::Path;
 
 use serde::Serialize;
 
-use crate::ledger::python::top_level_definitions;
-use crate::ledger::{Finding, Place};
+use crate::ledger::python_ast::top_level_definitions;
+use crate::ledger::{FindingPlace, LedgerFinding};
 use crate::{source, syntax};
 
 use super::Kind;
@@ -15,7 +15,7 @@ use super::Kind;
 /// define it, one place per module.
 #[derive(Debug, Default)]
 pub(super) struct PublicDefinitions {
-    places: BTreeMap<String, Vec<Place>>,
+    places: BTreeMap<String, Vec<FindingPlace>>,
 }
 
 /// How many public names a survey read, and how many of them one module alone defines.
@@ -62,13 +62,13 @@ impl PublicDefinitions {
             }
             let places = self.places.entry(name.into_owned()).or_default();
             if places.last().is_none_or(|place| place.path != shown) {
-                places.push(Place::line(shown, definition.start_pos().line() + 1));
+                places.push(FindingPlace::line(shown, definition.start_pos().line() + 1));
             }
         }
     }
 
     /// A finding for each name that two or more modules define, and the counts of all names.
-    pub(super) fn collisions(self) -> (Vec<Finding<Kind>>, NameCounts) {
+    pub(super) fn collisions(self) -> (Vec<LedgerFinding<Kind>>, NameCounts) {
         let counts = NameCounts {
             public_names: self.places.len(),
             defined_once: self
@@ -83,7 +83,7 @@ impl PublicDefinitions {
             .filter(|(_, places)| places.len() > 1)
             .map(|(name, places)| {
                 let modules = places.len();
-                Finding {
+                LedgerFinding {
                     kind: Kind::NameCollision,
                     evidence: format!(
                         "The name {name} is defined in {modules} modules, so a search for it finds {modules} definitions."

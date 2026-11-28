@@ -26,7 +26,7 @@ impl Zone {
 }
 
 /// Classifies `path` into an intent zone using path components and conventional filenames.
-pub(crate) fn classify(path: &Path) -> Zone {
+pub(crate) fn classify_file_zone(path: &Path) -> Zone {
     let name = path
         .file_name()
         .and_then(|part| part.to_str())

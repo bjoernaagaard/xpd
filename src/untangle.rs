@@ -1,8 +1,11 @@
 mod copies;
+mod coupling_map;
 mod history;
-mod map;
-mod python;
+mod module_graph;
+mod python_facts;
 mod redundancy;
+mod shared_state;
+mod symbol_reach;
 mod zones;
 
 use std::collections::{BTreeSet, HashMap, HashSet};
@@ -16,7 +19,10 @@ use clap::ValueEnum;
 use rayon::prelude::*;
 use serde::Serialize;
 
-use crate::ledger::{self, Ledger, Place, Select, SurveyOutput, Tree, twins};
+use crate::ledger::{
+    self, FindingPlace, Ledger, LedgerFinding, LedgerKind, QuestionCatalog, Select, SurveyOutput,
+    Tree, WorkflowId, twins,
+};
 use crate::output::Format;
 use crate::source;
 use crate::style::Style;
@@ -26,12 +32,12 @@ use crate::workspace::Workspace;
 use crate::ledger::gix_source::Listing;
 use history::History;
 
-type Finding = ledger::Finding<Kind>;
+type Finding = LedgerFinding<UntangleKind>;
 
 /// The three ways to get the question wrong, and the code that stands outside the design.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize)]
 #[serde(rename_all = "kebab-case")]
-pub(crate) enum Group {
+pub(crate) enum UntangleGroup {
     HiddenLink,
     NeedlessLink,
     Surplus,
@@ -41,7 +47,7 @@ pub(crate) enum Group {
 /// What a finding is.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, ValueEnum)]
 #[serde(rename_all = "kebab-case")]
-pub(crate) enum Kind {
+pub(crate) enum UntangleKind {
     /// The same code is written out in more than one place.
     Copy,
     /// Two files change in the same commits, and no import joins them.
@@ -78,58 +84,58 @@ pub(crate) enum Kind {
     MixedResponsibilities,
 }
 
-impl ledger::Kind for Kind {
-    type Group = Group;
+impl LedgerKind for UntangleKind {
+    type Group = UntangleGroup;
 
     const GOALS: &'static [ledger::Goal] = &[ledger::Goal::Shorter, ledger::Goal::Design];
 
-    const COMMAND: &'static str = "untangle";
+    const WORKFLOW: WorkflowId = WorkflowId::Untangle;
 
-    const GROUPS: &'static [Group] = &[
-        Group::HiddenLink,
-        Group::NeedlessLink,
-        Group::Surplus,
-        Group::SpecialCase,
+    const GROUPS: &'static [UntangleGroup] = &[
+        UntangleGroup::HiddenLink,
+        UntangleGroup::NeedlessLink,
+        UntangleGroup::Surplus,
+        UntangleGroup::SpecialCase,
     ];
 
-    fn group(self) -> Group {
+    fn group(self) -> UntangleGroup {
         match self {
             Self::Copy | Self::NearCopy | Self::ChangesTogether | Self::SharedState => {
-                Group::HiddenLink
+                UntangleGroup::HiddenLink
             }
             Self::VolatileImport
             | Self::ImportCycle
             | Self::PrivateReach
             | Self::VagueModule
-            | Self::MixedResponsibilities => Group::NeedlessLink,
+            | Self::MixedResponsibilities => UntangleGroup::NeedlessLink,
             Self::DefaultArgument
             | Self::PassThrough
             | Self::Unreferenced
             | Self::ConstantParameter
             | Self::OrphanedModule
             | Self::FacadeModule
-            | Self::SingleUseModule => Group::Surplus,
-            Self::OneValueBranch | Self::OneCallerParameter => Group::SpecialCase,
+            | Self::SingleUseModule => UntangleGroup::Surplus,
+            Self::OneValueBranch | Self::OneCallerParameter => UntangleGroup::SpecialCase,
         }
     }
 
-    fn heading(group: Group) -> &'static str {
+    fn heading(group: UntangleGroup) -> &'static str {
         match group {
-            Group::HiddenLink => {
+            UntangleGroup::HiddenLink => {
                 "Hidden links: pieces that must change together, where the code does not show it"
             }
-            Group::NeedlessLink => {
+            UntangleGroup::NeedlessLink => {
                 "Needless links: pieces tied together that change for different reasons"
             }
-            Group::Surplus => "Surplus: pieces with no reason of their own to change",
-            Group::SpecialCase => {
+            UntangleGroup::Surplus => "Surplus: pieces with no reason of their own to change",
+            UntangleGroup::SpecialCase => {
                 "Special cases: code for one situation, which the design did not account for"
             }
         }
     }
 }
 
-impl Kind {
+impl UntangleKind {
     /// The kind that a rule of the Python pack reports, for the rules that the ledger takes
     /// over from `xpd check`.
     fn of_rule(rule: &str) -> Option<Self> {
@@ -168,7 +174,7 @@ struct Read {
   xpd untangle --since main")]
 pub(crate) struct UntangleArgs {
     #[command(flatten)]
-    select: Select<Kind>,
+    select: Select<UntangleKind>,
     #[arg(long)]
     questions: bool,
     /// Print a Mermaid (or JSON with --format json) module coupling and health map.
@@ -178,13 +184,13 @@ pub(crate) struct UntangleArgs {
 
 impl UntangleArgs {
     pub(crate) fn run(self, default: Format) -> Result<ExitCode> {
-        let catalog = ledger::Catalog::load(include_str!("../rules/xpd/untangle.yml"))?;
+        let catalog = QuestionCatalog::load(include_str!("../rules/xpd/untangle.yml"))?;
         if self.questions {
             return catalog.print(self.select.format_override().unwrap_or(default));
         }
         if self.map {
             let paths = self.select.paths();
-            let top = ledger::repository(&paths[0]);
+            let top = ledger::git_repository(&paths[0]);
             let files = Tree {
                 top: top.as_deref(),
                 shown_from: None,
@@ -194,8 +200,8 @@ impl UntangleArgs {
                 .map_or_else(History::default, |top| History::read(top, "HEAD"));
             let listing = Listing::of(paths, files, top.as_deref(), "HEAD")?;
             let collected = collect(files, &listing, &history)?;
-            let edges = python::edges(&collected.modules);
-            map::print(
+            let edges = module_graph::resolve_module_edges(&collected.modules);
+            coupling_map::print_coupling_map(
                 &collected.modules,
                 &edges,
                 &collected.findings,
@@ -222,7 +228,7 @@ impl UntangleArgs {
 }
 
 /// The first lines of the text: the count, and what the run read.
-fn header(ledger: &Ledger<Kind, Read>) -> String {
+fn header(ledger: &Ledger<UntangleKind, Read>) -> String {
     let Read {
         files,
         python,
@@ -244,12 +250,12 @@ fn header(ledger: &Ledger<Kind, Read>) -> String {
 struct Surveyed {
     shown: String,
     tracked: Option<String>,
-    blocks: Vec<copies::Block>,
+    blocks: Vec<copies::TokenBlock>,
     shapes: twins::Shapes,
-    defaults: Option<redundancy::Facts>,
-    python: Option<(PathBuf, python::Facts)>,
+    defaults: Option<redundancy::DefaultArgFacts>,
+    python: Option<(PathBuf, python_facts::ModuleFacts)>,
     /// The findings that rules of `xpd check` report.
-    ruled: Vec<python::Local>,
+    ruled: Vec<python_facts::LocalUntangleFinding>,
 }
 
 /// One file as the ledger needs it. `None` for a file that cannot be read.
@@ -269,12 +275,12 @@ fn read(
         let linted = workspace.analyze(source::File::on_disk(path), &text);
         for found in &linted.found {
             let issue = found.issue();
-            if let Some(kind) = Kind::of_rule(&issue.id.to_string()) {
+            if let Some(kind) = UntangleKind::of_rule(&issue.id.to_string()) {
                 let line = issue.position.map_or(1, |at| at.line);
                 ruled.push((kind, line, issue.message, 1));
             }
         }
-        let facts = python::facts(&absolute, &root, &text, |candidate| {
+        let facts = python_facts::extract_module_facts(&absolute, &root, &text, |candidate| {
             listing.exists(candidate)
         });
         (absolute, facts)
@@ -284,7 +290,8 @@ fn read(
         tracked,
         blocks: copies::blocks(&root.root()),
         shapes: twins::shapes(&root.root()),
-        defaults: (language == SupportLang::Python).then(|| redundancy::facts(&root)),
+        defaults: (language == SupportLang::Python)
+            .then(|| redundancy::extract_default_arg_facts(&root)),
         python,
         ruled,
     })
@@ -292,18 +299,18 @@ fn read(
 
 /// The copies of code among the files.
 fn copied(surveyed: &[Surveyed]) -> Vec<Finding> {
-    let blocks: Vec<(&str, copies::Block)> = (surveyed.iter())
+    let blocks: Vec<(&str, copies::TokenBlock)> = (surveyed.iter())
         .flat_map(|file| (file.blocks.iter()).map(|block| (file.shown.as_str(), block.clone())))
         .collect();
-    (copies::groups(&blocks).into_iter())
+    (copies::exact_copy_groups(&blocks).into_iter())
         .map(|group| {
             let (_, block) = group[0];
             let lines = block.lines.1 - block.lines.0 + 1;
             Finding {
-                kind: Kind::Copy,
+                kind: UntangleKind::Copy,
                 key: format!("{:016x}", block.hash),
                 places: (group.iter())
-                    .map(|(file, block)| Place::lines(file, block.lines))
+                    .map(|(file, block)| FindingPlace::lines(file, block.lines))
                     .collect(),
                 evidence: format!(
                     "The same {lines} lines of code are written in {} places.",
@@ -329,7 +336,7 @@ fn local(surveyed: &[Surveyed]) -> Vec<Finding> {
                         "{}\n{evidence}",
                         file.tracked.as_deref().unwrap_or(&file.shown)
                     ),
-                    places: vec![Place::line(&file.shown, *line)],
+                    places: vec![FindingPlace::line(&file.shown, *line)],
                     evidence: evidence.clone(),
                     weight: *weight,
                 });
@@ -367,11 +374,11 @@ fn changed_together(
             evidence.push_str(" They are in different folders.");
         }
         findings.push(Finding {
-            kind: Kind::ChangesTogether,
+            kind: UntangleKind::ChangesTogether,
             key: format!("{first}\n{second}"),
             places: vec![
-                Place::file(&shown_as[first]),
-                Place::file(&shown_as[second]),
+                FindingPlace::file(&shown_as[first]),
+                FindingPlace::file(&shown_as[second]),
             ],
             evidence,
             weight: pair.together * 1000 / pair.of + if apart { 1000 } else { 0 },
@@ -385,7 +392,7 @@ struct Collected {
     read: Read,
     findings: Vec<Finding>,
     tracked: HashMap<String, String>,
-    modules: Vec<python::Module>,
+    modules: Vec<python_facts::SurveyedModule>,
 }
 
 /// Surveys `listing` and `history`, returning the modules and unindexed findings.
@@ -429,10 +436,10 @@ fn collect(tree: Tree<'_>, listing: &Listing, history: &History) -> Result<Colle
     let shown_as: HashMap<String, String> = (surveyed.iter())
         .filter_map(|file| Some((file.tracked.clone()?, file.shown.clone())))
         .collect();
-    let modules: Vec<python::Module> = (surveyed.into_iter())
+    let modules: Vec<python_facts::SurveyedModule> = (surveyed.into_iter())
         .filter_map(|file| {
             let (absolute, facts) = file.python?;
-            Some(python::Module {
+            Some(python_facts::SurveyedModule {
                 shown: file.shown,
                 file: absolute,
                 tracked: file.tracked,
@@ -445,7 +452,7 @@ fn collect(tree: Tree<'_>, listing: &Listing, history: &History) -> Result<Colle
         .as_deref()
         .map(zones::EntryPoints::from_pyproject)
         .unwrap_or_default();
-    findings.extend(python::findings(
+    findings.extend(python_facts::cross_module_findings(
         &modules,
         &history.changes(),
         &entry_points,
@@ -453,7 +460,7 @@ fn collect(tree: Tree<'_>, listing: &Listing, history: &History) -> Result<Colle
     findings.extend(changed_together(
         history,
         &shown_as,
-        &python::imports(&modules),
+        &module_graph::tracked_import_pairs(&modules),
     ));
     Ok(Collected {
         read,
@@ -470,8 +477,8 @@ fn survey(
     tree: Tree<'_>,
     listing: &Listing,
     history: &History,
-    catalog: &ledger::Catalog,
-) -> Result<SurveyOutput<Kind, Read>> {
+    catalog: &QuestionCatalog,
+) -> Result<SurveyOutput<UntangleKind, Read>> {
     let Collected {
         read,
         findings,

@@ -27,6 +27,12 @@ use serde_json::Value;
 mod pack_names;
 #[path = "src/search.rs"]
 mod search;
+#[expect(
+    dead_code,
+    reason = "build.rs reads WorkflowId metadata without calling every runtime policy helper"
+)]
+#[path = "src/ledger/workflow_registry.rs"]
+mod workflow_registry;
 
 /// The file in a pack folder that is the manifest and not a rule.
 const MANIFEST: &str = "pack.yml";
@@ -74,6 +80,7 @@ fn main() -> Result<()> {
     println!("cargo:rerun-if-changed={PLUGIN}");
     println!("cargo:rerun-if-changed={PLUGIN_MCP}");
     plugin_version()?;
+    verify_workflows()?;
     println!("cargo:rerun-if-changed=indexes");
     let mut packs = Vec::new();
     let mut docs = BTreeMap::new();
@@ -693,4 +700,147 @@ fn encode(
         Value::Number(_) => bail!("discovery entries contain no numeric fields"),
     }
     Ok(())
+}
+
+/// Verifies that every `WorkflowId` variant is listed in `WorkflowId::ALL`, round-trips through
+/// `spec()` and `FromStr`, and ships its companion catalog, skill, and (in git checkouts) command
+/// documentation page.
+fn verify_workflows() -> Result<()> {
+    let registry_path = "src/ledger/workflow_registry.rs";
+    println!("cargo:rerun-if-changed={registry_path}");
+    let command_docs = Path::new("website/reference/commands");
+    if command_docs.exists() {
+        println!("cargo:rerun-if-changed={}", command_docs.display());
+    }
+
+    let source = fs::read_to_string(registry_path)
+        .with_context(|| format!("cannot read {registry_path}"))?;
+    let declared = parse_workflow_variants(&source)?;
+    let mut registered = BTreeSet::new();
+    for &id in workflow_registry::WorkflowId::ALL {
+        let variant = format!("{id:?}");
+        ensure!(
+            registered.insert(variant.clone()),
+            "{registry_path}: duplicate WorkflowId::{variant} entry in WorkflowId::ALL"
+        );
+    }
+    for variant in &declared {
+        ensure!(
+            registered.contains(variant),
+            "{registry_path}: WorkflowId::{variant} is missing from WorkflowId::ALL"
+        );
+    }
+
+    let check_website_docs = Path::new(".git").exists() || Path::new("website").exists();
+    for &id in workflow_registry::WorkflowId::ALL {
+        let spec = id.spec();
+        ensure!(
+            spec.id == id,
+            "{registry_path}: WorkflowId::{id:?}.spec().id does not match"
+        );
+        ensure!(
+            spec.cli_name == id.as_str(),
+            "{registry_path}: WorkflowId::{id:?}.spec().cli_name does not match as_str()"
+        );
+        let parsed: workflow_registry::WorkflowId = id.as_str().parse().with_context(|| {
+            format!(
+                "{registry_path}: WorkflowId::from_str({:?}) failed",
+                id.as_str()
+            )
+        })?;
+        ensure!(
+            parsed == id,
+            "{registry_path}: WorkflowId::from_str({:?}) returned {parsed:?}, expected {id:?}",
+            id.as_str()
+        );
+
+        let slug = id.as_str();
+        let catalog_path = PathBuf::from(format!("rules/xpd/{slug}.yml"));
+        let catalog = fs::read_to_string(&catalog_path).with_context(|| {
+            format!(
+                "missing workflow catalog {} for WorkflowId::{id:?}",
+                catalog_path.display()
+            )
+        })?;
+        ensure!(
+            !catalog.trim().is_empty(),
+            "empty workflow catalog {} for WorkflowId::{id:?}",
+            catalog_path.display()
+        );
+
+        let skill_path = PathBuf::from(format!("skills/xpd-{slug}/SKILL.md"));
+        let skill = fs::read_to_string(&skill_path).with_context(|| {
+            format!(
+                "missing workflow skill {} for WorkflowId::{id:?}",
+                skill_path.display()
+            )
+        })?;
+        ensure!(
+            !skill.trim().is_empty(),
+            "empty workflow skill {} for WorkflowId::{id:?}",
+            skill_path.display()
+        );
+        let expected_name = format!("name: xpd-{slug}");
+        ensure!(
+            skill.contains(&expected_name),
+            "workflow skill {} must declare `{expected_name}` for WorkflowId::{id:?}",
+            skill_path.display()
+        );
+
+        if check_website_docs {
+            let doc_path = command_docs.join(format!("{slug}.md"));
+            let doc = fs::read_to_string(&doc_path).with_context(|| {
+                format!(
+                    "missing command documentation {} for WorkflowId::{id:?}",
+                    doc_path.display()
+                )
+            })?;
+            ensure!(
+                !doc.trim().is_empty(),
+                "empty command documentation {} for WorkflowId::{id:?}",
+                doc_path.display()
+            );
+        }
+    }
+    Ok(())
+}
+
+/// Extracts declared variant identifiers from `enum WorkflowId { ... }` in `source`.
+fn parse_workflow_variants(source: &str) -> Result<Vec<String>> {
+    let start = source
+        .find("enum WorkflowId")
+        .context("src/ledger/workflow_registry.rs does not declare `enum WorkflowId`")?;
+    let after_header = &source[start..];
+    let open = after_header
+        .find('{')
+        .context("src/ledger/workflow_registry.rs: `enum WorkflowId` has no `{`")?;
+    let body = &after_header[open + 1..];
+    let close = body
+        .find('}')
+        .context("src/ledger/workflow_registry.rs: `enum WorkflowId` has no `}`")?;
+    let mut variants = Vec::new();
+    for line in body[..close].lines() {
+        let trimmed = line.trim();
+        if trimmed.is_empty() || trimmed.starts_with("///") || trimmed.starts_with("#[") {
+            continue;
+        }
+        for part in trimmed.split(',') {
+            let candidate = part.trim();
+            if candidate.is_empty() {
+                continue;
+            }
+            let ident = candidate
+                .split(|ch: char| !(ch.is_ascii_alphanumeric() || ch == '_'))
+                .next()
+                .unwrap_or("");
+            if !ident.is_empty() {
+                variants.push(ident.to_owned());
+            }
+        }
+    }
+    ensure!(
+        !variants.is_empty(),
+        "src/ledger/workflow_registry.rs: `enum WorkflowId` declares no variants"
+    );
+    Ok(variants)
 }
