@@ -10,6 +10,16 @@ pub(crate) const TAG_STRING: u8 = 3;
 pub(crate) const TAG_ARRAY: u8 = 4;
 pub(crate) const TAG_OBJECT: u8 = 5;
 
+/// The FNV-1a hash of the text that a record's vector is made from.
+pub(crate) fn text_hash(name: &str, summary: &str) -> u64 {
+    name.bytes()
+        .chain([0])
+        .chain(summary.bytes())
+        .fold(0xcbf2_9ce4_8422_2325, |hash, byte| {
+            (hash ^ u64::from(byte)).wrapping_mul(0x0000_0100_0000_01b3)
+        })
+}
+
 pub(crate) fn tokens(text: &str) -> Vec<String> {
     let mut split = String::new();
     let mut previous = false;

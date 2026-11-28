@@ -418,7 +418,15 @@ fn collect(tree: Tree<'_>, listing: &Listing, history: &History) -> Result<Colle
     };
     let mut findings = copied(&surveyed);
     findings.extend(local(&surveyed));
-    findings.extend(redundancy::default_arguments(&surveyed)?);
+    let project_root = listing
+        .files
+        .first()
+        .and_then(|(path, _)| path.parent())
+        .filter(|dir| !dir.as_os_str().is_empty())
+        .map(Path::to_path_buf)
+        .or_else(|| std::env::current_dir().ok())
+        .unwrap_or_else(|| PathBuf::from("."));
+    findings.extend(redundancy::default_arguments(&surveyed, &project_root)?);
     let shapes: Vec<_> = surveyed
         .iter_mut()
         .map(|file| (file.shown.as_str(), std::mem::take(&mut file.shapes)))

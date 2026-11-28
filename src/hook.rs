@@ -345,6 +345,7 @@ fn brief(project: &Path, files: &[PathBuf]) -> Result<String> {
     use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 
     let settings = Settings::find_in(project, project)?;
+    let style = settings.style;
     // The packs apply by the imports of a file, whatever versions the project's venv holds.
     let workspace = Workspace::load(
         project.to_path_buf(),
@@ -385,7 +386,7 @@ fn brief(project: &Path, files: &[PathBuf]) -> Result<String> {
     let packs: Vec<String> = (packs.iter())
         .map(|(name, count)| format!("{name} ({})", counted(*count, "file")))
         .collect();
-    let style_line = match settings.style {
+    let style_line = match style {
         Style::Strict => {
             "The style setting is strict, so a rule of the house style is a warning, and the \
              Stop check holds a turn that leaves a warning."
@@ -522,7 +523,7 @@ fn user_prompt(cwd: &Path, prompt: &str) -> Result<ExitCode> {
                     .to_owned(),
             );
         }
-        let library = index::load(None)?.without_download(&cwd);
+        let library = index::load_for_project(&cwd, None, None)?.without_download(&cwd);
         if let Some(playbook) = index::playbook_for(&library, prompt)
             && !matches!(
                 playbook.name.as_str(),

@@ -248,6 +248,9 @@ enum Cmd {
     },
     /// Parse library source into a versioned index. Never imports or runs library code.
     Index(IndexArgs),
+    /// Manage local and third-party Python library indexes in `[tool.xpd.libraries]`.
+    #[command(subcommand)]
+    Library(crate::library_cmd::LibraryCommand),
     /// Lint Python files. Exit 0 when clean, 1 on any issue of the --fail-on severity, which is
     /// error by default, 2 if xpd can't run.
     ///
@@ -480,6 +483,7 @@ pub fn run() -> ExitCode {
             print_entries(&[entry], format, Detail::Full)
         })()),
         Cmd::Index(args) => unit_result(refresh_index(args)),
+        Cmd::Library(command) => command_result(command.run(default_format)),
         Cmd::Hook => crate::hook::run(),
         Cmd::Graph {
             command: Some(GraphCommand::Impact(args)),
@@ -651,7 +655,7 @@ fn refresh_index(args: IndexArgs) -> Result<()> {
     let version = version.map_or_else(|| index::source_version(&source, &package), Ok)?;
     let output = output.unwrap_or_else(|| PathBuf::from(format!("indexes/{package}.json")));
     let categories = catalog::current_categories()?;
-    let mut index = index::generate(&source, &package, &version)?;
+    let mut index = index::generate(&source, &package, &version, index::GriffeFallback::None)?;
     index.classify(&categories);
     if let (Some(root), Some(url), Some(license)) =
         (examples.as_deref(), url.as_deref(), license.as_deref())
@@ -1143,8 +1147,8 @@ fn unclean_playbooks() -> Result<usize> {
 /// with the model.
 fn check_ranking(index: Option<&std::path::Path>, path: &std::path::Path) -> Result<()> {
     let questions: Vec<serde_json::Value> = serde_json::from_str(&std::fs::read_to_string(path)?)?;
-    let with_model = index::load(index)?;
-    let keywords = index::load(index)?.keywords_only();
+    let with_model = index::load_for(index, None)?;
+    let keywords = index::load_for(index, None)?.keywords_only();
     let searches = [
         ("keywords", &keywords),
         ("keywords and the embedding model", &with_model),

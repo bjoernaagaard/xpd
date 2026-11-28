@@ -89,7 +89,7 @@ impl Venv {
 
     /// `Lib/site-packages` on Windows, `lib/python3.x/site-packages` elsewhere, and
     /// `lib64/python3.x/site-packages`, where Fedora and similar systems put compiled packages.
-    fn site_dirs(&self) -> Vec<PathBuf> {
+    pub(crate) fn site_dirs(&self) -> Vec<PathBuf> {
         let mut dirs = vec![self.root.join("Lib").join("site-packages")];
         for lib in ["lib", "lib64"] {
             if let Ok(entries) = fs::read_dir(self.root.join(lib)) {

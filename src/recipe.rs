@@ -598,6 +598,7 @@ pub(crate) fn harvest(
                 kind: Kind::Recipe,
                 package: package.to_owned(),
                 name: recipe_name(package, &title),
+                defined_in: None,
                 callable: None,
                 parameters: Vec::new(),
                 parameters_written: Vec::new(),

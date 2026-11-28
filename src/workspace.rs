@@ -57,7 +57,10 @@ impl Workspace {
     pub(crate) fn bundled(style: Style) -> Result<Self> {
         Ok(Self {
             root: PathBuf::new(),
-            settings: Settings { style },
+            settings: Settings {
+                style,
+                libraries: std::collections::BTreeMap::new(),
+            },
             catalog: Arc::new(Catalog::load(None, None, style)?),
             environment: None,
         })
@@ -172,7 +175,7 @@ impl WorkspaceCache {
                 let (catalog, settings, embedded, changed) = if let Some(old) = previous {
                     (
                         Arc::clone(&old.workspace.catalog),
-                        old.workspace.settings,
+                        old.workspace.settings.clone(),
                         old.embedded.clone(),
                         old.error.as_deref() != Some(&message),
                     )

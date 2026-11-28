@@ -1,4 +1,5 @@
 use std::collections::{BTreeSet, HashMap, HashSet};
+use std::path::Path;
 
 use anyhow::Result;
 
@@ -150,12 +151,12 @@ struct Defaults {
 }
 
 impl Defaults {
-    fn new(files: &[Surveyed]) -> Result<Self> {
+    fn new(files: &[Surveyed], project: &Path) -> Result<Self> {
         let facts = || files.iter().filter_map(|file| file.defaults.as_ref());
         let packages: BTreeSet<String> = facts()
             .flat_map(|facts| facts.packages.iter().cloned())
             .collect();
-        let library = index::load(None)?;
+        let library = index::load_for_project(project, None, None)?;
         Ok(Self {
             methods: index::methods(&library, &packages)?,
             library,
@@ -274,7 +275,7 @@ pub(super) fn extract_default_arg_facts(root: &Root) -> DefaultArgFacts {
     facts
 }
 
-pub(super) fn default_arguments(surveyed: &[Surveyed]) -> Result<Vec<Finding>> {
+pub(super) fn default_arguments(surveyed: &[Surveyed], project: &Path) -> Result<Vec<Finding>> {
     let mut findings = Vec::new();
     let mut defaults = None;
     for file in surveyed {
@@ -284,7 +285,7 @@ pub(super) fn default_arguments(surveyed: &[Surveyed]) -> Result<Vec<Finding>> {
         for keyword in &facts.keywords {
             let defaults = match &mut defaults {
                 Some(defaults) => defaults,
-                None => defaults.insert(Defaults::new(surveyed)?),
+                None => defaults.insert(Defaults::new(surveyed, project)?),
             };
             let Some(evidence) = defaults.passed(keyword, &facts.packages)? else {
                 continue;

@@ -29,6 +29,8 @@ mod impact;
 mod imports;
 mod index;
 mod ledger;
+mod library_cache;
+mod library_cmd;
 mod lsp;
 mod mcp;
 mod migration;

@@ -81,6 +81,7 @@ class Entry(TypedDict):
     kind: str
     package: str
     name: str
+    defined_in: str
     callable: str
     definitions: list[Definition]
     summary: str
@@ -507,10 +508,12 @@ def entries(module: griffe.Module, callables: Callables) -> list[Entry]:
             names[key] = (path, target)
     found = []
     for path, target in sorted(names.values(), key=lambda item: item[0]):
+        defining_module = target.path.rsplit(".", 1)[0] if "." in target.path else package
         entry = Entry(
             kind="symbol",
             package=package,
             name=path,
+            defined_in=defining_module,
             callable="class" if target.is_class else "function",
             definitions=callables.definitions(target),
             summary=summary(target),

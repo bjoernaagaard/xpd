@@ -1,5 +1,5 @@
 //! Source-only library discovery, and search by keywords and by meaning.
-use std::cell::OnceCell;
+use std::cell::{OnceCell, RefCell};
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::path::{Path, PathBuf};
 
@@ -8,12 +8,14 @@ use serde::{Deserialize, Serialize};
 
 use crate::category::{Categories, Category, IndexCategories};
 use crate::embed::Model;
+use crate::library_cache;
 use crate::outline::{self, Callable, ParameterText};
 use crate::pack_names::public_module;
 use crate::search::{
     DIMENSIONS, TAG_ARRAY, TAG_FALSE, TAG_NULL, TAG_OBJECT, TAG_STRING, TAG_TRUE, VECTORS_HEADER,
     tokens,
 };
+use crate::settings::Settings;
 use crate::{pack, venv};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -73,6 +75,9 @@ pub(crate) struct Entry {
     pub(crate) kind: Kind,
     pub(crate) package: String,
     pub(crate) name: String,
+    /// Defining module path when the symbol is re-exported under a shorter public alias.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) defined_in: Option<String>,
     /// `class` or `function` for a symbol, and `method` or `property` for a member of a class
     /// that `api` was asked for.
     pub(crate) callable: Option<CallableKind>,
@@ -149,6 +154,8 @@ struct Resolved {
     kind: Kind,
     package: String,
     name: String,
+    #[serde(default)]
+    defined_in: Option<String>,
     callable: Option<CallableKind>,
     definitions: Vec<Definition>,
     summary: String,
@@ -239,10 +246,24 @@ impl Sources {
     }
 }
 
+/// Whether [`generate`] may invoke `uv run --with griffe==2.4.1` when the project Python lacks Griffe.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum GriffeFallback {
+    /// Fail with the exact install command if the project Python lacks `griffe==2.4.1`.
+    None,
+    /// Retry transparently with `uv run --no-project --with griffe==2.4.1 python`.
+    UvRun,
+}
+
 /// Gets the public API from Griffe without importing the library, and the parameters of each
 /// symbol from its source.
-pub(crate) fn generate(source: &Path, package: &str, version: &str) -> Result<Index> {
-    let output = std::process::Command::new(venv::project_python())
+pub(crate) fn generate(
+    source: &Path,
+    package: &str,
+    version: &str,
+    fallback: GriffeFallback,
+) -> Result<Index> {
+    let mut output = std::process::Command::new(venv::project_python())
         .arg("-I")
         .arg("-c")
         .arg(include_str!("../py/index.py"))
@@ -251,6 +272,27 @@ pub(crate) fn generate(source: &Path, package: &str, version: &str) -> Result<In
         .arg(version)
         .output()
         .context("could not start Python for Griffe")?;
+    if fallback == GriffeFallback::UvRun
+        && !output.status.success()
+        && String::from_utf8_lossy(&output.stderr).contains("Index building needs griffe==")
+        && let Ok(uv_output) = std::process::Command::new("uv")
+            .args([
+                "run",
+                "--no-project",
+                "--with",
+                "griffe==2.4.1",
+                "python",
+                "-I",
+                "-c",
+                include_str!("../py/index.py"),
+            ])
+            .arg(source)
+            .arg(package)
+            .arg(version)
+            .output()
+    {
+        output = uv_output;
+    }
     ensure!(
         output.status.success(),
         "{}",
@@ -280,6 +322,7 @@ pub(crate) fn generate(source: &Path, package: &str, version: &str) -> Result<In
             kind: entry.kind,
             package: entry.package,
             name: entry.name,
+            defined_in: entry.defined_in,
             callable: entry.callable,
             summary: entry.summary,
             keywords: entry.keywords,
@@ -319,12 +362,79 @@ impl Index {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum EmbedMode {
+    Auto,
+    CachedOnly,
+    KeywordsOnly,
+}
+
+#[derive(Debug)]
+struct LibraryLayer {
+    package: String,
+    entries: Vec<Entry>,
+    categories: IndexCategories,
+    cache_key: Option<String>,
+    vectors: RefCell<Option<Vec<[u8; DIMENSIONS]>>>,
+}
+
+impl LibraryLayer {
+    fn from_index(index: Index, cache_key: Option<String>) -> Self {
+        Self {
+            package: index.package,
+            entries: index.entries,
+            categories: index.categories,
+            cache_key,
+            vectors: RefCell::new(None),
+        }
+    }
+
+    fn vectors(&self, model: Option<&Model>, embed_mode: EmbedMode) -> Vec<[u8; DIMENSIONS]> {
+        let mut guard = self.vectors.borrow_mut();
+        let vectors = guard.get_or_insert_with(|| match self.cache_key.as_deref() {
+            Some(key) => library_cache::load_cached_vectors(key, &self.entries),
+            None => vec![[0; DIMENSIONS]; self.entries.len()],
+        });
+        if embed_mode == EmbedMode::Auto
+            && let (Some(key), Some(model)) = (self.cache_key.as_deref(), model)
+            && let Err(error) =
+                library_cache::ensure_cached_vectors(key, &self.entries, vectors, model)
+        {
+            eprintln!(
+                "xpd: cannot cache vectors for {}: {error:#}. Search uses keywords only.",
+                self.package
+            );
+        }
+        vectors.clone()
+    }
+}
+
 #[derive(Debug)]
 pub(crate) struct Library {
-    local: Option<Vec<Entry>>,
-    overlay: Option<(String, IndexCategories)>,
+    include_bundled: bool,
+    layers: Vec<LibraryLayer>,
+    embed_mode: EmbedMode,
     /// Loaded on the first search, so `api` never loads it. `None` inside when it is absent.
     model: OnceCell<Option<Model>>,
+}
+
+/// Stable cache key for a local index file path.
+pub(crate) fn file_cache_key(path: &Path) -> String {
+    let resolved = std::fs::canonicalize(path)
+        .or_else(|_| std::path::absolute(path))
+        .unwrap_or_else(|_| path.to_path_buf());
+    format!("file:{}", resolved.display())
+}
+
+/// Bundled package names and their symbol counts.
+pub(crate) fn bundled_package_counts() -> BTreeMap<&'static str, usize> {
+    let mut counts = BTreeMap::new();
+    for record in RECORDS {
+        if record.kind == Kind::Symbol {
+            *counts.entry(record.package).or_default() += 1;
+        }
+    }
+    counts
 }
 
 impl Library {
@@ -332,6 +442,7 @@ impl Library {
     /// on this machine. The hook searches on every prompt, and it must not wait for a download.
     pub(crate) fn without_download(self, project: &Path) -> Self {
         Self {
+            embed_mode: EmbedMode::CachedOnly,
             model: OnceCell::from(Model::cached(project)),
             ..self
         }
@@ -340,31 +451,58 @@ impl Library {
     /// The same library, searched by keywords only.
     pub(crate) fn keywords_only(self) -> Self {
         Self {
+            embed_mode: EmbedMode::KeywordsOnly,
             model: OnceCell::from(None),
             ..self
         }
     }
 
-    /// The embedding model, which is used for the embedded records only.
+    /// The embedding model, respecting the configured embedding mode.
     fn model(&self) -> Option<&Model> {
-        if self.local.is_some() {
-            return None;
+        match self.embed_mode {
+            EmbedMode::KeywordsOnly => None,
+            EmbedMode::CachedOnly => self.model.get().and_then(Option::as_ref),
+            EmbedMode::Auto => self.model.get_or_init(Model::open).as_ref(),
         }
-        self.model.get_or_init(Model::open).as_ref()
     }
 
     /// Opens or downloads the embedding model and reports whether semantic search is available.
     pub(crate) fn ensure_model(&self) -> bool {
         self.model().is_some()
     }
+
+    fn effective_layers(&self) -> Vec<usize> {
+        let mut latest_by_package = BTreeMap::new();
+        for (index, layer) in self.layers.iter().enumerate() {
+            latest_by_package.insert(layer.package.as_str(), index);
+        }
+        let mut active: Vec<usize> = latest_by_package.into_values().collect();
+        active.sort_unstable();
+        active
+    }
+
+    fn shadowed_packages(&self) -> BTreeSet<&str> {
+        self.layers
+            .iter()
+            .map(|layer| layer.package.as_str())
+            .collect()
+    }
+
+    fn layer_for_package(&self, package: &str) -> Option<&LibraryLayer> {
+        self.layers
+            .iter()
+            .rev()
+            .find(|layer| layer.package == package)
+    }
 }
 
 impl Library {
     fn portable_policy(&self, categories: &Categories, package: &str) -> Option<&IndexCategories> {
-        self.overlay
-            .as_ref()
-            .filter(|(name, _)| name == package && !categories.has_policy(package))
-            .map(|(_, policy)| policy)
+        if categories.has_policy(package) {
+            return None;
+        }
+        self.layer_for_package(package)
+            .map(|layer| &layer.categories)
     }
 
     fn module_category(&self, categories: &Categories, package: &str, module: &str) -> Category {
@@ -394,18 +532,14 @@ impl Library {
                 BTreeSet::from([self.module_category(categories, &entry.package, entry.module())])
             }
             Kind::Rule => {
-                if self
-                    .overlay
-                    .as_ref()
-                    .is_some_and(|(package, _)| package == &entry.package)
+                if let Some(layer) = self.layer_for_package(&entry.package)
                     && !RECORDS
                         .iter()
                         .any(|record| record.kind == Kind::Rule && record.name == entry.name)
                 {
-                    let mut linked = self
-                        .local
+                    let mut linked = layer
+                        .entries
                         .iter()
-                        .flatten()
                         .filter(|symbol| {
                             symbol.kind == Kind::Symbol && symbol.rules.contains(&entry.name)
                         })
@@ -452,60 +586,100 @@ impl Library {
     }
 }
 
-pub(crate) fn load(extra: Option<&Path>) -> Result<Library> {
-    let (local, overlay) = if let Some(path) = extra {
-        let index: Index = serde_json::from_str(&std::fs::read_to_string(path)?)?;
+fn read_index_file(path: &Path) -> Result<Index> {
+    let raw = std::fs::read_to_string(path)
+        .with_context(|| format!("cannot read index {}", path.display()))?;
+    let index: Index = serde_json::from_str(&raw)
+        .with_context(|| format!("cannot parse index {}", path.display()))?;
+    validate_index(&index, &path.display().to_string())?;
+    Ok(index)
+}
+
+fn validate_index(index: &Index, label: &str) -> Result<()> {
+    ensure!(
+        index.schema_version == INDEX_SCHEMA,
+        "{label} has index schema {}, and this xpd reads schema {INDEX_SCHEMA}. Build the index again with xpd index.",
+        index.schema_version
+    );
+    for entry in &index.entries {
+        let valid_callable = match entry.kind {
+            Kind::Symbol => entry.callable.is_some(),
+            Kind::Rule | Kind::Recipe => entry.callable.is_none(),
+        };
         ensure!(
-            index.schema_version == INDEX_SCHEMA,
-            "{} has index schema {}, and this xpd reads schema {INDEX_SCHEMA}. Build the index again with xpd index.",
-            path.display(),
-            index.schema_version
+            valid_callable,
+            "{label}: entry {} has invalid callable {:?} for kind {:?}",
+            entry.name,
+            entry.callable,
+            entry.kind
         );
-        for entry in &index.entries {
-            let valid_callable = match entry.kind {
-                Kind::Symbol => entry.callable.is_some(),
-                Kind::Rule | Kind::Recipe => entry.callable.is_none(),
-            };
-            ensure!(
-                valid_callable,
-                "{}: entry {} has invalid callable {:?} for kind {:?}",
-                path.display(),
-                entry.name,
-                entry.callable,
-                entry.kind
-            );
-        }
-        let mut entries = RECORDS
-            .iter()
-            .filter(|e| e.package != index.package || e.kind == Kind::Rule)
-            .map(Stored::entry)
-            .collect::<std::result::Result<Vec<Entry>, _>>()?;
-        entries.extend(index.entries);
-        (Some(entries), Some((index.package, index.categories)))
-    } else {
-        (None, None)
-    };
+    }
+    Ok(())
+}
+
+fn load_specialized_manim() -> Result<LibraryLayer> {
+    let index: Index = serde_json::from_str(include_str!("../indexes/specialized/manim.json"))?;
+    validate_index(&index, "bundled Manim index")?;
+    Ok(LibraryLayer::from_index(
+        index,
+        Some("specialized:manim".to_owned()),
+    ))
+}
+
+pub(crate) fn load(extra: Option<&Path>) -> Result<Library> {
+    let mut layers = Vec::new();
+    if let Some(path) = extra {
+        let index = read_index_file(path)?;
+        layers.push(LibraryLayer::from_index(index, Some(file_cache_key(path))));
+    }
     Ok(Library {
-        local,
-        overlay,
+        include_bundled: true,
+        layers,
+        embed_mode: EmbedMode::Auto,
+        model: OnceCell::new(),
+    })
+}
+
+/// Loads bundled libraries layered with any `[tool.xpd.libraries]` configured for `project`,
+/// an optional `--index` file, and the specialized Manim index when `package == Some("manim")`.
+pub(crate) fn load_for_project(
+    project: &Path,
+    extra: Option<&Path>,
+    package: Option<&str>,
+) -> Result<Library> {
+    let mut layers = Vec::new();
+    if let Ok(settings) = Settings::find(project) {
+        for path in settings.libraries.values() {
+            let index = read_index_file(path)?;
+            layers.push(LibraryLayer::from_index(index, Some(file_cache_key(path))));
+        }
+    }
+    if let Some(path) = extra {
+        let index = read_index_file(path)?;
+        layers.push(LibraryLayer::from_index(index, Some(file_cache_key(path))));
+    }
+    if package == Some("manim") && !layers.iter().any(|layer| layer.package == "manim") {
+        layers.push(load_specialized_manim()?);
+    }
+    Ok(Library {
+        include_bundled: true,
+        layers,
+        embed_mode: EmbedMode::Auto,
         model: OnceCell::new(),
     })
 }
 
 pub(crate) fn load_for(extra: Option<&Path>, package: Option<&str>) -> Result<Library> {
-    if extra.is_some() || package != Some("manim") {
-        return load(extra);
+    if let Ok(cwd) = std::env::current_dir() {
+        load_for_project(&cwd, extra, package)
+    } else {
+        let mut library = load(extra)?;
+        if package == Some("manim") && !library.layers.iter().any(|layer| layer.package == "manim")
+        {
+            library.layers.push(load_specialized_manim()?);
+        }
+        Ok(library)
     }
-    let index: Index = serde_json::from_str(include_str!("../indexes/specialized/manim.json"))?;
-    ensure!(
-        index.schema_version == INDEX_SCHEMA,
-        "rebuild the bundled Manim index for schema {INDEX_SCHEMA}"
-    );
-    Ok(Library {
-        local: Some(index.entries),
-        overlay: None,
-        model: OnceCell::new(),
-    })
 }
 
 impl Entry {
@@ -541,6 +715,7 @@ impl Entry {
             kind: Kind::Symbol,
             package: self.package,
             name: format!("{}.{}", self.name, member.name),
+            defined_in: self.defined_in,
             callable: Some(callable),
             parameters: member.parameters,
             parameters_written: member.parameters_written,
@@ -556,14 +731,22 @@ impl Entry {
 
 /// The entry named `name`, or else the member that `name` names as `Class.member`.
 pub(crate) fn api(library: &Library, name: &str) -> Result<Option<Entry>> {
+    let shadowed = library.shadowed_packages();
     let entry = |name: &str| -> Result<Option<Entry>> {
-        if let Some(entries) = &library.local {
-            return Ok(entries.iter().find(|e| e.name == name).cloned());
+        for index in library.effective_layers().into_iter().rev() {
+            let layer = &library.layers[index];
+            if let Some(found) = layer.entries.iter().find(|entry| entry.name == name) {
+                return Ok(Some(found.clone()));
+            }
+        }
+        if !library.include_bundled {
+            return Ok(None);
         }
         RECORDS
             .iter()
-            .find(|e| e.name == name)
-            .map(|e| e.entry().context("embedded entry"))
+            .filter(|record| record.kind == Kind::Rule || !shadowed.contains(record.package))
+            .find(|record| record.name == name)
+            .map(|record| record.entry().context("embedded entry"))
             .transpose()
     };
     if let Some(found) = entry(name)? {
@@ -591,15 +774,27 @@ pub(crate) fn methods(
             methods.entry(member.name).or_default().push(method);
         }
     };
-    if let Some(entries) = &library.local {
-        for class in entries.iter().filter(|e| packages.contains(&e.package)) {
-            add(class.clone());
+    let shadowed = library.shadowed_packages();
+    for index in library.effective_layers() {
+        let layer = &library.layers[index];
+        if packages.contains(&layer.package) {
+            for class in layer
+                .entries
+                .iter()
+                .filter(|entry| entry.kind == Kind::Symbol)
+            {
+                add(class.clone());
+            }
         }
-        return Ok(methods);
     }
-    for record in RECORDS {
-        if record.kind == Kind::Symbol && packages.contains(record.package) {
-            add(record.entry().context("embedded entry")?);
+    if library.include_bundled {
+        for record in RECORDS {
+            if record.kind == Kind::Symbol
+                && !shadowed.contains(record.package)
+                && packages.contains(record.package)
+            {
+                add(record.entry().context("embedded entry")?);
+            }
         }
     }
     Ok(methods)
@@ -707,6 +902,42 @@ pub(crate) fn find(
     find_in_category(library, query, package, kind, limit, None)
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+enum Candidate {
+    Bundled(usize),
+    Layer(usize, usize),
+}
+
+impl Candidate {
+    fn kind(self, library: &Library) -> Kind {
+        match self {
+            Self::Bundled(index) => RECORDS[index].kind,
+            Self::Layer(layer, index) => library.layers[layer].entries[index].kind,
+        }
+    }
+
+    fn name(self, library: &Library) -> &str {
+        match self {
+            Self::Bundled(index) => RECORDS[index].name,
+            Self::Layer(layer, index) => &library.layers[layer].entries[index].name,
+        }
+    }
+
+    fn is_playbook(self, library: &Library) -> bool {
+        match self {
+            Self::Bundled(index) => RECORDS[index].is_playbook(),
+            Self::Layer(layer, index) => library.layers[layer].entries[index].is_playbook(),
+        }
+    }
+
+    fn to_entry(self, library: &Library) -> Entry {
+        match self {
+            Self::Bundled(index) => RECORDS[index].entry().expect("build validated index entry"),
+            Self::Layer(layer, index) => library.layers[layer].entries[index].clone(),
+        }
+    }
+}
+
 pub(crate) fn find_in_category(
     library: &Library,
     query: &str,
@@ -715,25 +946,105 @@ pub(crate) fn find_in_category(
     limit: Option<usize>,
     category: Option<(&Categories, Category)>,
 ) -> Matches {
-    if let Some(entries) = &library.local {
-        return Matches::collect(
-            find_dynamic(entries, query, package, kind)
+    let shadowed = library.shadowed_packages();
+    let active_layers: Vec<usize> = library
+        .effective_layers()
+        .into_iter()
+        .filter(|&layer_idx| {
+            let layer = &library.layers[layer_idx];
+            package.is_none_or(|pkg| layer.package == pkg)
+                && layer
+                    .entries
+                    .iter()
+                    .any(|entry| kind.is_none_or(|wanted| entry.kind == wanted))
+        })
+        .collect();
+    let passes = |record: &Stored| {
+        (record.kind == Kind::Rule || !shadowed.contains(record.package))
+            && package.is_none_or(|pkg| record.package == pkg)
+            && kind.is_none_or(|wanted| record.kind == wanted)
+    };
+    if active_layers.is_empty() && library.include_bundled {
+        return find_bundled_only(library, query, package, kind, limit, category, &passes);
+    }
+
+    let mut ranked = Vec::new();
+    if library.include_bundled {
+        ranked.extend(
+            keyword_ranking(query, passes)
                 .into_iter()
-                .filter(|e| {
-                    category.is_none_or(|(policy, value)| {
-                        library.entry_categories(policy, e).contains(&value)
-                    })
-                })
-                .cloned(),
-            limit,
+                .map(|(index, score)| (Candidate::Bundled(index), score)),
         );
     }
-    let passes =
-        |e: &Stored| package.is_none_or(|p| e.package == p) && kind.is_none_or(|k| e.kind == k);
+    for &layer_idx in &active_layers {
+        ranked.extend(layer_keyword_ranking(
+            &library.layers[layer_idx],
+            layer_idx,
+            query,
+            package,
+            kind,
+        ));
+    }
+    sort_candidates(library, &mut ranked);
+
+    if let Some(model) = library.model() {
+        let mut queries = vec![query];
+        if kind.is_none_or(|wanted| wanted == Kind::Rule) && limit != Some(0) {
+            queries.extend(rule_query_parts(query));
+        }
+        match model.queries(&queries) {
+            Ok(query_vectors) => {
+                let mut meaning = Vec::new();
+                if library.include_bundled {
+                    meaning.extend(
+                        meaning_ranking(&query_vectors[0], passes)
+                            .into_iter()
+                            .map(|(index, score)| (Candidate::Bundled(index), score)),
+                    );
+                }
+                for &layer_idx in &active_layers {
+                    let layer = &library.layers[layer_idx];
+                    let vectors = layer.vectors(Some(model), library.embed_mode);
+                    meaning.extend(layer_meaning_ranking(
+                        layer,
+                        layer_idx,
+                        &vectors,
+                        &query_vectors[0],
+                        package,
+                        kind,
+                    ));
+                }
+                sort_candidates(library, &mut meaning);
+                ranked = fuse_candidates(library, &ranked, &meaning);
+                prioritize_rule_candidates(
+                    &mut ranked,
+                    &queries[1..],
+                    &query_vectors[1..],
+                    package,
+                );
+            }
+            Err(error) => {
+                eprintln!("xpd: cannot embed the query: {error:#}. Search uses keywords only.");
+            }
+        }
+    }
+
+    collect_candidates(library, ranked, limit, category)
+}
+
+fn find_bundled_only(
+    library: &Library,
+    query: &str,
+    package: Option<&str>,
+    kind: Option<Kind>,
+    limit: Option<usize>,
+    category: Option<(&Categories, Category)>,
+    passes: &impl Fn(&Stored) -> bool,
+) -> Matches {
     let mut ranked = keyword_ranking(query, passes);
     if let Some(model) = library.model() {
         let mut queries = vec![query];
-        if kind.is_none_or(|kind| kind == Kind::Rule) && limit != Some(0) {
+        if kind.is_none_or(|wanted| wanted == Kind::Rule) && limit != Some(0) {
             queries.extend(rule_query_parts(query));
         }
         match model.queries(&queries) {
@@ -741,7 +1052,9 @@ pub(crate) fn find_in_category(
                 ranked = fuse(&ranked, &meaning_ranking(&vectors[0], passes));
                 prioritize_rules(&mut ranked, &queries[1..], &vectors[1..], package);
             }
-            Err(e) => eprintln!("xpd: cannot embed the query: {e:#}. Search uses keywords only."),
+            Err(error) => {
+                eprintln!("xpd: cannot embed the query: {error:#}. Search uses keywords only.");
+            }
         }
     }
     let mut counts = [0; 3];
@@ -750,23 +1063,10 @@ pub(crate) fn find_in_category(
             .into_iter()
             .filter(|(i, _)| {
                 let record = &RECORDS[*i];
-                if let Some((policy, wanted)) = category {
-                    let matches = match record.kind {
-                        Kind::Symbol => {
-                            let module = public_module(record.package, record.name);
-                            library.module_category(policy, record.package, module) == wanted
-                        }
-                        Kind::Rule => policy
-                            .bundled_rule(record.package, record.name)
-                            .contains(&wanted),
-                        Kind::Recipe => {
-                            let recipe = record.entry().expect("build validated recipe");
-                            library.entry_categories(policy, &recipe).contains(&wanted)
-                        }
-                    };
-                    if !matches {
-                        return false;
-                    }
+                if let Some((policy, wanted)) = category
+                    && !bundled_matches_category(library, record, policy, wanted)
+                {
+                    return false;
                 }
                 let (slot, default) = record.kind.group();
                 counts[slot] += 1;
@@ -775,6 +1075,240 @@ pub(crate) fn find_in_category(
             .map(|(i, _)| RECORDS[i].entry().expect("build validated index entry")),
         limit,
     )
+}
+
+fn collect_candidates(
+    library: &Library,
+    ranked: Vec<(Candidate, f64)>,
+    limit: Option<usize>,
+    category: Option<(&Categories, Category)>,
+) -> Matches {
+    let mut counts = [0; 3];
+    Matches::collect(
+        ranked
+            .into_iter()
+            .filter(|&(candidate, _)| {
+                if let Some((policy, wanted)) = category {
+                    let matches = match candidate {
+                        Candidate::Bundled(index) => {
+                            bundled_matches_category(library, &RECORDS[index], policy, wanted)
+                        }
+                        Candidate::Layer(layer_idx, entry_idx) => library
+                            .entry_categories(policy, &library.layers[layer_idx].entries[entry_idx])
+                            .contains(&wanted),
+                    };
+                    if !matches {
+                        return false;
+                    }
+                }
+                let (slot, default) = candidate.kind(library).group();
+                counts[slot] += 1;
+                counts[slot] <= limit.unwrap_or(default)
+            })
+            .map(|(candidate, _)| candidate.to_entry(library)),
+        limit,
+    )
+}
+
+fn bundled_matches_category(
+    library: &Library,
+    record: &Stored,
+    policy: &Categories,
+    wanted: Category,
+) -> bool {
+    match record.kind {
+        Kind::Symbol => {
+            let module = public_module(record.package, record.name);
+            library.module_category(policy, record.package, module) == wanted
+        }
+        Kind::Rule => policy
+            .bundled_rule(record.package, record.name)
+            .contains(&wanted),
+        Kind::Recipe => {
+            let recipe = record.entry().expect("build validated recipe");
+            library.entry_categories(policy, &recipe).contains(&wanted)
+        }
+    }
+}
+
+fn sort_candidates(library: &Library, ranked: &mut [(Candidate, f64)]) {
+    ranked.sort_by(|(a, sa), (b, sb)| {
+        sb.total_cmp(sa)
+            .then_with(|| b.is_playbook(library).cmp(&a.is_playbook(library)))
+            .then_with(|| a.name(library).cmp(b.name(library)))
+    });
+}
+
+fn fuse_candidates(
+    library: &Library,
+    keywords: &[(Candidate, f64)],
+    meaning: &[(Candidate, f64)],
+) -> Vec<(Candidate, f64)> {
+    let mut fused = BTreeMap::<Candidate, f64>::new();
+    for (ranking, weight, bonus) in [
+        (keywords, 1.15, [0.05, 0.02, 0.02]),
+        (meaning, 1.0, [0.0; 3]),
+    ] {
+        let mut counts = [0_u32; 3];
+        for &(candidate, _) in ranking {
+            let (slot, _) = candidate.kind(library).group();
+            counts[slot] += 1;
+            let rank = counts[slot];
+            let top = usize::try_from(rank - 1)
+                .ok()
+                .and_then(|place| bonus.get(place))
+                .copied()
+                .unwrap_or_default();
+            *fused.entry(candidate).or_default() += weight / (FUSION_K + f64::from(rank)) + top;
+        }
+    }
+    let mut ranked: Vec<_> = fused.into_iter().collect();
+    sort_candidates(library, &mut ranked);
+    ranked
+}
+
+fn prioritize_rule_candidates(
+    ranked: &mut [(Candidate, f64)],
+    queries: &[&str],
+    vectors: &[Vec<f32>],
+    package: Option<&str>,
+) {
+    if queries.is_empty() {
+        return;
+    }
+    let rankings: Vec<_> = vectors
+        .iter()
+        .map(|vector| {
+            meaning_ranking(vector, |entry| {
+                entry.kind == Kind::Rule && package.is_none_or(|pkg| entry.package == pkg)
+            })
+        })
+        .collect();
+    let leads: Vec<_> = rankings
+        .iter()
+        .filter_map(|ranking| ranking.first().map(|&(index, _)| Candidate::Bundled(index)))
+        .collect();
+    ranked.sort_by_key(|&(candidate, _)| !leads.contains(&candidate));
+}
+
+fn layer_keyword_ranking(
+    layer: &LibraryLayer,
+    layer_idx: usize,
+    query: &str,
+    package: Option<&str>,
+    kind: Option<Kind>,
+) -> Vec<(Candidate, f64)> {
+    let documents = layer
+        .entries
+        .iter()
+        .map(|entry| {
+            let qualified = match entry.defined_in.as_deref() {
+                Some(module) if module != entry.package && !entry.name.starts_with(module) => {
+                    format!("{} {module}", entry.name)
+                }
+                _ => entry.name.clone(),
+            };
+            let enriched_summary = match entry.defined_in.as_deref() {
+                Some(module) if module != entry.package && !entry.name.starts_with(module) => {
+                    let module_words = module.replace('.', " ");
+                    if entry.summary.is_empty() {
+                        module_words
+                    } else {
+                        format!("{} {module_words}", entry.summary)
+                    }
+                }
+                _ => entry.summary.clone(),
+            };
+            [
+                entry
+                    .name
+                    .rsplit('.')
+                    .next()
+                    .unwrap_or(&entry.name)
+                    .to_owned(),
+                qualified,
+                enriched_summary,
+                serde_json::to_string(&entry.parameters).unwrap_or_default(),
+                serde_json::to_string(&entry.keywords).unwrap_or_default(),
+                entry
+                    .members
+                    .iter()
+                    .map(|member| member.summary.as_str())
+                    .collect::<Vec<_>>()
+                    .join(" "),
+            ]
+        })
+        .collect::<Vec<_>>();
+    let table = crate::search::weights(&documents);
+    let words: BTreeSet<_> = tokens(query).into_iter().collect();
+    let mut scores = vec![0.0; layer.entries.len()];
+    for word in &words {
+        if let Some(postings) = table.get(word) {
+            for &(index, score) in postings {
+                scores[index] += score;
+            }
+        }
+    }
+    layer
+        .entries
+        .iter()
+        .enumerate()
+        .zip(scores)
+        .filter(|((_, entry), score)| {
+            *score > 0.0
+                && package.is_none_or(|pkg| entry.package == pkg)
+                && kind.is_none_or(|wanted| entry.kind == wanted)
+        })
+        .map(|((entry_idx, entry), score)| {
+            (
+                Candidate::Layer(layer_idx, entry_idx),
+                rank_score(
+                    &entry.name,
+                    &entry.summary,
+                    entry.kind,
+                    query,
+                    words.len(),
+                    score,
+                ),
+            )
+        })
+        .collect()
+}
+
+fn layer_meaning_ranking(
+    layer: &LibraryLayer,
+    layer_idx: usize,
+    vectors: &[[u8; DIMENSIONS]],
+    meaning: &[f32],
+    package: Option<&str>,
+    kind: Option<Kind>,
+) -> Vec<(Candidate, f64)> {
+    layer
+        .entries
+        .iter()
+        .enumerate()
+        .zip(vectors)
+        .filter(|((_, entry), _)| {
+            package.is_none_or(|pkg| entry.package == pkg)
+                && kind.is_none_or(|wanted| entry.kind == wanted)
+        })
+        .filter_map(|((entry_idx, _), vector)| {
+            let (dot, norm) =
+                vector
+                    .iter()
+                    .zip(meaning)
+                    .fold((0.0, 0.0), |(dot, norm), (&v, &m)| {
+                        let v = f32::from(v.cast_signed());
+                        (dot + v * m, norm + v * v)
+                    });
+            (norm > 0.0).then(|| {
+                (
+                    Candidate::Layer(layer_idx, entry_idx),
+                    f64::from(dot / norm.sqrt()),
+                )
+            })
+        })
+        .collect()
 }
 
 fn rule_query_parts(query: &str) -> Vec<&str> {
@@ -1031,62 +1565,6 @@ pub(crate) fn write_vectors(path: &Path) -> Result<()> {
         RECORDS.len() - missing.len()
     );
     std::fs::write(path, data).with_context(|| format!("cannot write {}", path.display()))
-}
-
-fn find_dynamic<'a>(
-    entries: &'a [Entry],
-    query: &str,
-    package: Option<&str>,
-    kind: Option<Kind>,
-) -> Vec<&'a Entry> {
-    let documents = entries
-        .iter()
-        .map(|e| {
-            [
-                e.name.rsplit('.').next().unwrap_or(&e.name).to_owned(),
-                e.name.clone(),
-                e.summary.clone(),
-                serde_json::to_string(&e.parameters).unwrap_or_default(),
-                serde_json::to_string(&e.keywords).unwrap_or_default(),
-                e.members
-                    .iter()
-                    .map(|m| m.summary.as_str())
-                    .collect::<Vec<_>>()
-                    .join(" "),
-            ]
-        })
-        .collect::<Vec<_>>();
-    let table = crate::search::weights(&documents);
-    let words: BTreeSet<_> = tokens(query).into_iter().collect();
-    let mut scores = vec![0.0; entries.len()];
-    for word in &words {
-        if let Some(postings) = table.get(word) {
-            for &(i, score) in postings {
-                scores[i] += score;
-            }
-        }
-    }
-    let mut ranked = entries
-        .iter()
-        .zip(scores)
-        .filter(|(e, score)| {
-            *score > 0.0
-                && package.is_none_or(|p| e.package == p)
-                && kind.is_none_or(|k| e.kind == k)
-        })
-        .map(|(e, score)| {
-            (
-                e,
-                rank_score(&e.name, &e.summary, e.kind, query, words.len(), score),
-            )
-        })
-        .collect::<Vec<_>>();
-    ranked.sort_by(|(a, sa), (b, sb)| {
-        sb.total_cmp(sa)
-            .then_with(|| b.is_playbook().cmp(&a.is_playbook()))
-            .then_with(|| a.name.cmp(&b.name))
-    });
-    ranked.into_iter().map(|(e, _)| e).collect()
 }
 
 fn rank_score(

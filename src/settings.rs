@@ -11,6 +11,7 @@
 //! project file sets wins over the user's file. The project file also holds the record of
 //! `xpd doctor`'s profile, the `[tool.xpd.profile]` table, which doctor reads and checks.
 
+use std::collections::BTreeMap;
 use std::env;
 use std::path::{Path, PathBuf};
 
@@ -28,11 +29,14 @@ const PROJECT_TABLE: [&str; 2] = ["tool", "xpd"];
 const STYLE: &str = "style";
 /// The key of the profile record, which only the project file holds.
 const PROFILE: &str = "profile";
+/// The table of local project library indexes, which only the project file holds.
+const LIBRARIES: &str = "libraries";
 
 /// What the settings files say for one project.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub(crate) struct Settings {
     pub(crate) style: Style,
+    pub(crate) libraries: BTreeMap<String, PathBuf>,
 }
 
 impl Settings {
@@ -44,15 +48,19 @@ impl Settings {
     }
 
     pub(crate) fn find_in(project: &Path, invocation_dir: &Path) -> Result<Self> {
-        let project_style = match project_table(project)? {
+        let (project_style, libraries) = match project_table(project)? {
             Some((file, doc)) => {
                 let table = toml::get(&doc, &PROJECT_TABLE).and_then(|item| item.as_table_like());
-                table
-                    .map(|table| style(table, &file, &[STYLE, PROFILE]))
-                    .transpose()?
-                    .flatten()
+                match table {
+                    Some(table) => {
+                        let parsed_style = style(table, &file, &[STYLE, PROFILE, LIBRARIES])?;
+                        let parsed_libraries = libraries(table, &file)?;
+                        (parsed_style, parsed_libraries)
+                    }
+                    None => (None, BTreeMap::new()),
+                }
             }
-            None => None,
+            None => (None, BTreeMap::new()),
         };
         let style = match project_style {
             Some(style) => Some(style),
@@ -60,8 +68,51 @@ impl Settings {
         };
         Ok(Self {
             style: style.unwrap_or_default(),
+            libraries,
         })
     }
+}
+
+/// Parses `[tool.xpd.libraries]` entries as `package = "path/to/index.json"`, resolved against
+/// the folder containing `file`.
+fn libraries(table: &dyn TableLike, file: &Path) -> Result<BTreeMap<String, PathBuf>> {
+    let Some(item) = table.get(LIBRARIES) else {
+        return Ok(BTreeMap::new());
+    };
+    let Some(entries) = item.as_table_like() else {
+        let found = toml::Observed::of_item(item)
+            .map_or_else(|| "an array of tables".to_owned(), |value| value.show());
+        bail!(
+            "{}: {LIBRARIES} is {found}, and it must be a table mapping package names to index file paths",
+            file.display()
+        );
+    };
+    let root = file.parent().unwrap_or_else(|| Path::new(""));
+    let mut configured = BTreeMap::new();
+    for (package, value) in entries.iter() {
+        let Some(raw_path) = value.as_str() else {
+            let found = toml::Observed::of_item(value)
+                .map_or_else(|| "a table".to_owned(), |obs| obs.show());
+            bail!(
+                "{}: {LIBRARIES}.{package} is {found}, and it must be a string path to an index JSON file",
+                file.display()
+            );
+        };
+        if raw_path.trim().is_empty() {
+            bail!(
+                "{}: {LIBRARIES}.{package} must not be empty",
+                file.display()
+            );
+        }
+        let path = PathBuf::from(raw_path);
+        let resolved = if path.is_absolute() {
+            path
+        } else {
+            root.join(path)
+        };
+        configured.insert(package.to_owned(), resolved);
+    }
+    Ok(configured)
 }
 
 /// The closest `pyproject.toml` at or above `project` that has a `[tool.xpd]` table.

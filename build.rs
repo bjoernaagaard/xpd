@@ -52,6 +52,7 @@ const PLUGIN_MCP: &str = "mcp.json";
 const VECTORS: &str = "indexes/vectors.bin";
 use search::{
     DIMENSIONS, TAG_ARRAY, TAG_FALSE, TAG_NULL, TAG_OBJECT, TAG_STRING, TAG_TRUE, VECTORS_HEADER,
+    text_hash,
 };
 /// Fails the build when the plugin names another version than the crate, so a release
 /// cannot ship skills under an old version or start an old xpd.
@@ -558,17 +559,6 @@ fn playbooks(docs: &BTreeMap<String, BTreeMap<String, String>>) -> Result<Vec<se
         }));
     }
     Ok(entries)
-}
-
-/// The FNV-1a hash of the text that a record's vector is made from, which is its name and its
-/// summary. A record whose text changed gets another hash, so its stored vector is dropped.
-fn text_hash(name: &str, summary: &str) -> u64 {
-    name.bytes()
-        .chain([0])
-        .chain(summary.bytes())
-        .fold(0xcbf2_9ce4_8422_2325, |hash, byte| {
-            (hash ^ u64::from(byte)).wrapping_mul(0x0000_0100_0000_01b3)
-        })
 }
 
 /// Writes `OUT_DIR/vectors.bin`, the vector of each entry in the order of the entries. An entry
