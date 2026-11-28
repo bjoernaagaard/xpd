@@ -51,7 +51,7 @@ $ xpd discover gate rename-clean --format json | jq -c '.run.rounds[0][0] | {out
 $ xpd discover titles.py notes.py --format json | jq -c .read
 {"files":2,"public_names":2,"defined_once":2}
 $ xpd discover finish --format json | jq -c .run.finished
-xpd: 3 findings at the start, 0 now: 3 fixed, 0 added, 0 left without a reason; lines 4 -> 4
+xpd: 3 findings at the start, 0 now: 3 fixed, 0 added, 0 accepted, 0 left without a reason; lines 4 -> 4
 true
 ```
 

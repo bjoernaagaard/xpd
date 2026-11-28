@@ -109,6 +109,37 @@ pub(super) struct Facts {
     pub(super) local: Vec<Local>,
 }
 
+impl Facts {
+    pub(super) fn zone(&self) -> Zone {
+        self.zone
+    }
+
+    pub(super) fn loc(&self) -> usize {
+        self.loc
+    }
+}
+
+/// One resolved import edge between two surveyed Python modules.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) struct Edge {
+    pub(super) from: usize,
+    pub(super) to: usize,
+    pub(super) eager: bool,
+}
+
+/// Every resolved import edge between surveyed Python modules, noting whether an eager
+/// top-level import connects the pair.
+pub(super) fn edges(modules: &[Module]) -> Vec<Edge> {
+    let graph = Graph::new(modules);
+    let mut found = Vec::new();
+    for (from, targets) in graph.imports.iter().enumerate() {
+        for &to in targets.keys() {
+            let eager = graph.eager_imports[from].contains_key(&to);
+            found.push(Edge { from, to, eager });
+        }
+    }
+    found
+}
 /// A finding of one file: its kind, its line, its evidence and how strong the evidence is.
 pub(super) type Local = (Kind, usize, String, usize);
 

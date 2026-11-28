@@ -1,5 +1,6 @@
 mod copies;
 mod history;
+mod map;
 mod python;
 mod redundancy;
 mod zones;
@@ -162,6 +163,7 @@ struct Read {
 #[command(after_long_help = "Examples:
   xpd untangle
   xpd untangle src/ --format json
+  xpd untangle src/ --map
   xpd untangle --kind copy,changes-together --limit 0
   xpd untangle --since main")]
 pub(crate) struct UntangleArgs {
@@ -169,6 +171,9 @@ pub(crate) struct UntangleArgs {
     select: Select<Kind>,
     #[arg(long)]
     questions: bool,
+    /// Print a Mermaid (or JSON with --format json) module coupling and health map.
+    #[arg(long)]
+    map: bool,
 }
 
 impl UntangleArgs {
@@ -176,6 +181,27 @@ impl UntangleArgs {
         let catalog = ledger::Catalog::load(include_str!("../rules/xpd/untangle.yml"))?;
         if self.questions {
             return catalog.print(self.select.format_override().unwrap_or(default));
+        }
+        if self.map {
+            let paths = self.select.paths();
+            let top = ledger::repository(&paths[0]);
+            let files = Tree {
+                top: top.as_deref(),
+                shown_from: None,
+            };
+            let history = top
+                .as_deref()
+                .map_or_else(History::default, |top| History::read(top, "HEAD"));
+            let listing = Listing::of(paths, files, top.as_deref(), "HEAD")?;
+            let collected = collect(files, &listing, &history)?;
+            let edges = python::edges(&collected.modules);
+            map::print(
+                &collected.modules,
+                &edges,
+                &collected.findings,
+                self.select.format_override().unwrap_or(default),
+            )?;
+            return Ok(ExitCode::SUCCESS);
         }
         let survey = |paths: &[PathBuf],
                       files: Tree<'_>,
@@ -354,15 +380,16 @@ fn changed_together(
     findings
 }
 
-/// What was read and every finding of the files that `listing` lists, by group, kind and
-/// strength. The rules of `xpd check` take a
-/// moment to compile, so they are loaded only when a Python file is read.
-fn survey(
-    tree: Tree<'_>,
-    listing: &Listing,
-    history: &History,
-    catalog: &ledger::Catalog,
-) -> Result<SurveyOutput<Kind, Read>> {
+/// Raw survey state shared between the ledger report and `--map`.
+struct Collected {
+    read: Read,
+    findings: Vec<Finding>,
+    tracked: HashMap<String, String>,
+    modules: Vec<python::Module>,
+}
+
+/// Surveys `listing` and `history`, returning the modules and unindexed findings.
+fn collect(tree: Tree<'_>, listing: &Listing, history: &History) -> Result<Collected> {
     let files = &listing.files;
     let workspace = (files
         .iter()
@@ -428,5 +455,28 @@ fn survey(
         &shown_as,
         &python::imports(&modules),
     ));
+    Ok(Collected {
+        read,
+        findings,
+        tracked,
+        modules,
+    })
+}
+
+/// What was read and every finding of the files that `listing` lists, by group, kind and
+/// strength. The rules of `xpd check` take a
+/// moment to compile, so they are loaded only when a Python file is read.
+fn survey(
+    tree: Tree<'_>,
+    listing: &Listing,
+    history: &History,
+    catalog: &ledger::Catalog,
+) -> Result<SurveyOutput<Kind, Read>> {
+    let Collected {
+        read,
+        findings,
+        tracked,
+        ..
+    } = collect(tree, listing, history)?;
     Ok(catalog.modules(read, findings, |path| tracked.get(path).cloned()))
 }

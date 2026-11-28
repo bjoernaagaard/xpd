@@ -460,6 +460,11 @@ impl<K: Kind> Select<K> {
         self.format
     }
 
+    /// Selected paths from the command line.
+    pub(crate) fn paths(&self) -> &[PathBuf] {
+        &self.paths
+    }
+
     /// Prints the ledger of the paths, or runs a stage of a ledger run, forwarding an optional
     /// runtime `adapter` and any per-figure checklist items returned by `survey`.
     pub(crate) fn print_with<R: Serialize>(
@@ -713,7 +718,7 @@ impl<K: Kind, R> Ledger<K, R> {
 }
 
 /// The top folder of the git repository that holds `path`. `None` outside a repository.
-fn repository(path: &Path) -> Option<PathBuf> {
+pub(crate) fn repository(path: &Path) -> Option<PathBuf> {
     let folder = if path.is_dir() {
         path
     } else {

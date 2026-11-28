@@ -45,7 +45,7 @@ $ sed -i 's/        pass/        raise/' loader.py && git -c user.name=xpd -c us
 $ xpd harden gate propagate --format json | jq -c '.run.answered["loader.py/fails-loudly"].verdict'
 "fixed"
 $ xpd harden finish --format json | jq -c .run.finished
-xpd: 1 findings at the start, 0 now: 1 fixed, 0 added, 0 left without a reason; lines 5 -> 5
+xpd: 1 findings at the start, 0 now: 1 fixed, 0 added, 0 accepted, 0 left without a reason; lines 5 -> 5
 true
 ```
 

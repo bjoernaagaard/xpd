@@ -85,7 +85,7 @@ Inspect the checklist and record your reasons before finishing. The scratch revi
 $ xpd opt-review solve.py --format json | jq '{answered:[.checklist[]|{item:.id,verdict:"accepted",reason:"Scratch solve verified against its known optimum; no allocation decision is made."}]}' | xpd opt-review plan - --format json | jq -r '.next.stage'
 plan
 $ xpd opt-review finish --format json | jq -r '.next.stage'
-xpd: 1 findings at the start, 0 now: 1 fixed, 0 added, 0 left without a reason; lines 8 -> 9
+xpd: 1 findings at the start, 0 now: 1 fixed, 0 added, 0 accepted, 0 left without a reason; lines 8 -> 9
 finished
 ```
 

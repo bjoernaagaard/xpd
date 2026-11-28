@@ -14,7 +14,7 @@ Use `xpd untangle` to put pieces that change together in the same module, sever 
 | Surplus | `pass-through`, `default-argument`, `unreferenced`, `constant-parameter`, `orphaned-module`, `facade-module`, `single-use-module` |
 | Special cases | `one-value-branch`, `one-caller-parameter` |
 
-Each module with a finding gets six structural checklist items. Run `xpd untangle --questions` to inspect the catalog. Supported fix goals are `shorter` (requires a lower line count) and `design` (requires editing a file owning a cited checklist item). For a data script refactor, prove behavior did not change with `xpd equiv` and note the result in the commit.
+Each module with a finding gets six structural checklist items. Run `xpd untangle --questions` to inspect the catalog, or `xpd untangle <path> --map` to render a Mermaid module coupling and health map (add `--format json` for structured graph data). Supported fix goals are `shorter` (requires a lower line count) and `design` (requires editing a file owning a cited checklist item). For a data script refactor, prove behavior did not change with `xpd equiv` and note the result in the commit.
 
 ## Recorded run
 

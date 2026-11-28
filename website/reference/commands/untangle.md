@@ -3,11 +3,11 @@ Run `xpd untangle` to find pieces that change together in separate modules, need
 | Group | Finding kinds |
 | --- | --- |
 | Hidden links | `copy`, `near-copy`, `changes-together`, `shared-state` |
-| Needless links | `volatile-import`, `import-cycle`, `private-reach`, `vague-module` |
-| Surplus | `pass-through`, `default-argument`, `unreferenced`, `constant-parameter` |
+| Needless links | `volatile-import`, `import-cycle`, `private-reach`, `vague-module`, `mixed-responsibilities` |
+| Surplus | `pass-through`, `default-argument`, `unreferenced`, `constant-parameter`, `orphaned-module`, `facade-module`, `single-use-module` |
 | Special cases | `one-value-branch`, `one-caller-parameter` |
 
-A module with a finding gets six structural checklist items. Run `xpd untangle --questions` to read the questions and the facts that inform them. The supported fix goals are `shorter` and `design`.
+A module with a finding gets six structural checklist items. Run `xpd untangle --questions` to read the questions and the facts that inform them, or `xpd untangle <paths> --map` to print a Mermaid module coupling and health map (add `--format json` for structured nodes, edges, and hidden links). The supported fix goals are `shorter` and `design`.
 
 A `shorter` fix requires a lower line count. For a data script refactor, run `xpd equiv` on the old and new versions and record the result in the fix commit.
 
